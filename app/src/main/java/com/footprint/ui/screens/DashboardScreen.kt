@@ -94,7 +94,7 @@ fun DashboardScreen(
             title = "本月亮点",
             stats = listOf(
                 "记录" to "${state.summary.monthly.totalEntries}",
-                "活力" to state.summary.monthly.energyAverage.takeIf { it > 0 }?.let { df.format(it) } ?: "-",
+                "活力" to (state.summary.monthly.energyAverage.takeIf { it > 0 }?.let { df.format(it) } ?: "-"),
                 "主情绪" to (state.summary.monthly.dominantMood?.label ?: "待发现")
             )
         )

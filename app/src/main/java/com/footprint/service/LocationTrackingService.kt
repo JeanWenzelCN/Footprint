@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+import android.content.pm.ServiceInfo
+
 /**
  * 后台位置追踪服务
  * 使用前台服务持续获取用户位置信息
@@ -101,10 +103,14 @@ class LocationTrackingService : Service() {
     }
 
     private fun buildNotification(locationCount: Int = 0): Notification {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            putExtra("destination", "map")
+        }
+        
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
-            packageManager.getLaunchIntentForPackage(packageName),
+            launchIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -142,7 +148,12 @@ class LocationTrackingService : Service() {
         }
 
         // 启动前台服务
-        startForeground(NOTIFICATION_ID, buildNotification(0))
+        val notification = buildNotification(0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         // 配置位置请求
         val locationRequest = LocationRequest.Builder(

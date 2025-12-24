@@ -30,10 +30,10 @@ import com.footprint.ui.screens.MapScreen
 import com.footprint.ui.screens.TimelineScreen
 
 @Composable
-fun FootprintApp() {
+fun FootprintApp(initialDestination: FootprintDestination = FootprintDestination.Dashboard) {
     val viewModel: FootprintViewModel = viewModel(factory = FootprintViewModel.Factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var destination by rememberSaveable { mutableStateOf(FootprintDestination.Dashboard) }
+    var destination by rememberSaveable { mutableStateOf(initialDestination) }
     var showEntryDialog by remember { mutableStateOf(false) }
     var showGoalDialog by remember { mutableStateOf(false) }
 

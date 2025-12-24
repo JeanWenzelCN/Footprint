@@ -10,9 +10,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        
+        val initialDestination = if (intent?.getStringExtra("destination") == "map") {
+            FootprintDestination.Map
+        } else {
+            FootprintDestination.Dashboard
+        }
+
         setContent {
             FootprintTheme {
-                FootprintApp()
+                FootprintApp(initialDestination = initialDestination)
             }
         }
     }

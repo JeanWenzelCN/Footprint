@@ -136,7 +136,7 @@ class FootprintViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val application = checkNotNull(
                     extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
-                ) { \"Application was not provided in ViewModel extras\" }
+                ) { "Application was not provided in ViewModel extras" }
                 return FootprintViewModel(application as FootprintApplication) as T
             }
         }

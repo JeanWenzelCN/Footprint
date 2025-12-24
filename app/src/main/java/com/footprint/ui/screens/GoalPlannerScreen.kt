@@ -42,12 +42,12 @@ fun GoalPlannerScreen(
     ) {
         Text(text = "目标驾驶舱", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            PlannerCard(title = "年度打卡", value = "${summary.yearly.totalEntries} 次")
-            PlannerCard(title = "活跃天数", value = summary.daysActiveThisYear.toString())
+            PlannerCard(modifier = Modifier.weight(1f), title = "年度打卡", value = "${summary.yearly.totalEntries} 次")
+            PlannerCard(modifier = Modifier.weight(1f), title = "活跃天数", value = summary.daysActiveThisYear.toString())
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            PlannerCard(title = "连续记录", value = "${summary.streakDays} 天")
-            PlannerCard(title = "本月能量", value = summary.monthly.energyAverage.takeIf { it > 0 }?.toInt()?.toString() ?: "-" )
+            PlannerCard(modifier = Modifier.weight(1f), title = "连续记录", value = "${summary.streakDays} 天")
+            PlannerCard(modifier = Modifier.weight(1f), title = "本月能量", value = summary.monthly.energyAverage.takeIf { it > 0 }?.toInt()?.toString() ?: "-" )
         }
 
         Button(onClick = onAddGoal) { Text("添加目标") }
@@ -70,10 +70,10 @@ fun GoalPlannerScreen(
                     Text(text = "预计：${goal.targetDate.format(formatter)}", style = MaterialTheme.typography.labelMedium)
                     Text(text = goal.notes, style = MaterialTheme.typography.bodySmall)
                     LinearProgressIndicator(
-                        progress = goal.progress.coerceIn(0, 100) / 100f,
+                        progress = { goal.progress.coerceIn(0, 100) / 100f },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp)
+                            .padding(top = 12.dp),
                     )
                 }
             }
@@ -82,9 +82,9 @@ fun GoalPlannerScreen(
 }
 
 @Composable
-private fun PlannerCard(title: String, value: String) {
+private fun PlannerCard(modifier: Modifier = Modifier, title: String, value: String) {
     Card(
-        modifier = Modifier.weight(1f),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
