@@ -15,7 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
-import androidx.compose.material.icons.outlined.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -119,7 +119,7 @@ private fun YearNavigator(year: Int, onBack: () -> Unit, onForward: () -> Unit) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(icon = Icons.Outlined.ArrowBackIosNew, onClick = onBack)
                 Text(text = year.toString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 12.dp))
-                IconButton(icon = Icons.Outlined.ArrowForwardIos, onClick = onForward)
+                IconButton(icon = Icons.AutoMirrored.Outlined.ArrowForwardIos, onClick = onForward)
             }
         }
     }

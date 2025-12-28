@@ -79,6 +79,18 @@ class FootprintViewModel(
         yearFilter.value = (yearFilter.value + delta).coerceIn(1970, maxYear)
     }
 
+    fun updateFootprint(entry: com.footprint.data.model.FootprintEntry) {
+        viewModelScope.launch {
+            repository.saveEntry(entry) // Repository 的 saveEntry 内部使用的是 upsert，所以直接调用即可
+        }
+    }
+
+    fun deleteFootprint(entry: com.footprint.data.model.FootprintEntry) {
+        viewModelScope.launch {
+            repository.deleteEntry(entry.id)
+        }
+    }
+
     fun addFootprint(
         title: String,
         location: String,
@@ -137,6 +149,7 @@ class FootprintViewModel(
                 val application = checkNotNull(
                     extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                 ) { "Application was not provided in ViewModel extras" }
+                @Suppress("UNCHECKED_CAST")
                 return FootprintViewModel(application as FootprintApplication) as T
             }
         }

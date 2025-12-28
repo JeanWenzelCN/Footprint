@@ -1,54 +1,39 @@
 package com.footprint.service
 
-import android.Manifest
 import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.location.Location
 import android.os.Build
 import android.os.IBinder
-import android.os.Looper
-import androidx.core.app.ActivityCompat
+import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.google.android.gms.location.*
+import com.amap.api.location.AMapLocation
+import com.amap.api.location.AMapLocationClient
+import com.amap.api.location.AMapLocationClientOption
+import com.amap.api.location.AMapLocationListener
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-import android.content.pm.ServiceInfo
+class LocationTrackingService : Service(), AMapLocationListener {
 
-/**
- * 后台位置追踪服务
- * 使用前台服务持续获取用户位置信息
- */
-class LocationTrackingService : Service() {
-
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var locationCallback: LocationCallback
-    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
-    private val _isTracking = MutableStateFlow(false)
-    private val _currentLocation = MutableStateFlow<Location?>(null)
-    private val _trackingPath = MutableStateFlow<List<Location>>(emptyList())
-
+    private var locationClient: AMapLocationClient? = null
+    
     companion object {
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "location_tracking_channel"
-        const val CHANNEL_NAME = "位置追踪"
-
         const val ACTION_START_TRACKING = "com.footprint.START_TRACKING"
         const val ACTION_STOP_TRACKING = "com.footprint.STOP_TRACKING"
 
         private val _sharedIsTracking = MutableStateFlow(false)
         val isTracking: StateFlow<Boolean> = _sharedIsTracking.asStateFlow()
 
-        private val _sharedCurrentLocation = MutableStateFlow<Location?>(null)
-        val currentLocation: StateFlow<Location?> = _sharedCurrentLocation.asStateFlow()
+        private val _sharedCurrentLocation = MutableStateFlow<AMapLocation?>(null)
+        val currentLocation: StateFlow<AMapLocation?> = _sharedCurrentLocation.asStateFlow()
 
-        private val _sharedTrackingPath = MutableStateFlow<List<Location>>(emptyList())
-        val trackingPath: StateFlow<List<Location>> = _sharedTrackingPath.asStateFlow()
+        private val _sharedTrackingPath = MutableStateFlow<List<AMapLocation>>(emptyList())
+        val trackingPath: StateFlow<List<AMapLocation>> = _sharedTrackingPath.asStateFlow()
 
         fun startTracking(context: Context) {
             val intent = Intent(context, LocationTrackingService::class.java).apply {
@@ -71,151 +56,86 @@ class LocationTrackingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        createNotificationChannel()
-        setupLocationCallback()
+        initLocationClient()
+    }
+
+    private fun initLocationClient() {
+        try {
+            AMapLocationClient.updatePrivacyShow(applicationContext, true, true)
+            AMapLocationClient.updatePrivacyAgree(applicationContext, true)
+            
+            locationClient = AMapLocationClient(applicationContext)
+            locationClient?.setLocationListener(this)
+            
+            val option = AMapLocationClientOption().apply {
+                locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                interval = 2000L // 2秒刷新一次，更灵敏
+                isNeedAddress = true
+                isMockEnable = true
+                isLocationCacheEnable = false // 禁用缓存，强制获取最新位置
+                isOnceLocation = false
+            }
+            locationClient?.setLocationOption(option)
+        } catch (e: Exception) {
+            Log.e("FootprintLoc", "SDK初始化失败: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START_TRACKING -> startLocationTracking()
-            ACTION_STOP_TRACKING -> stopLocationTracking()
+            ACTION_START_TRACKING -> {
+                startForeground(NOTIFICATION_ID, buildNotification(0))
+                locationClient?.startLocation()
+                _sharedIsTracking.value = true
+                Log.d("FootprintLoc", "定位服务已启动")
+            }
+            ACTION_STOP_TRACKING -> {
+                locationClient?.stopLocation()
+                _sharedIsTracking.value = false
+                stopSelf()
+            }
         }
         return START_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "用于后台持续追踪位置"
-                setShowBadge(false)
+    override fun onLocationChanged(location: AMapLocation?) {
+        if (location != null) {
+            if (location.errorCode == 0) {
+                // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
+                if (location.latitude > 1.0 && location.longitude > 1.0) {
+                    _sharedCurrentLocation.value = location
+                    if (_sharedIsTracking.value) {
+                        val path = _sharedTrackingPath.value.toMutableList()
+                        path.add(location)
+                        _sharedTrackingPath.value = path
+                    }
+                    Log.d("FootprintLoc", "坐标获取成功: ${location.latitude}, ${location.longitude}")
+                }
+            } else {
+                Log.e("FootprintLoc", "定位错误: ${location.errorCode} - ${location.errorInfo}")
             }
-
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
         }
     }
 
-    private fun buildNotification(locationCount: Int = 0): Notification {
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            putExtra("destination", "map")
+    private fun buildNotification(count: Int): Notification {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(CHANNEL_ID, "足迹记录", NotificationManager.IMPORTANCE_LOW)
+            manager.createNotificationChannel(channel)
         }
-        
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            launchIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("足迹正在记录")
-            .setContentText("已记录 $locationCount 个位置点")
+            .setContentTitle("正在探索世界")
+            .setContentText("已捕获点位: $count")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
-    private fun setupLocationCallback() {
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { location ->
-                    updateLocation(location)
-                }
-            }
-        }
-    }
-
-    private fun startLocationTracking() {
-        if (_isTracking.value) return
-
-        // 检查权限
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            stopSelf()
-            return
-        }
-
-        // 启动前台服务
-        val notification = buildNotification(0)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
-
-        // 配置位置请求
-        val locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            5000L // 每5秒更新一次
-        ).apply {
-            setMinUpdateIntervalMillis(2000L) // 最快2秒更新一次
-            setMaxUpdateDelayMillis(10000L)
-        }.build()
-
-        // 开始请求位置更新
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.getMainLooper()
-        )
-
-        _isTracking.value = true
-        _sharedIsTracking.value = true
-
-        // 清空之前的轨迹
-        _trackingPath.value = emptyList()
-        _sharedTrackingPath.value = emptyList()
-    }
-
-    private fun stopLocationTracking() {
-        if (!_isTracking.value) {
-            stopSelf()
-            return
-        }
-
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-        _isTracking.value = false
-        _sharedIsTracking.value = false
-
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
-    }
-
-    private fun updateLocation(location: Location) {
-        _currentLocation.value = location
-        _sharedCurrentLocation.value = location
-
-        // 添加到轨迹路径
-        val currentPath = _trackingPath.value.toMutableList()
-        currentPath.add(location)
-        _trackingPath.value = currentPath
-        _sharedTrackingPath.value = currentPath
-
-        // 更新通知
-        val notification = buildNotification(currentPath.size)
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, notification)
-    }
-
+    override fun onBind(intent: Intent?): IBinder? = null
     override fun onDestroy() {
+        locationClient?.stopLocation()
+        locationClient?.onDestroy()
         super.onDestroy()
-        serviceScope.cancel()
-        if (_isTracking.value) {
-            fusedLocationClient.removeLocationUpdates(locationCallback)
-        }
-        _isTracking.value = false
-        _sharedIsTracking.value = false
     }
 }

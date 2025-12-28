@@ -7,14 +7,20 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [FootprintEntity::class, TravelGoalEntity::class],
-    version = 1,
+    entities = [
+        FootprintEntity::class, 
+        TravelGoalEntity::class, 
+        BadgeEntity::class, 
+        PrivacyFenceEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class FootprintDatabase : RoomDatabase() {
     abstract fun footprintDao(): FootprintDao
     abstract fun travelGoalDao(): TravelGoalDao
+    abstract fun premiumDao(): PremiumDao
 
     companion object {
         @Volatile

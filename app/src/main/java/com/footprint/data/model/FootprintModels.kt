@@ -12,8 +12,17 @@ data class FootprintEntry(
     val distanceKm: Double,
     val photos: List<String>,
     val energyLevel: Int,
-    val happenedOn: LocalDate
+    val happenedOn: LocalDate,
+    val altitude: Double? = null,
+    val weather: String? = null,
+    val temperature: Double? = null,
+    val transportType: TransportType = TransportType.UNKNOWN,
+    val carbonSavedKg: Double = 0.0
 )
+
+enum class TransportType(val label: String) {
+    WALK("步行"), BIKE("骑行"), CAR("自驾"), TRAIN("铁路"), PLANE("航空"), UNKNOWN("未知")
+}
 
 data class TravelGoal(
     val id: Long = 0,
@@ -21,8 +30,23 @@ data class TravelGoal(
     val targetLocation: String,
     val targetDate: LocalDate,
     val notes: String,
-    val isCompleted: Boolean,
-    val progress: Int
+    val isCompleted: Boolean = false,
+    val progress: Int = 0
+)
+
+data class FootprintSummary(
+    val yearly: Stats = Stats(),
+    val monthly: Stats = Stats(),
+    val streakDays: Int = 0,
+    val daysActiveThisYear: Int = 0
+)
+
+data class Stats(
+    val totalEntries: Int = 0,
+    val totalDistance: Double = 0.0,
+    val uniquePlaces: Int = 0,
+    val dominantMood: Mood? = null,
+    val energyAverage: Double = 0.0
 )
 
 data class PeriodStats(
@@ -31,11 +55,4 @@ data class PeriodStats(
     val dominantMood: Mood? = null,
     val uniquePlaces: Int = 0,
     val energyAverage: Double = 0.0
-)
-
-data class FootprintSummary(
-    val yearly: PeriodStats = PeriodStats(),
-    val monthly: PeriodStats = PeriodStats(),
-    val daysActiveThisYear: Int = 0,
-    val streakDays: Int = 0
 )

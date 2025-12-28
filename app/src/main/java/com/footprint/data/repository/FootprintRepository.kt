@@ -62,7 +62,12 @@ class FootprintRepository(
         distanceKm = distanceKm,
         photos = photos,
         energyLevel = energyLevel,
-        happenedOn = happenedOn
+        happenedOn = happenedOn,
+        altitude = altitude,
+        weather = weather,
+        temperature = temperature,
+        transportType = com.footprint.data.model.TransportType.valueOf(transportType),
+        carbonSavedKg = carbonSaved
     )
 
     private fun FootprintEntry.toEntity() = FootprintEntity(
@@ -75,7 +80,12 @@ class FootprintRepository(
         distanceKm = distanceKm,
         photos = photos,
         energyLevel = energyLevel,
-        happenedOn = happenedOn
+        happenedOn = happenedOn,
+        altitude = altitude,
+        weather = weather,
+        temperature = temperature,
+        transportType = transportType.name,
+        carbonSaved = carbonSavedKg
     )
 
     private fun TravelGoalEntity.toModel() = TravelGoal(

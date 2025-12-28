@@ -1,109 +1,41 @@
-# Gradle files
-.claude/
-.gradle/
-.gradle-cache/
-build/
-*/build/
-gradle-*/
-tmp/
-PROJECT_SUMMARY.md
-
-# Local configuration file (sdk path, etc)
-local.properties
-
-# Android Studio / IntelliJ IDEA
-.idea/
+# Android
 *.iml
-*.iws
-*.ipr
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
-.idea/libraries/
-.idea/modules.xml
-.idea/.name
-.idea/compiler.xml
-.idea/jarRepositories.xml
-
-# Android SDK
-android-sdk/
-
-# OS-specific files
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-*~
+/build
+/app/build
+/captures
 
-# Built application files
-*.apk
-*.ap_
-*.aab
-
-# Files for the ART/Dalvik VM
-*.dex
-
-# Java class files
-*.class
-
-# Generated files
-bin/
-gen/
-out/
-release/
-
-# Log Files
-*.log
-
-# Android Profiling
-*.hprof
+# External native build artifacts
+.externalNativeBuild
+.cxx
 
 # Keystore files
 *.jks
 *.keystore
+*.p12
 
-# External native build folder generated in Android Studio 2.2 and later
-.externalNativeBuild
-.cxx/
-
-# Version control
-.svn/
-.git/attributes
-
-# Kotlin
-.kotlin/
-
-# Captures folder
-captures/
-
-# IntelliJ
-out/
-
-# Google Services (e.g. APIs or Firebase)
+# Google Services
 google-services.json
 
-# Freeline
-freeline.py
-freeline/
-freeline_project_description.json
+# Credentials
+secrets.xml
 
-# fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots
-fastlane/test_output
-fastlane/readme.md
+# Log files
+*.log
 
-# Backup files
-*.bak
-gradle/gradle-8.6-bin.zip
-*.zip
-gradle/gradle-8.6-bin.zip
-*.zip
-gradle/gradle-8.6-bin.zip
-*.zip
+# Gradle
+.gradle/
+build/
+
+# Kotlin
+/bin/
+/gen/
+/out/

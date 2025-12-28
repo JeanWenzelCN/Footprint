@@ -32,19 +32,22 @@ private val DarkColors = darkColorScheme(
     onSurface = Color.White
 )
 
+enum class AppThemeStyle {
+    CLASSIC, CYBERPUNK, FOREST, SAHARA
+}
+
 @Composable
 fun FootprintTheme(
-    useDarkTheme: Boolean = isSystemInDarkTheme(),
-    useDynamicColor: Boolean = true,
+    style: AppThemeStyle = AppThemeStyle.CLASSIC,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val dynamicColor = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-    val colorScheme: ColorScheme = when {
-        dynamicColor && useDarkTheme -> dynamicDarkColorScheme(LocalContext.current)
-        dynamicColor && !useDarkTheme -> dynamicLightColorScheme(LocalContext.current)
-        useDarkTheme -> DarkColors
-        else -> LightColors
+    val colorScheme = when (style) {
+        AppThemeStyle.CYBERPUNK -> if (darkTheme) CyberpunkDarkColors else CyberpunkLightColors
+        AppThemeStyle.FOREST -> ForestColors
+        AppThemeStyle.SAHARA -> SaharaColors
+        else -> if (darkTheme) DarkColors else LightColors
     }
 
     MaterialTheme(

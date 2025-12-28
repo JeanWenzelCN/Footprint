@@ -1,288 +1,156 @@
 package com.footprint.ui.screens
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.amap.api.maps.CameraUpdateFactory
+import com.amap.api.maps.MapView
+import com.amap.api.maps.model.LatLng
+import com.amap.api.maps.model.MyLocationStyle
+import com.amap.api.maps.model.PolylineOptions
 import com.footprint.service.LocationTrackingService
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.*
-import kotlinx.coroutines.launch
 
-/**
- * 地图追踪屏幕
- * 显示实时位置和轨迹路径
- */
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val mapView = remember { MapView(context) }
+    
+    // 扩展权限列表
+    val permissionsToRequest = mutableListOf(
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ).apply {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }.toTypedArray()
 
-    // 位置权限
-    val locationPermissions = rememberMultiplePermissionsState(
-        permissions = listOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-    )
+    var hasPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+    }
 
-    // 追踪状态
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        hasPermission = it[Manifest.permission.ACCESS_FINE_LOCATION] == true
+    }
+
     val isTracking by LocationTrackingService.isTracking.collectAsState()
     val currentLocation by LocationTrackingService.currentLocation.collectAsState()
     val trackingPath by LocationTrackingService.trackingPath.collectAsState()
 
-    // 相机位置
-    val cameraPositionState = rememberCameraPositionState {
-        // 默认位置：北京
-        position = CameraPosition.fromLatLngZoom(
-            LatLng(39.9042, 116.4074),
-            12f
-        )
-    }
-
-    // 更新相机跟随当前位置
+    // 监听位置，并确保相机移动是基于有效坐标的
     LaunchedEffect(currentLocation) {
-        currentLocation?.let { location ->
-            val latLng = LatLng(location.latitude, location.longitude)
-            cameraPositionState.animate(
-                update = com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(
-                    latLng,
-                    15f
-                )
-            )
+        currentLocation?.let { loc ->
+            if (loc.latitude > 1.0) {
+                mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 17f))
+            }
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (locationPermissions.allPermissionsGranted) {
-            // 地图视图
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState,
-                properties = MapProperties(
-                    isMyLocationEnabled = true
-                ),
-                uiSettings = MapUiSettings(
-                    zoomControlsEnabled = true,
-                    myLocationButtonEnabled = true,
-                    compassEnabled = true
-                )
-            ) {
-                // 当前位置标记
-                currentLocation?.let { location ->
-                    Marker(
-                        state = MarkerState(
-                            position = LatLng(location.latitude, location.longitude)
-                        ),
-                        title = "当前位置",
-                        snippet = "精度: ${location.accuracy.toInt()}m"
-                    )
-                }
-
-                // 轨迹路径
-                if (trackingPath.isNotEmpty()) {
-                    val pathPoints = trackingPath.map {
-                        LatLng(it.latitude, it.longitude)
-                    }
-
-                    Polyline(
-                        points = pathPoints,
-                        color = androidx.compose.ui.graphics.Color(0xFF2196F3),
-                        width = 8f
-                    )
-
-                    // 起点标记
-                    trackingPath.firstOrNull()?.let { start ->
-                        Marker(
-                            state = MarkerState(
-                                position = LatLng(start.latitude, start.longitude)
-                            ),
-                            title = "起点",
-                            icon = com.google.android.gms.maps.model.BitmapDescriptorFactory
-                                .defaultMarker(com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN)
-                        )
-                    }
-                }
-            }
-
-            // 统计信息卡片
-            if (isTracking && trackingPath.isNotEmpty()) {
-                TrackingStatsCard(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(16.dp),
-                    pointCount = trackingPath.size,
-                    distance = calculatePathDistance(trackingPath)
-                )
-            }
-
-            // 控制按钮
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // 开始/停止追踪按钮
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            if (isTracking) {
-                                LocationTrackingService.stopTracking(context)
-                            } else {
-                                LocationTrackingService.startTracking(context)
+        if (hasPermission) {
+            AndroidView(
+                factory = {
+                    mapView.apply {
+                        map.apply {
+                            uiSettings.isMyLocationButtonEnabled = false
+                            isMyLocationEnabled = true
+                            myLocationStyle = MyLocationStyle().apply {
+                                myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
+                                interval(2000)
+                                showMyLocation(true)
                             }
                         }
-                    },
-                    containerColor = if (isTracking) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
                     }
-                ) {
-                    Icon(
-                        imageVector = if (isTracking) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = if (isTracking) "停止追踪" else "开始追踪"
-                    )
+                },
+                modifier = Modifier.fillMaxSize()
+            ) { mv ->
+                if (trackingPath.isNotEmpty()) {
+                    mv.map.clear()
+                    val points = trackingPath.map { LatLng(it.latitude, it.longitude) }
+                    mv.map.addPolyline(PolylineOptions().addAll(points).width(18f).color(android.graphics.Color.parseColor("#00FF9F")))
                 }
-
-                // 追踪状态文本
-                Text(
-                    text = if (isTracking) "追踪中..." else "点击开始追踪",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
             }
         } else {
-            // 权限请求界面
-            PermissionRequestScreen(
-                onRequestPermissions = { locationPermissions.launchMultiplePermissionRequest() }
-            )
+            PermissionDenyOverlay { launcher.launch(permissionsToRequest) }
         }
-    }
-}
 
-@Composable
-fun TrackingStatsCard(
-    modifier: Modifier = Modifier,
-    pointCount: Int,
-    distance: Float
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+        // 定位回正按钮
+        Box(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 20.dp)) {
+            FilledIconButton(
+                onClick = {
+                    if (currentLocation != null && currentLocation!!.latitude > 1.0) {
+                        mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(currentLocation!!.latitude, currentLocation!!.longitude), 18f))
+                    } else {
+                        // 强制拉起一次定位
+                        LocationTrackingService.startTracking(context)
+                    }
+                },
+                modifier = Modifier.size(56.dp).border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White.copy(alpha = 0.2f))
+            ) {
+                Icon(Icons.Rounded.GpsFixed, null, tint = Color.White)
+            }
+        }
+
+        // 底部控制
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 110.dp)
+                .height(80.dp)
+                .fillMaxWidth(),
+            color = Color.White.copy(alpha = 0.15f),
+            shape = RoundedCornerShape(28.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
         ) {
-            // 记录点数
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "$pointCount",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "位置点",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // 总距离
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Timeline,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = formatDistance(distance),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "总距离",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("GPS 状态", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+                    Text(if (currentLocation == null) "搜索信号..." else "信号良好", color = if (currentLocation == null) Color.Yellow else Color(0xFF00FF9F), fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = {
+                        if (isTracking) LocationTrackingService.stopTracking(context)
+                        else LocationTrackingService.startTracking(context)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isTracking) Color(0xFFFF3B30) else Color(0xFF00FF9F))
+                ) {
+                    Text(if (isTracking) "停止" else "开启追踪", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
 
 @Composable
-fun PermissionRequestScreen(
-    onRequestPermissions: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.LocationOff,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "需要位置权限",
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "为了追踪您的足迹，需要访问设备位置",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(onClick = onRequestPermissions) {
-            Text("授予权限")
+fun PermissionDenyOverlay(onRetry: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.Security, null, tint = Color(0xFF00FF9F), modifier = Modifier.size(64.dp))
+            Text("需要定位与通知权限", color = Color.White, modifier = Modifier.padding(top = 16.dp))
+            Button(onClick = onRetry, modifier = Modifier.padding(top = 24.dp)) { Text("立即授权") }
         }
-    }
-}
-
-// 辅助函数：计算路径距离
-private fun calculatePathDistance(locations: List<android.location.Location>): Float {
-    if (locations.size < 2) return 0f
-    var totalDistance = 0f
-    for (i in 0 until locations.size - 1) {
-        totalDistance += locations[i].distanceTo(locations[i + 1])
-    }
-    return totalDistance
-}
-
-// 辅助函数：格式化距离显示
-private fun formatDistance(meters: Float): String {
-    return when {
-        meters < 1000 -> "${meters.toInt()} 米"
-        else -> String.format("%.2f 公里", meters / 1000)
     }
 }

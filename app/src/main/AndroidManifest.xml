@@ -1,21 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.footprint">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Location permissions -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- Background location (for Android 10+) -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-
-    <!-- Internet for maps -->
+    <!-- 高德地图所需权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Foreground service for location tracking -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".FootprintApplication"
@@ -26,10 +24,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Footprint">
 
-        <!-- Google Maps API Key (will need to be configured) -->
+        <!-- 高德地图 API Key -->
+        <!-- 自动从 local.properties 读取，不泄露至 GitHub -->
         <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_GOOGLE_MAPS_API_KEY" />
+            android:name="com.amap.api.v2.apikey"
+            android:value="${AMAP_KEY}" />
 
         <activity
             android:name=".MainActivity"
@@ -41,7 +40,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Location Tracking Service -->
         <service
             android:name=".service.LocationTrackingService"
             android:enabled="true"

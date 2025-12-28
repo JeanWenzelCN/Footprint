@@ -36,17 +36,20 @@ import java.time.ZoneId
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddFootprintDialog(
+    initialEntry: com.footprint.data.model.FootprintEntry? = null,
     onDismiss: () -> Unit,
     onSave: (FootprintDraft) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var detail by remember { mutableStateOf("") }
-    var tags by remember { mutableStateOf("") }
-    var distance by remember { mutableStateOf("5") }
-    var energy by remember { mutableStateOf(6f) }
-    var mood by remember { mutableStateOf(Mood.EXCITED) }
-    val datePickerState = rememberDatePickerState(System.currentTimeMillis())
+    var title by remember { mutableStateOf(initialEntry?.title ?: "") }
+    var location by remember { mutableStateOf(initialEntry?.location ?: "") }
+    var detail by remember { mutableStateOf(initialEntry?.detail ?: "") }
+    var tags by remember { mutableStateOf(initialEntry?.tags?.joinToString(",") ?: "") }
+    var distance by remember { mutableStateOf(initialEntry?.distanceKm?.toString() ?: "5") }
+    var energy by remember { mutableStateOf(initialEntry?.energyLevel?.toFloat() ?: 6f) }
+    var mood by remember { mutableStateOf(initialEntry?.mood ?: Mood.EXCITED) }
+    val datePickerState = rememberDatePickerState(
+        initialEntry?.happenedOn?.atStartOfDay(java.time.ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis()
+    )
     var showDatePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {

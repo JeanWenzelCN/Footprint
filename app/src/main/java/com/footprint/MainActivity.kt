@@ -9,17 +9,13 @@ import com.footprint.ui.theme.FootprintTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 让内容延伸到状态栏和导航栏下方，配合 Material 3 沉浸式体验
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
-        val initialDestination = if (intent?.getStringExtra("destination") == "map") {
-            FootprintDestination.Map
-        } else {
-            FootprintDestination.Dashboard
-        }
-
         setContent {
+            // style 参数可以动态切换主题，例如 AppThemeStyle.CYBERPUNK
             FootprintTheme {
-                FootprintApp(initialDestination = initialDestination)
+                FootprintApp()
             }
         }
     }

@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,12 +11,21 @@ android {
     namespace = "com.footprint"
     compileSdk = 34
 
+    val localProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) {
+            file.inputStream().use { load(it) }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.footprint"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+
+        manifestPlaceholders["AMAP_KEY"] = localProperties.getProperty("AMAP_KEY") ?: "YOUR_AMAP_API_KEY"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -93,12 +105,11 @@ dependencies {
     // Google Play Services - Location
     implementation("com.google.android.gms:play-services-location:21.1.0")
 
-    // Google Maps Compose
-    implementation("com.google.maps.android:maps-compose:4.3.3")
-    implementation("com.google.android.gms:play-services-maps:18.2.0")
-
-    // Permissions handling
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+    // AMap (高德地图) SDK
+    // 3D地图 SDK (通常已内置定位核心类，避免重复引用)
+    implementation("com.amap.api:3dmap:latest.integration")
+    // 如果 3dmap 不包含完整定位功能，可以使用以下方式引入但排除冲突，但通常只留 3dmap 即可
+    // implementation("com.amap.api:location:latest.integration") 
 
     // Testing
     testImplementation("junit:junit:4.13.2")
