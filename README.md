@@ -77,5 +77,5 @@
 ---
 
 <div align="center">
-Made with ❤️ by Footprint Team
+Made with ❤️ by StarsUnsurpass
 </div>
