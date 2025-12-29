@@ -318,6 +318,6 @@ adb shell am start -n com.footprint.debug/com.footprint.MainActivity
 
 ---
 
-**最后更新**: 2025-11-15
+**最后更新**: 2025-12-29
 **版本**: v0.1.0-alpha
 **状态**: 可编译运行（需配置Maps API Key）
