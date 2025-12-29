@@ -12,7 +12,7 @@
 **更新的文件：**
 - `app/build.gradle.kts` - 添加新依赖
   - Google Play Services Location (21.1.0)
-  - Google Maps Compose (4.3.3)
+  - AMap 3DMap SDK (High Accuracy)
   - Accompanist Permissions (0.34.0)
   - Coroutines Play Services
 
@@ -24,7 +24,7 @@
 **新增文件：**
 - `service/LocationTrackingService.kt`
   - 前台服务实现
-  - 实时位置追踪
+  - 实时位置追踪 (AMap Location SDK)
   - 通知显示
   - 轨迹记录
 
@@ -37,7 +37,7 @@
 ### 4. ✅ 添加地图可视化
 **新增文件：**
 - `ui/screens/MapScreen.kt`
-  - Google Maps集成
+  - AMap (高德地图) 集成
   - 实时位置标记
   - 轨迹路径绘制
   - 权限请求UI
@@ -128,15 +128,15 @@ Footprint/
 
 ### 1. 实时位置追踪
 - ✅ 前台服务持续追踪
-- ✅ 每5秒更新位置
+- ✅ 每2秒更新位置 (高精度模式)
 - ✅ 通知显示追踪状态
 - ✅ 轨迹点记录
 
 ### 2. 地图可视化
-- ✅ Google Maps集成
+- ✅ 高德地图 (AMap) 集成
 - ✅ 当前位置标记
-- ✅ 轨迹路径绘制（蓝色线条）
-- ✅ 起点标记（绿色）
+- ✅ 轨迹路径绘制（绿色线条）
+- ✅ 起点标记
 - ✅ 相机自动跟随
 - ✅ 统计信息卡片（位置点数、总距离）
 
@@ -164,8 +164,7 @@ Footprint/
 - **Jetpack Compose** - 声明式UI
 - **Material 3** - Material Design
 - **Room** - 本地数据库
-- **Google Play Services** - 位置服务
-- **Google Maps Compose** - 地图集成
+- **AMap SDK** - 高德地图与定位
 - **Accompanist** - Compose扩展（权限）
 - **Coroutines & Flow** - 异步处理
 
@@ -187,16 +186,15 @@ Footprint/
 
 1. **SDK路径配置** (local.properties已配置)
    ```properties
-   sdk.dir=/mnt/c/Users/xhq/AppData/Local/Android/Sdk
+   sdk.dir=/path/to/android/sdk
    ```
 
-2. **Google Maps API Key** (需要配置)
-   - 获取API密钥: https://console.cloud.google.com/
-   - 在 `AndroidManifest.xml` 中替换:
-   ```xml
-   <meta-data
-       android:name="com.google.android.geo.API_KEY"
-       android:value="YOUR_ACTUAL_API_KEY_HERE" />
+2. **AMap API Key** (需要配置)
+   - 获取API密钥: https://console.amap.com/
+   - 需要获取 debug/release keystore 的 SHA1
+   - 在 `local.properties` 中添加:
+   ```properties
+   AMAP_KEY=你的高德地图APIKey
    ```
 
 ### 编译命令
