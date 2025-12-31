@@ -73,11 +73,21 @@
 
 ## 🕒 更新日志 (Changelog)
 
-### 2025-12-31: 液态玻璃 UI 重构与动态配置
-- **UI 重构**: 全面升级为液态玻璃 (Glassmorphism) 风格，新增 `GlassMorphicCard` 和 `AppBackground` 组件。
-- **页面优化**: 概览、地图、时间轴、目标计划页及弹窗均已适配新风格。
-- **功能增强**: 支持应用内动态配置高德地图 API Key，移除对 `AndroidManifest.xml` 硬编码的依赖，提升安全性与易用性。
-- **体验提升**: 优化了高分屏下的显示效果，新增动态渐变背景。
+### 2025-12-31: 液态玻璃 UI 重构与核心 Bug 修复
+
+#### ✨ 新增特性 (Features)
+- **UI 重构**: 全面升级为液态玻璃 (Glassmorphism) 风格，新增 `GlassMorphicCard` 和 `AppBackground` 组件，适配高分屏光影。
+- **动态配置**: 支持应用内动态配置高德地图 API Key，移除对 `AndroidManifest.xml` 硬编码依赖。
+- **开发者辅助**: 在 Key 配置弹窗中新增 **SHA1 一键复制** 功能，解决高德控制台配置难题。
+
+#### 🐛 核心修复日志 (Bug Fixes & Root Causes)
+
+| 问题现象 (Issue) | 根本原因 (Root Cause) | 解决方案 (Fix) |
+| :--- | :--- | :--- |
+| **地图白屏/黑屏** | Jetpack Compose 的 `AndroidView` 与高德 `MapView` 生命周期不同步。当 Compose 首次渲染时，Activity 可能已过 `ON_CREATE`，导致地图 OpenGL 上下文未初始化。 | 在 `DisposableEffect` 中显式手动调用 `mapView.onCreate()`，并根据当前 Lifecycle 状态自动补偿 `onResume()`。 |
+| **定位错误 7 (鉴权失败)** | `build.gradle.kts` 配置中 `debug` 类型包含 `applicationIdSuffix = ".debug"`。这导致调试版包名变为 `com.footprint.debug`，与高德后台注册的 `com.footprint` 不匹配，触发安全拦截。 | 移除 `applicationIdSuffix` 配置，确保 Debug 和 Release 版本包名严格一致 (`com.footprint`)。 |
+| **Key 设置后不生效** | SDK 的 `MapsInitializer` 和 `LocationClient` 默认只在应用启动时读取一次 Key，运行时更新未触发重新初始化。 | 在用户保存 Key 的瞬间，代码级强制调用 SDK 的 `setApiKey` 接口，实现配置即时生效无需重启。 |
+| **定位一直请求中** | 错误信息被吞没，用户不知道是权限、网络还是 Key 的问题。 | 增加错误码拦截机制，在主线程弹出 Toast 明确提示错误类型（如“Error 7: 包名不匹配”或“Error 12: 缺权限”）。 |
 
 ---
 
