@@ -101,11 +101,16 @@ fun MapScreen() {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFE0E0E0))) { // 增加背景色，区分是地图黑屏还是View没加载
         if (hasPermission) {
             AndroidView(
-                factory = {
+                factory = { ctx ->
                     mapView.apply {
+                        // 必须手动调用 onCreate (即使在 DisposableEffect 中调用过，这里确保 View 树加载时已就绪)
+                        // 注意：为了避免重复调用导致异常，通常依赖外部 Lifecycle，但为了防止黑屏，
+                        // 我们在这里确保它有一些基本参数。
+                        // 实际最好的做法是只依赖 DisposableEffect，但这里我们设置一个初始位置防止 (0,0)
+                        
                         map.apply {
                             uiSettings.isMyLocationButtonEnabled = false
                             isMyLocationEnabled = true
@@ -114,6 +119,8 @@ fun MapScreen() {
                                 interval(2000)
                                 showMyLocation(true)
                             }
+                            // 默认移动到北京，防止初始黑屏
+                            moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(39.9042, 116.4074), 10f))
                         }
                     }
                 },
@@ -156,6 +163,7 @@ fun MapScreen() {
                             mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(currentLocation!!.latitude, currentLocation!!.longitude), 18f))
                         } else {
                             // 强制拉起一次定位
+                            android.widget.Toast.makeText(context, "正在请求定位...", android.widget.Toast.LENGTH_SHORT).show()
                             LocationTrackingService.startTracking(context)
                         }
                     },
