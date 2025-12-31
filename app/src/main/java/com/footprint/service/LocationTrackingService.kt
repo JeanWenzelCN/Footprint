@@ -138,7 +138,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     Log.d("FootprintLoc", "坐标获取成功: ${location.latitude}, ${location.longitude}")
                 }
             } else {
-                Log.e("FootprintLoc", "定位错误: ${location.errorCode} - ${location.errorInfo}")
+                val errText = "定位错误: ${location.errorCode} - ${location.errorInfo}"
+                Log.e("FootprintLoc", errText)
+                // 在主线程弹 Toast 方便调试
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(applicationContext, errText, android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

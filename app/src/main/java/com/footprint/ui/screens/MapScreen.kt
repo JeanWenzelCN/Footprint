@@ -233,8 +233,15 @@ fun MapScreen() {
             onDismiss = { showApiKeyDialog = false },
             onSave = { key ->
                 ApiKeyManager.setApiKey(context, key)
+                // 立即生效，无需重启
+                try {
+                    com.amap.api.maps.MapsInitializer.setApiKey(key)
+                    com.amap.api.location.AMapLocationClient.setApiKey(key)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 showApiKeyDialog = false
-                android.widget.Toast.makeText(context, "API Key 已保存，请重启应用生效", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, "API Key 已保存并立即生效", android.widget.Toast.LENGTH_LONG).show()
             }
         )
     }
