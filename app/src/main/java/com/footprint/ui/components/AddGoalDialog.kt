@@ -2,8 +2,10 @@ package com.footprint.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.LocalDate
@@ -54,53 +57,73 @@ fun AddGoalDialog(
         Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
     } ?: LocalDate.now().plusWeeks(2)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        GoalDraft(
-                            title = title,
-                            location = location,
-                            date = selectedDate,
-                            notes = notes
-                        )
-                    )
-                },
-                enabled = title.isNotBlank() && location.isNotBlank()
-            ) { Text("保存目标") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        title = { Text("创建旅程目标") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        GlassMorphicCard(
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "创建旅程目标",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("目标名称") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = location,
                     onValueChange = { location = it },
                     label = { Text("目的地") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text("灵感/资源") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                Button(onClick = { showDatePicker = true }) {
+                Button(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Text("目标日期：$selectedDate")
+                }
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp), 
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("取消", color = Color.Gray) }
+                    Button(
+                        onClick = {
+                            onSave(
+                                GoalDraft(
+                                    title = title,
+                                    location = location,
+                                    date = selectedDate,
+                                    notes = notes
+                                )
+                            )
+                        },
+                        enabled = title.isNotBlank() && location.isNotBlank(),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) { Text("保存目标") }
                 }
             }
         }
-    )
+    }
 }
 
 data class GoalDraft(

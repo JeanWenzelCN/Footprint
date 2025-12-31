@@ -1,20 +1,16 @@
 package com.footprint.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,12 +18,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.footprint.data.model.FootprintEntry
 import com.footprint.data.model.Mood
 import com.footprint.ui.state.FilterState
+import com.footprint.ui.components.AppBackground
+import com.footprint.ui.components.GlassMorphicCard
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -46,19 +43,30 @@ fun TimelineScreen(
     val formatter = DateTimeFormatter.ofPattern("MM月dd日")
     val headerFormatter = DateTimeFormatter.ofPattern("yyyy年MM月")
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // ... (省略部分代码)
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            grouped.forEach { (month, items) ->
-                stickyHeader {
-                    // ... (省略部分代码)
-                }
-                items(items) { entry ->
-                    TimelineCard(entry = entry, formatter = formatter, onClick = { onEditEntry(entry) })
+    AppBackground(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // ... (可以添加搜索栏等头部组件，此处简化只保留列表)
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                grouped.forEach { (month, items) ->
+                    stickyHeader {
+                        GlassMorphicCard(
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        ) {
+                             Text(
+                                text = month.format(headerFormatter),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                    items(items) { entry ->
+                        TimelineCard(entry = entry, formatter = formatter, onClick = { onEditEntry(entry) })
+                    }
                 }
             }
         }
@@ -67,15 +75,12 @@ fun TimelineScreen(
 
 @Composable
 private fun TimelineCard(entry: FootprintEntry, formatter: DateTimeFormatter, onClick: () -> Unit) {
-    Card(
+    GlassMorphicCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            .padding(vertical = 4.dp)
+            .clickable { onClick() }
     ) {
-        // ... (内部内容保持不变)
-
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = entry.happenedOn.format(formatter), style = MaterialTheme.typography.labelMedium)
             Text(text = entry.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

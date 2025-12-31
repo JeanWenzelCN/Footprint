@@ -23,6 +23,14 @@
 
 ---
 
+## 🎨 最新视觉更新 (New!)
+
+- **全域液态玻璃**：所有页面（概览、足迹海、目标页、弹窗）均已升级为高通透的液态玻璃风格。
+- **动态渐变背景**：新增 `AppBackground`，提供淡雅且富有层次的全局背景，增强沉浸感。
+- **高分屏优化**：摒弃传统模糊滤镜，采用高精度矢量渐变与光影模拟，确保在高分辨率屏幕上字体与图标锐利清晰，无锯齿。
+
+---
+
 ## 🚀 快速上手 (配置 API Key)
 
 为了保护隐私，本项目仓库不包含高德地图 API Key。请按照以下步骤配置以运行项目：
@@ -33,15 +41,12 @@
 3. **获取 SHA1**：在项目根目录下运行 `./gradlew signingReport`，复制 `Variant: debug` 下的 SHA1 值。
 4. 将你的 **包名** (`com.footprint`) 和 **SHA1** 填入高德后台，生成 API Key。
 
-### 2. 配置到项目
-打开 `app/src/main/AndroidManifest.xml`，找到以下部分：
-
-```xml
-<!-- 高德地图 API Key -->
-<meta-data
-    android:name="com.amap.api.v2.apikey"
-    android:value="在这里粘贴你的 API Key" />
-```
+### 2. 应用内配置 Key (New!)
+无需修改代码或配置文件！
+1. 编译并安装应用。
+2. 打开地图界面，点击右上角的 **设置 (⚙️)** 按钮。
+3. 在弹出的玻璃风格对话框中输入你的 Key 并保存。
+4. 重启应用即可生效。
 
 ---
 
@@ -59,8 +64,20 @@
 ## 📂 项目结构
 
 - `app/src/main/java/com/footprint/ui/theme`：定制的液态玻璃主题与赛博朋克调色板。
+- `app/src/main/java/com/footprint/ui/components`：核心 UI 组件库，包含 `GlassMorphicCard` 和 `AppBackground`。
 - `app/src/main/java/com/footprint/service`：高性能后台定位追踪服务。
+- `app/src/main/java/com/footprint/utils`：API Key 安全管理工具。
 - `app/src/main/java/com/footprint/ui/screens/MapScreen`：核心地图交互逻辑。
+
+---
+
+## 🕒 更新日志 (Changelog)
+
+### 2025-12-31: 液态玻璃 UI 重构与动态配置
+- **UI 重构**: 全面升级为液态玻璃 (Glassmorphism) 风格，新增 `GlassMorphicCard` 和 `AppBackground` 组件。
+- **页面优化**: 概览、地图、时间轴、目标计划页及弹窗均已适配新风格。
+- **功能增强**: 支持应用内动态配置高德地图 API Key，移除对 `AndroidManifest.xml` 硬编码的依赖，提升安全性与易用性。
+- **体验提升**: 优化了高分屏下的显示效果，新增动态渐变背景。
 
 ---
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.footprint.data.model.Mood
@@ -70,57 +72,48 @@ fun AddFootprintDialog(
         Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
     } ?: LocalDate.now()
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = {
-                    val payload = FootprintDraft(
-                        title = title,
-                        location = location,
-                        detail = detail,
-                        mood = mood,
-                        tags = tags.split(',', '，').mapNotNull { it.trim().takeIf(String::isNotEmpty) },
-                        distance = distance.toDoubleOrNull() ?: 0.0,
-                        energy = energy.toInt().coerceIn(1, 10),
-                        date = selectedDate
-                    )
-                    onSave(payload)
-                },
-                enabled = title.isNotBlank() && location.isNotBlank()
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        GlassMorphicCard(
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-        title = { Text(text = "添加新的足迹") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "添加新的足迹", 
+                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("标题") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = location,
                     onValueChange = { location = it },
                     label = { Text("地点") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = detail,
                     onValueChange = { detail = it },
                     label = { Text("故事和感受") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = tags,
                     onValueChange = { tags = it },
                     label = { Text("标签，用逗号分隔") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Mood.entries.forEach { option ->
@@ -131,13 +124,23 @@ fun AddFootprintDialog(
                         )
                     }
                 }
-                OutlinedTextField(
-                    value = distance,
-                    onValueChange = { distance = it },
-                    label = { Text("里程 (km)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = distance,
+                        onValueChange = { distance = it },
+                        label = { Text("里程 (km)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Button(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                    ) {
+                        Text("日期")
+                    }
+                }
+                
                 Column {
                     Text(text = "活力指数: ${energy.toInt()}")
                     Slider(
@@ -147,12 +150,32 @@ fun AddFootprintDialog(
                         valueRange = 1f..10f
                     )
                 }
-                Button(onClick = { showDatePicker = true }) {
-                    Text("选择日期：$selectedDate")
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消", color = Color.Gray) }
+                    Button(
+                        onClick = {
+                            val payload = FootprintDraft(
+                                title = title,
+                                location = location,
+                                detail = detail,
+                                mood = mood,
+                                tags = tags.split(',', '，').mapNotNull { it.trim().takeIf(String::isNotEmpty) },
+                                distance = distance.toDoubleOrNull() ?: 0.0,
+                                energy = energy.toInt().coerceIn(1, 10),
+                                date = selectedDate
+                            )
+                            onSave(payload)
+                        },
+                        enabled = title.isNotBlank() && location.isNotBlank(),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text("保存")
+                    }
                 }
             }
         }
-    )
+    }
 }
 
 data class FootprintDraft(

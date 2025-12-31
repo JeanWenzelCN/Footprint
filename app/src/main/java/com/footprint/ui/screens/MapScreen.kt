@@ -22,6 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.os.Bundle
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.amap.api.maps.CameraUpdateFactory
@@ -30,11 +34,32 @@ import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.PolylineOptions
 import com.footprint.service.LocationTrackingService
+import com.footprint.utils.ApiKeyManager
+import com.footprint.ui.components.GlassMorphicCard
 
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+    
+    // 管理 MapView 生命周期
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, mapView) {
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_CREATE -> mapView.onCreate(Bundle())
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(lifecycleObserver)
+        onDispose {
+            lifecycle.removeObserver(lifecycleObserver)
+            mapView.onDestroy()
+        }
+    }
     
     // 扩展权限列表
     val permissionsToRequest = mutableListOf(
@@ -57,6 +82,8 @@ fun MapScreen() {
     val isTracking by LocationTrackingService.isTracking.collectAsState()
     val currentLocation by LocationTrackingService.currentLocation.collectAsState()
     val trackingPath by LocationTrackingService.trackingPath.collectAsState()
+    
+    var showApiKeyDialog by remember { mutableStateOf(false) }
 
     // 监听位置，并确保相机移动是基于有效坐标的
     LaunchedEffect(currentLocation) {
@@ -94,50 +121,161 @@ fun MapScreen() {
         } else {
             PermissionDenyOverlay { launcher.launch(permissionsToRequest) }
         }
+        
+        // API Key 设置按钮
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 48.dp, end = 20.dp)) {
+            GlassMorphicCard(
+                shape = CircleShape,
+                modifier = Modifier.size(48.dp)
+            ) {
+                IconButton(
+                    onClick = { showApiKeyDialog = true },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(Icons.Default.Settings, "设置 API Key", tint = Color.Black.copy(alpha = 0.8f))
+                }
+            }
+        }
 
         // 定位回正按钮
         Box(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 20.dp)) {
-            FilledIconButton(
-                onClick = {
-                    if (currentLocation != null && currentLocation!!.latitude > 1.0) {
-                        mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(currentLocation!!.latitude, currentLocation!!.longitude), 18f))
-                    } else {
-                        // 强制拉起一次定位
-                        LocationTrackingService.startTracking(context)
-                    }
-                },
-                modifier = Modifier.size(56.dp).border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White.copy(alpha = 0.2f))
+            GlassMorphicCard(
+                shape = CircleShape,
+                modifier = Modifier.size(56.dp)
             ) {
-                Icon(Icons.Rounded.GpsFixed, null, tint = Color.White)
+                IconButton(
+                    onClick = {
+                        if (currentLocation != null && currentLocation!!.latitude > 1.0) {
+                            mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(currentLocation!!.latitude, currentLocation!!.longitude), 18f))
+                        } else {
+                            // 强制拉起一次定位
+                            LocationTrackingService.startTracking(context)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black.copy(alpha = 0.8f))
+                }
             }
         }
 
         // 底部控制
-        Surface(
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 110.dp)
-                .height(80.dp)
-                .fillMaxWidth(),
-            color = Color.White.copy(alpha = 0.15f),
-            shape = RoundedCornerShape(28.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                .fillMaxWidth()
+                .height(88.dp)
         ) {
-            Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("GPS 状态", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
-                    Text(if (currentLocation == null) "搜索信号..." else "信号良好", color = if (currentLocation == null) Color.Yellow else Color(0xFF00FF9F), fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = {
-                        if (isTracking) LocationTrackingService.stopTracking(context)
-                        else LocationTrackingService.startTracking(context)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isTracking) Color(0xFFFF3B30) else Color(0xFF00FF9F))
+            GlassMorphicCard(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(28.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxSize().padding(horizontal = 24.dp), 
+                    horizontalArrangement = Arrangement.SpaceBetween, 
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (isTracking) "停止" else "开启追踪", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Column {
+                        Text(
+                            "GPS 状态", 
+                            color = Color.Black.copy(alpha = 0.6f), 
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            if (currentLocation == null) "搜索信号..." else "信号良好", 
+                            color = if (currentLocation == null) Color(0xFFE6A23C) else Color(0xFF67C23A), 
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (isTracking) LocationTrackingService.stopTracking(context)
+                            else LocationTrackingService.startTracking(context)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isTracking) Color(0xFFFF4D4F) else Color(0xFF1890FF),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    ) {
+                        Text(
+                            if (isTracking) "停止" else "开始", 
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+    
+    if (showApiKeyDialog) {
+        ApiKeyDialog(
+            initialKey = ApiKeyManager.getApiKey(context) ?: "",
+            onDismiss = { showApiKeyDialog = false },
+            onSave = { key ->
+                ApiKeyManager.setApiKey(context, key)
+                showApiKeyDialog = false
+                android.widget.Toast.makeText(context, "API Key 已保存，请重启应用生效", android.widget.Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+}
+
+@Composable
+fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var apiKey by remember { mutableStateOf(initialKey) }
+    
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        GlassMorphicCard(
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "设置 API Key", 
+                    style = MaterialTheme.typography.titleLarge, 
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "请输入您的高德地图 API Key：", 
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF1890FF),
+                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f)
+                    )
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("取消", color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onSave(apiKey) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1890FF))
+                    ) {
+                        Text("保存")
+                    }
                 }
             }
         }

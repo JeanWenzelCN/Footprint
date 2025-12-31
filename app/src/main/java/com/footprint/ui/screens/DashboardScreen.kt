@@ -18,8 +18,6 @@ import androidx.compose.material.icons.outlined.ArrowBackIosNew
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -39,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.footprint.data.model.Mood
 import com.footprint.ui.state.FootprintUiState
+import com.footprint.ui.components.AppBackground
+import com.footprint.ui.components.GlassMorphicCard
 import java.text.DecimalFormat
 import java.time.format.DateTimeFormatter
 
@@ -55,59 +55,63 @@ fun DashboardScreen(
     var query by rememberSaveable { mutableStateOf(state.filterState.searchQuery) }
     val df = remember { DecimalFormat("0.0") }
 
-    Column(
-        modifier = modifier
-            .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        Text(
-            text = "年度·月度足迹雷达",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        OutlinedTextField(
-            value = query,
-            onValueChange = {
-                query = it
-                onSearch(it)
-            },
-            label = { Text("搜索地点/标签/故事") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        YearNavigator(
-            year = state.filterState.year,
-            onBack = { onYearShift(-1) },
-            onForward = { onYearShift(1) }
-        )
-
-        SummaryRow(
-            title = "年度足迹",
-            stats = listOf(
-                "总记录" to "${state.summary.yearly.totalEntries} 次",
-                "里程" to "${df.format(state.summary.yearly.totalDistance)} km",
-                "独特地点" to "${state.summary.yearly.uniquePlaces}"
+    AppBackground(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                text = "年度·月度足迹雷达",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
-        )
-        SummaryRow(
-            title = "本月亮点",
-            stats = listOf(
-                "记录" to "${state.summary.monthly.totalEntries}",
-                "活力" to (state.summary.monthly.energyAverage.takeIf { it > 0 }?.let { df.format(it) } ?: "-"),
-                "主情绪" to (state.summary.monthly.dominantMood?.label ?: "待发现")
+            OutlinedTextField(
+                value = query,
+                onValueChange = {
+                    query = it
+                    onSearch(it)
+                },
+                label = { Text("搜索地点/标签/故事") },
+                modifier = Modifier.fillMaxWidth()
             )
-        )
 
-        MoodDistributionSection(mood = state.summary.yearly.dominantMood, onMoodSelected = onMoodSelected)
+            YearNavigator(
+                year = state.filterState.year,
+                onBack = { onYearShift(-1) },
+                onForward = { onYearShift(1) }
+            )
 
-        RecentFootprintsSection(entries = state.entries.take(3), onCreateGoal = onCreateGoal)
+            SummaryRow(
+                title = "年度足迹",
+                stats = listOf(
+                    "总记录" to "${state.summary.yearly.totalEntries} 次",
+                    "里程" to "${df.format(state.summary.yearly.totalDistance)} km",
+                    "独特地点" to "${state.summary.yearly.uniquePlaces}"
+                )
+            )
+            SummaryRow(
+                title = "本月亮点",
+                stats = listOf(
+                    "记录" to "${state.summary.monthly.totalEntries}",
+                    "活力" to (state.summary.monthly.energyAverage.takeIf { it > 0 }?.let { df.format(it) } ?: "-"),
+                    "主情绪" to (state.summary.monthly.dominantMood?.label ?: "待发现")
+                )
+            )
+
+            MoodDistributionSection(mood = state.summary.yearly.dominantMood, onMoodSelected = onMoodSelected)
+
+            RecentFootprintsSection(entries = state.entries.take(3), onCreateGoal = onCreateGoal)
+            
+            Spacer(modifier = Modifier.height(80.dp)) // Bottom padding for nav bar
+        }
     }
 }
 
 @Composable
 private fun YearNavigator(year: Int, onBack: () -> Unit, onForward: () -> Unit) {
-    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    GlassMorphicCard(shape = RoundedCornerShape(20.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -161,14 +165,18 @@ private fun SummaryRow(title: String, stats: List<Pair<String, String>>) {
 
 @Composable
 private fun SummaryCard(modifier: Modifier, label: String, value: String, accent: Color) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.12f))
+    GlassMorphicCard(
+        modifier = modifier
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = label, style = MaterialTheme.typography.labelLarge)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                text = value, 
+                style = MaterialTheme.typography.headlineSmall, 
+                fontWeight = FontWeight.Bold,
+                color = accent
+            )
         }
     }
 }
@@ -219,7 +227,7 @@ private fun RecentFootprintsSection(entries: List<com.footprint.data.model.Footp
             Button(onClick = onCreateGoal) { Text("新的计划") }
         }
         entries.forEach { entry ->
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            GlassMorphicCard(shape = RoundedCornerShape(18.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = entry.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(modifier = Modifier.height(4.dp))
