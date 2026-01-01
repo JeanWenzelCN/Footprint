@@ -59,7 +59,8 @@ fun DashboardScreen(
     onMoodSelected: (Mood?) -> Unit,
     onCreateGoal: () -> Unit,
     onExportTrace: () -> Unit,
-    onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit
+    onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
+    onEditGoal: (com.footprint.data.model.TravelGoal) -> Unit
 ) {
     val scrollState = rememberScrollState()
     var query by rememberSaveable { mutableStateOf(state.filterState.searchQuery) }
@@ -193,7 +194,11 @@ fun DashboardScreen(
 
             MoodDistributionSection(mood = state.summary.yearly.dominantMood, onMoodSelected = onMoodSelected)
 
-            RecentFootprintsSection(entries = state.entries.take(3), onCreateGoal = onCreateGoal, onEditEntry = onEditEntry)
+            // Recent Footprints (No limit)
+            RecentFootprintsSection(entries = state.entries, onCreateGoal = onCreateGoal, onEditEntry = onEditEntry)
+            
+            // Goals Section (No limit)
+            GoalsListSection(goals = state.goals, onEditGoal = onEditGoal)
             
             Spacer(modifier = Modifier.height(80.dp)) // Bottom padding for nav bar
         }
@@ -305,6 +310,52 @@ private fun MoodDistributionSection(mood: Mood?, onMoodSelected: (Mood?) -> Unit
                 onClick = { onMoodSelected(null) },
                 label = { Text("全部") }
             )
+        }
+    }
+}
+
+@Composable
+private fun GoalsListSection(
+    goals: List<com.footprint.data.model.TravelGoal>,
+    onEditGoal: (com.footprint.data.model.TravelGoal) -> Unit
+) {
+    if (goals.isEmpty()) return
+    
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy/MM/dd") }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(text = "我的目标", style = MaterialTheme.typography.titleMedium)
+        goals.forEach { goal ->
+            GlassMorphicCard(
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.clickable { onEditGoal(goal) }
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = goal.title, 
+                            style = MaterialTheme.typography.titleMedium, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (goal.isCompleted) {
+                            Text(
+                                text = "已完成", 
+                                style = MaterialTheme.typography.labelSmall, 
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "目的地: ${goal.targetLocation} · 预计: ${goal.targetDate.format(formatter)}", 
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
         }
     }
 }

@@ -125,7 +125,8 @@ fun FootprintApp() {
                     onMoodSelected = viewModel::toggleMoodFilter,
                     onCreateGoal = { showGoalDialog = true },
                     onExportTrace = { navController.navigate("export_trace") },
-                    onEditEntry = { editingEntry = it }
+                    onEditEntry = { editingEntry = it },
+                    onEditGoal = { editingGoal = it }
                 )
             }
             composable("export_trace") {
