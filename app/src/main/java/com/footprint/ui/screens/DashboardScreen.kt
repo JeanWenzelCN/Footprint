@@ -134,7 +134,7 @@ fun DashboardScreen(
                     )
                 }
 
-                // Sections
+                // Sections (Use visibleEntries for keyword filtering)
                 recentFootprintsSection(entries = state.visibleEntries, onCreateGoal = onCreateGoal, onEditEntry = onEditEntry)
                 
                 goalsListSection(goals = state.goals, onEditGoal = onEditGoal)
@@ -145,7 +145,7 @@ fun DashboardScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.05f))
+                        .background(Color.Black.copy(alpha = 0.1f))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -155,7 +155,40 @@ fun DashboardScreen(
                 )
             }
 
-            // Layer 3: Top Bar & Search Bar (Fixed & Clear)
+            // Layer 3: Search Results (Real-time List)
+            if (isSearchFocused && query.isNotBlank()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 180.dp, start = 16.dp, end = 16.dp)
+                        .heightIn(max = 400.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    tonalElevation = 8.dp
+                ) {
+                    if (state.visibleEntries.isEmpty()) {
+                        Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("未找到相关记录", color = MaterialTheme.colorScheme.outline)
+                        }
+                    } else {
+                        LazyColumn {
+                            items(state.visibleEntries) { entry ->
+                                TelegramEntryItem(
+                                    entry = entry,
+                                    dateFormatter = DateTimeFormatter.ofPattern("MM-dd"),
+                                    onClick = {
+                                        onEditEntry(entry)
+                                        focusManager.clearFocus()
+                                    }
+                                )
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Layer 4: Top Bar & Search Bar (Fixed & Clear)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

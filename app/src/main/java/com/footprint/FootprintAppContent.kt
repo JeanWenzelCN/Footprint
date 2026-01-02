@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -191,7 +192,7 @@ fun FootprintApp() {
                         )
                     }
                     composable("settings") {
-                        val context = android.view.View(LocalContext.current).context
+                        val context = LocalContext.current
                         SettingsScreen(
                             currentThemeMode = uiState.themeMode,
                             onThemeModeChange = viewModel::setThemeMode,

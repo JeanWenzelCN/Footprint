@@ -59,15 +59,15 @@ class FootprintViewModel(
         val theme = args[5] as ThemeMode
 
         val visibleEntries = entries
-            .filter { it.happenedOn.year == year }
+            .filter { if (search.isBlank()) it.happenedOn.year == year else true }
             .filter { mood == null || it.mood == mood }
             .filter {
                 if (search.isBlank()) true
                 else {
-                    val query = search.trim().lowercase()
-                    it.title.lowercase().contains(query) ||
-                        it.location.lowercase().contains(query) ||
-                        it.tags.any { tag -> tag.lowercase().contains(query) }
+                    val queryText = search.trim().lowercase()
+                    it.title.lowercase().contains(queryText) ||
+                        it.location.lowercase().contains(queryText) ||
+                        it.tags.any { tag -> tag.lowercase().contains(queryText) }
                 }
             }
         FootprintUiState(
