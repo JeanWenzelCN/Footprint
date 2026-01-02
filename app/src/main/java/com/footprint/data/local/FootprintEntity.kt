@@ -18,6 +18,8 @@ data class FootprintEntity(
     val photos: List<String>,
     @ColumnInfo(name = "energy_level") val energyLevel: Int,
     @ColumnInfo(name = "happened_on") val happenedOn: LocalDate,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val altitude: Double? = null,
     val weather: String? = null,
     val temperature: Double? = null,

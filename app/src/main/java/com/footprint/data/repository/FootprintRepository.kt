@@ -82,10 +82,12 @@ class FootprintRepository(
         photos = photos,
         energyLevel = energyLevel,
         happenedOn = happenedOn,
+        latitude = latitude,
+        longitude = longitude,
         altitude = altitude,
         weather = weather,
         temperature = temperature,
-        transportType = com.footprint.data.model.TransportType.valueOf(transportType),
+        transportType = try { com.footprint.data.model.TransportType.valueOf(transportType) } catch (e: Exception) { com.footprint.data.model.TransportType.UNKNOWN },
         carbonSavedKg = carbonSaved
     )
 
@@ -100,6 +102,8 @@ class FootprintRepository(
         photos = photos,
         energyLevel = energyLevel,
         happenedOn = happenedOn,
+        latitude = latitude,
+        longitude = longitude,
         altitude = altitude,
         weather = weather,
         temperature = temperature,
@@ -139,7 +143,9 @@ private object SeedData {
             distanceKm = 18.4,
             photos = emptyList(),
             energyLevel = 8,
-            happenedOn = LocalDate.now().minusDays(12)
+            happenedOn = LocalDate.now().minusDays(12),
+            latitude = 31.1,
+            longitude = 102.9
         ),
         FootprintEntity(
             title = "魔都城市夜跑",
@@ -150,7 +156,9 @@ private object SeedData {
             distanceKm = 21.0,
             photos = emptyList(),
             energyLevel = 7,
-            happenedOn = LocalDate.now().minusDays(25)
+            happenedOn = LocalDate.now().minusDays(25),
+            latitude = 31.23,
+            longitude = 121.47
         ),
         FootprintEntity(
             title = "厦门海岸线骑行",
@@ -161,7 +169,9 @@ private object SeedData {
             distanceKm = 32.5,
             photos = emptyList(),
             energyLevel = 6,
-            happenedOn = LocalDate.now().minusDays(37)
+            happenedOn = LocalDate.now().minusDays(37),
+            latitude = 24.47,
+            longitude = 118.1
         )
     )
 

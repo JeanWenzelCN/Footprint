@@ -13,6 +13,8 @@ import com.footprint.data.repository.FootprintAnalytics
 import com.footprint.data.repository.FootprintRepository
 import com.footprint.ui.state.FilterState
 import com.footprint.ui.state.FootprintUiState
+import com.footprint.ui.theme.ThemeMode
+import com.footprint.utils.PreferenceManager
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,17 +27,30 @@ class FootprintViewModel(
     private val repository: FootprintRepository = (application as FootprintApplication).repository
 ) : AndroidViewModel(application) {
 
+    private val preferenceManager = PreferenceManager(application)
+    
     private val moodFilter = MutableStateFlow<Mood?>(null)
     private val searchQuery = MutableStateFlow("")
     private val yearFilter = MutableStateFlow(LocalDate.now().year)
+    private val themeMode = MutableStateFlow(preferenceManager.themeMode)
 
     val uiState = combine(
         repository.observeEntries(),
         repository.observeGoals(),
         moodFilter,
         searchQuery,
-        yearFilter
-    ) { entries, goals, mood, search, year ->
+        yearFilter,
+        themeMode
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        val entries = args[0] as List<FootprintEntry>
+        @Suppress("UNCHECKED_CAST")
+        val goals = args[1] as List<TravelGoal>
+        val mood = args[2] as Mood?
+        val search = args[3] as String
+        val year = args[4] as Int
+        val theme = args[5] as ThemeMode
+
         val visibleEntries = entries
             .filter { it.happenedOn.year == year }
             .filter { mood == null || it.mood == mood }
@@ -54,16 +69,22 @@ class FootprintViewModel(
             goals = goals,
             summary = FootprintAnalytics.buildSummary(entries),
             filterState = FilterState(mood, search, year),
+            themeMode = theme,
             isLoading = false
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = FootprintUiState()
+        initialValue = FootprintUiState(themeMode = preferenceManager.themeMode)
     )
 
     init {
         repository.ensureSeedData()
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        themeMode.value = mode
+        preferenceManager.themeMode = mode
     }
 
     fun toggleMoodFilter(mood: Mood?) {
@@ -81,7 +102,7 @@ class FootprintViewModel(
 
     fun updateFootprint(entry: com.footprint.data.model.FootprintEntry) {
         viewModelScope.launch {
-            repository.saveEntry(entry) // Repository 的 saveEntry 内部使用的是 upsert，所以直接调用即可
+            repository.saveEntry(entry)
         }
     }
 
@@ -100,7 +121,9 @@ class FootprintViewModel(
         distanceKm: Double,
         photos: List<String>,
         energyLevel: Int,
-        date: LocalDate
+        date: LocalDate,
+        latitude: Double? = null,
+        longitude: Double? = null
     ) {
         viewModelScope.launch {
             val entry = FootprintEntry(
@@ -112,7 +135,9 @@ class FootprintViewModel(
                 distanceKm = distanceKm,
                 photos = photos,
                 energyLevel = energyLevel,
-                happenedOn = date
+                happenedOn = date,
+                latitude = latitude,
+                longitude = longitude
             )
             repository.saveEntry(entry)
         }

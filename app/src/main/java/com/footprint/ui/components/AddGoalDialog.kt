@@ -109,7 +109,7 @@ fun AddGoalDialog(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp), 
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) { Text("取消", color = Color.Gray) }
+                    TextButton(onClick = onDismiss) { Text("取消", color = androidx.compose.material3.MaterialTheme.colorScheme.outline) }
                     Button(
                         onClick = {
                             onSave(

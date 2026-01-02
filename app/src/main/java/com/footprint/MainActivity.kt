@@ -13,10 +13,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
         setContent {
-            // style 参数可以动态切换主题，例如 AppThemeStyle.CYBERPUNK
-            FootprintTheme {
-                FootprintApp()
-            }
+            FootprintApp()
         }
     }
 }

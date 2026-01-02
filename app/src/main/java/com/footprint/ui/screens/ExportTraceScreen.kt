@@ -23,8 +23,10 @@ import com.amap.api.maps.MapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
 import com.amap.api.maps.model.PolylineOptions
+import com.amap.api.maps.AMap
 import com.footprint.FootprintViewModel
 import com.footprint.ui.components.GlassMorphicCard
+import androidx.compose.ui.graphics.luminance
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -39,6 +41,7 @@ fun ExportTraceScreen(
 ) {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     
     // Default to today 00:00 to now
     var startDate by remember { mutableStateOf(LocalDate.now()) }
@@ -59,6 +62,10 @@ fun ExportTraceScreen(
         onDispose {
             mapView.onDestroy()
         }
+    }
+
+    LaunchedEffect(isDark) {
+        mapView.map.mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
     }
 
     LaunchedEffect(points) {
@@ -105,7 +112,11 @@ fun ExportTraceScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
-            factory = { mapView },
+            factory = { 
+                mapView.apply {
+                    map.mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
+                }
+            },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -119,7 +130,11 @@ fun ExportTraceScreen(
                 onClick = onBack,
                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack, 
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
 
@@ -138,7 +153,8 @@ fun ExportTraceScreen(
                 Text(
                     "足迹回放 (精确到分钟)",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 
                 Row(
@@ -219,7 +235,8 @@ fun TimeSelector(
             Text(
                 text = date.format(dateFormatter),
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         
@@ -242,7 +259,8 @@ fun TimeSelector(
         ) {
              Text(
                 text = String.format("%02d:%02d", hour, minute),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

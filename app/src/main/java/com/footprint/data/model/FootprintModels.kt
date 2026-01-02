@@ -13,6 +13,8 @@ data class FootprintEntry(
     val photos: List<String>,
     val energyLevel: Int,
     val happenedOn: LocalDate,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val altitude: Double? = null,
     val weather: String? = null,
     val temperature: Double? = null,

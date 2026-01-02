@@ -22,6 +22,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.footprint.data.model.Mood
+import com.footprint.service.LocationTrackingService
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -53,6 +55,9 @@ fun AddFootprintDialog(
         initialEntry?.happenedOn?.atStartOfDay(java.time.ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis()
     )
     var showDatePicker by remember { mutableStateOf(false) }
+
+    // Get current location for new entries
+    val currentLocation by LocationTrackingService.currentLocation.collectAsState()
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -82,7 +87,7 @@ fun AddFootprintDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "添加新的足迹", 
+                    text = if (initialEntry != null) "编辑足迹" else "添加新的足迹", 
                     style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
@@ -152,7 +157,7 @@ fun AddFootprintDialog(
                 }
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("取消", color = Color.Gray) }
+                    TextButton(onClick = onDismiss) { Text("取消", color = androidx.compose.material3.MaterialTheme.colorScheme.outline) }
                     Button(
                         onClick = {
                             val payload = FootprintDraft(
@@ -163,7 +168,9 @@ fun AddFootprintDialog(
                                 tags = tags.split(',', '，').mapNotNull { it.trim().takeIf(String::isNotEmpty) },
                                 distance = distance.toDoubleOrNull() ?: 0.0,
                                 energy = energy.toInt().coerceIn(1, 10),
-                                date = selectedDate
+                                date = selectedDate,
+                                latitude = initialEntry?.latitude ?: currentLocation?.latitude,
+                                longitude = initialEntry?.longitude ?: currentLocation?.longitude
                             )
                             onSave(payload)
                         },
@@ -186,5 +193,7 @@ data class FootprintDraft(
     val tags: List<String>,
     val distance: Double,
     val energy: Int,
-    val date: LocalDate
+    val date: LocalDate,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )

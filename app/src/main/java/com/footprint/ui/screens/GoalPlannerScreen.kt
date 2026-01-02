@@ -3,13 +3,14 @@ package com.footprint.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
@@ -38,26 +39,32 @@ fun GoalPlannerScreen(
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     
     AppBackground(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(text = "目标驾驶舱", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                PlannerCard(modifier = Modifier.weight(1f), title = "年度打卡", value = "${summary.yearly.totalEntries} 次")
-                PlannerCard(modifier = Modifier.weight(1f), title = "活跃天数", value = summary.daysActiveThisYear.toString())
+            item {
+                Text(text = "目标驾驶舱", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                PlannerCard(modifier = Modifier.weight(1f), title = "连续记录", value = "${summary.streakDays} 天")
-                PlannerCard(modifier = Modifier.weight(1f), title = "本月能量", value = summary.monthly.energyAverage.takeIf { it > 0 }?.toInt()?.toString() ?: "-" )
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    PlannerCard(modifier = Modifier.weight(1f), title = "年度打卡", value = "${summary.yearly.totalEntries} 次")
+                    PlannerCard(modifier = Modifier.weight(1f), title = "活跃天数", value = summary.daysActiveThisYear.toString())
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    PlannerCard(modifier = Modifier.weight(1f), title = "连续记录", value = "${summary.streakDays} 天")
+                    PlannerCard(modifier = Modifier.weight(1f), title = "本月能量", value = summary.monthly.energyAverage.takeIf { it > 0 }?.toInt()?.toString() ?: "-" )
+                }
             }
     
-            Button(onClick = onAddGoal) { Text("添加目标") }
+            item {
+                Button(onClick = onAddGoal) { Text("添加目标") }
+            }
     
-            goals.forEach { goal ->
+            items(goals) { goal ->
                 GlassMorphicCard(
                     modifier = Modifier.fillMaxWidth().clickable { onEditGoal(goal) },
                     shape = RoundedCornerShape(16.dp)

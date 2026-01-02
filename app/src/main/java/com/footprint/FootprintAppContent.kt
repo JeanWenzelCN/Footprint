@@ -1,9 +1,12 @@
 package com.footprint
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,6 +28,7 @@ import androidx.navigation.compose.*
 import com.footprint.ui.components.AddFootprintDialog
 import com.footprint.ui.components.AddGoalDialog
 import com.footprint.ui.screens.*
+import com.footprint.ui.theme.FootprintTheme
 
 @Composable
 fun FootprintApp() {
@@ -40,119 +45,147 @@ fun FootprintApp() {
     val currentDestination = navBackStackEntry?.destination?.route
     
     val isBlurActive = showEntryDialog || editingEntry != null || showGoalDialog || editingGoal != null
+    val isDark = uiState.themeMode == com.footprint.ui.theme.ThemeMode.DARK || 
+                (uiState.themeMode == com.footprint.ui.theme.ThemeMode.SYSTEM && isSystemInDarkTheme())
 
-    Scaffold(
-        modifier = Modifier.then(
-            if (isBlurActive) {
-                Modifier
-                    .blur(16.dp)
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(Color.White.copy(alpha = 0.3f)) // Add overlay to improve legibility of dialogs
-                    }
-            } else Modifier
-        ),
-        floatingActionButton = {
-            if (currentDestination != "map" && currentDestination != "export_trace") {
-                ExtendedFloatingActionButton(
-                    onClick = { showEntryDialog = true },
-                    icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
-                    text = { Text("记录足迹") }
-                )
-            }
-        },
-        bottomBar = {
-            if (currentDestination != "export_trace") {
-                // 液态玻璃底部栏
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 20.dp)
-                        .height(72.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
-                ) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        tonalElevation = 0.dp
-                    ) {
-                        FootprintTab.entries.forEach { tab ->
-                            val selected = currentDestination == tab.route
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = {
-                                    navController.navigate(tab.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                icon = {
-                                    Icon(
-                                        tab.icon,
-                                        contentDescription = tab.label,
-                                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    FootprintTheme(themeMode = uiState.themeMode) {
+        Scaffold(
+            modifier = Modifier.then(
+                if (isBlurActive) {
+                    Modifier
+                        .blur(16.dp)
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f))
+                        }
+                } else Modifier
+            ),
+            floatingActionButton = {
+                if (currentDestination != "map" && currentDestination != "export_trace" && currentDestination != "settings") {
+                    ExtendedFloatingActionButton(
+                        onClick = { showEntryDialog = true },
+                        icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+                        text = { Text("记录足迹") }
+                    )
+                }
+            },
+            bottomBar = {
+                if (currentDestination != "export_trace" && currentDestination != "settings") {
+                    // 液态玻璃底部栏
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 20.dp)
+                            .height(72.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        if (isDark) Color.White.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.4f),
+                                        if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.1f)
                                     )
-                                },
-                                label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                )
+                                ),
+                                shape = RoundedCornerShape(24.dp)
                             )
+                    ) {
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            tonalElevation = 0.dp
+                        ) {
+                            FootprintTab.entries.forEach { tab ->
+                                val selected = currentDestination == tab.route
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = {
+                                        navController.navigate(tab.route) {
+                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                    icon = {
+                                        Icon(
+                                            tab.icon,
+                                            contentDescription = tab.label,
+                                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                        )
+                                    },
+                                    label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    )
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = "dashboard",
-            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()), // 调整 Padding 避免遮挡玻璃栏
-            enterTransition = { 
-                fadeIn(animationSpec = tween(400)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400))
-            },
-            exitTransition = { 
-                fadeOut(animationSpec = tween(400)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400))
-            }
-        ) {
-            composable("dashboard") {
-                DashboardScreen(
-                    state = uiState,
-                    onSearch = viewModel::updateSearch,
-                    onYearShift = viewModel::shiftYear,
-                    onMoodSelected = viewModel::toggleMoodFilter,
-                    onCreateGoal = { showGoalDialog = true },
-                    onExportTrace = { navController.navigate("export_trace") },
-                    onEditEntry = { editingEntry = it },
-                    onEditGoal = { editingGoal = it }
-                )
-            }
-            composable("export_trace") {
-                ExportTraceScreen(
-                    viewModel = viewModel,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-            composable("map") { MapScreen() }
-            composable("timeline") {
-                TimelineScreen(
-                    entries = uiState.visibleEntries,
-                    filterState = uiState.filterState,
-                    onMoodFilterChange = viewModel::toggleMoodFilter,
-                    onSearch = viewModel::updateSearch,
-                    onEditEntry = { editingEntry = it }
-                )
-            }
-            composable("planner") {
-                GoalPlannerScreen(
-                    goals = uiState.goals,
-                    summary = uiState.summary,
-                    onToggleGoal = viewModel::toggleGoal,
-                    onAddGoal = { showGoalDialog = true },
-                    onEditGoal = { editingGoal = it }
-                )
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = "dashboard",
+                modifier = Modifier.padding(
+                    bottom = if (currentDestination != "export_trace" && currentDestination != "settings") 
+                        innerPadding.calculateBottomPadding() else 0.dp
+                ),
+                enterTransition = { 
+                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + 
+                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                },
+                exitTransition = { 
+                    fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + 
+                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                }
+            ) {
+                composable("dashboard") {
+                    DashboardScreen(
+                        state = uiState,
+                        onSearch = viewModel::updateSearch,
+                        onYearShift = viewModel::shiftYear,
+                        onMoodSelected = viewModel::toggleMoodFilter,
+                        onCreateGoal = { showGoalDialog = true },
+                        onExportTrace = { navController.navigate("export_trace") },
+                        onSettings = { navController.navigate("settings") },
+                        onEditEntry = { editingEntry = it },
+                        onEditGoal = { editingGoal = it }
+                    )
+                }
+                composable("settings") {
+                    SettingsScreen(
+                        currentThemeMode = uiState.themeMode,
+                        onThemeModeChange = viewModel::setThemeMode,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("export_trace") {
+                    ExportTraceScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("map") { 
+                    MapScreen(entries = uiState.visibleEntries) 
+                }
+                composable("timeline") {
+                    TimelineScreen(
+                        entries = uiState.visibleEntries,
+                        filterState = uiState.filterState,
+                        onMoodFilterChange = viewModel::toggleMoodFilter,
+                        onSearch = viewModel::updateSearch,
+                        onEditEntry = { editingEntry = it }
+                    )
+                }
+                composable("planner") {
+                    GoalPlannerScreen(
+                        goals = uiState.goals,
+                        summary = uiState.summary,
+                        onToggleGoal = viewModel::toggleGoal,
+                        onAddGoal = { showGoalDialog = true },
+                        onEditGoal = { editingGoal = it }
+                    )
+                }
             }
         }
     }
@@ -175,7 +208,9 @@ fun FootprintApp() {
                         tags = payload.tags,
                         distanceKm = payload.distance,
                         energyLevel = payload.energy,
-                        happenedOn = payload.date
+                        happenedOn = payload.date,
+                        latitude = payload.latitude,
+                        longitude = payload.longitude
                     ))
                 } else {
                     viewModel.addFootprint(
@@ -187,7 +222,9 @@ fun FootprintApp() {
                         distanceKm = payload.distance,
                         photos = emptyList(),
                         energyLevel = payload.energy,
-                        date = payload.date
+                        date = payload.date,
+                        latitude = payload.latitude,
+                        longitude = payload.longitude
                     )
                 }
                 showEntryDialog = false

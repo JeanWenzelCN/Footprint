@@ -35,19 +35,30 @@ import com.amap.api.maps.MapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.PolylineOptions
+import com.amap.api.maps.model.MarkerOptions
+import com.amap.api.maps.model.BitmapDescriptorFactory
+import com.amap.api.maps.AMap
+import com.footprint.data.model.FootprintEntry
 import com.footprint.service.LocationTrackingService
 import com.footprint.utils.ApiKeyManager
 import com.footprint.ui.components.GlassMorphicCard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.luminance
 import com.footprint.utils.AppUtils
 
 @Composable
-fun MapScreen() {
+fun MapScreen(
+    entries: List<FootprintEntry> = emptyList()
+) {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     
+    var selectedEntry by remember { mutableStateOf<FootprintEntry?>(null) }
+
     // 管理 MapView 生命周期
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
@@ -61,9 +72,7 @@ fun MapScreen() {
         }
         lifecycle.addObserver(lifecycleObserver)
         
-        // 关键修复：手动调用 onCreate，防止因生命周期错位导致白屏
         mapView.onCreate(Bundle())
-        // 如果当前已经在前台（例如从其他页面返回或首次加载时已 RESUMED），补调 onResume
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             mapView.onResume()
         }
@@ -72,6 +81,11 @@ fun MapScreen() {
             lifecycle.removeObserver(lifecycleObserver)
             mapView.onDestroy()
         }
+    }
+
+    // 监听主题变化，更新地图样式
+    LaunchedEffect(isDark) {
+        mapView.map.mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
     }
     
     // 扩展权限列表
@@ -101,8 +115,8 @@ fun MapScreen() {
     // 监听位置，并确保相机移动是基于有效坐标的
     LaunchedEffect(currentLocation) {
         currentLocation?.let { loc ->
-            if (loc.latitude > 1.0) {
-                mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 17f))
+            if (loc.latitude > 1.0 && !isTracking) { // Only auto-pan if not tracking path, or handle better
+                // mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 17f))
             }
         }
     }
@@ -110,52 +124,101 @@ fun MapScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
+            .background(MaterialTheme.colorScheme.background)
             .then(
                 if (showApiKeyDialog) {
                     Modifier
                         .blur(16.dp)
                         .drawWithContent {
                             drawContent()
-                            drawRect(Color.White.copy(alpha = 0.3f))
+                            drawRect(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f))
                         }
                 } else Modifier
             )
-    ) { // 增加背景色，区分是地图黑屏还是View没加载
+    ) { 
         if (hasPermission) {
             AndroidView(
                 factory = { ctx ->
                     mapView.apply {
-                        // 必须手动调用 onCreate (即使在 DisposableEffect 中调用过，这里确保 View 树加载时已就绪)
-                        // 注意：为了避免重复调用导致异常，通常依赖外部 Lifecycle，但为了防止黑屏，
-                        // 我们在这里确保它有一些基本参数。
-                        // 实际最好的做法是只依赖 DisposableEffect，但这里我们设置一个初始位置防止 (0,0)
-                        
                         map.apply {
                             uiSettings.isMyLocationButtonEnabled = false
                             isMyLocationEnabled = true
+                            mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
                             myLocationStyle = MyLocationStyle().apply {
                                 myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
                                 interval(2000)
                                 showMyLocation(true)
                             }
-                            // 默认移动到北京，防止初始黑屏
+                            
+                            setOnMarkerClickListener { marker ->
+                                val entryId = marker.snippet?.toLongOrNull()
+                                selectedEntry = entries.find { it.id == entryId }
+                                true
+                            }
+                            
+                            setOnMapClickListener {
+                                selectedEntry = null
+                            }
+
                             moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(39.9042, 116.4074), 10f))
                         }
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             ) { mv ->
+                mv.map.clear()
+                
+                // Draw Tracking Path
                 if (trackingPath.isNotEmpty()) {
-                    mv.map.clear()
                     val points = trackingPath.map { LatLng(it.latitude, it.longitude) }
                     mv.map.addPolyline(PolylineOptions().addAll(points).width(18f).color(android.graphics.Color.parseColor("#00FF9F")))
+                }
+                
+                // Draw Footprint Markers
+                entries.forEach { entry ->
+                    if (entry.latitude != null && entry.longitude != null) {
+                        mv.map.addMarker(
+                            MarkerOptions()
+                                .position(LatLng(entry.latitude, entry.longitude))
+                                .title(entry.title)
+                                .snippet(entry.id.toString())
+                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+                        )
+                    }
                 }
             }
         } else {
             PermissionDenyOverlay { launcher.launch(permissionsToRequest) }
         }
         
+        // Footprint Detail Card
+        AnimatedVisibility(
+            visible = selectedEntry != null,
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp, start = 24.dp, end = 24.dp)
+        ) {
+            selectedEntry?.let { entry ->
+                GlassMorphicCard(
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(entry.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(entry.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        }
+                        IconButton(onClick = { selectedEntry = null }) {
+                            Icon(Icons.Default.Close, null)
+                        }
+                    }
+                }
+            }
+        }
+
         // API Key 设置按钮
         Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 48.dp, end = 20.dp)) {
             GlassMorphicCard(
@@ -166,7 +229,7 @@ fun MapScreen() {
                     onClick = { showApiKeyDialog = true },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Icon(Icons.Default.Settings, "设置 API Key", tint = Color.Black.copy(alpha = 0.8f))
+                    Icon(Icons.Default.Settings, "设置 API Key", tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -182,14 +245,13 @@ fun MapScreen() {
                         if (currentLocation != null && currentLocation!!.latitude > 1.0) {
                             mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(currentLocation!!.latitude, currentLocation!!.longitude), 18f))
                         } else {
-                            // 强制拉起一次定位
                             android.widget.Toast.makeText(context, "正在请求定位...", android.widget.Toast.LENGTH_SHORT).show()
                             LocationTrackingService.startTracking(context)
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black.copy(alpha = 0.8f))
+                    Icon(Icons.Rounded.GpsFixed, null, tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -199,7 +261,7 @@ fun MapScreen() {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 110.dp)
+                .padding(bottom = 20.dp) // Adjusted for bottom nav bar padding if any, but since it's a separate screen...
                 .fillMaxWidth()
                 .height(88.dp)
         ) {
@@ -215,7 +277,7 @@ fun MapScreen() {
                     Column {
                         Text(
                             "GPS 状态", 
-                            color = Color.Black.copy(alpha = 0.6f), 
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), 
                             style = MaterialTheme.typography.labelSmall
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -231,8 +293,8 @@ fun MapScreen() {
                             else LocationTrackingService.startTracking(context)
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isTracking) Color(0xFFFF4D4F) else Color(0xFF1890FF),
-                            contentColor = Color.White
+                            containerColor = if (isTracking) Color(0xFFFF4D4F) else MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = RoundedCornerShape(16.dp),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
@@ -253,7 +315,6 @@ fun MapScreen() {
             onDismiss = { showApiKeyDialog = false },
             onSave = { key ->
                 ApiKeyManager.setApiKey(context, key)
-                // 立即生效，无需重启
                 try {
                     com.amap.api.maps.MapsInitializer.setApiKey(key)
                     com.amap.api.location.AMapLocationClient.setApiKey(key)
@@ -286,24 +347,24 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
                 Text(
                     "设置 API Key", 
                     style = MaterialTheme.typography.titleLarge, 
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // SHA1 显示区域
                 Text(
                     text = "Package: ${context.packageName}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.Black.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "SHA1 (点击复制):", style = MaterialTheme.typography.labelMedium, color = Color.Black.copy(alpha = 0.7f))
+                Text(text = "SHA1 (点击复制):", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .background(Color.Black.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
                         .clickable {
                             clipboardManager.setText(AnnotatedString(sha1))
                             android.widget.Toast.makeText(context, "SHA1 已复制", android.widget.Toast.LENGTH_SHORT).show()
@@ -315,7 +376,7 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
                         style = MaterialTheme.typography.labelSmall, 
                         modifier = Modifier.weight(1f),
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        color = Color.Black.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
                     Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                 }
@@ -324,7 +385,7 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
                 Text(
                     "请输入您的高德地图 API Key：", 
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Black.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -334,8 +395,10 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF1890FF),
-                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -344,12 +407,12 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("取消", color = Color.Gray)
+                        Text("取消", color = MaterialTheme.colorScheme.outline)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { onSave(apiKey) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1890FF))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text("保存")
                     }
@@ -361,10 +424,10 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
 
 @Composable
 fun PermissionDenyOverlay(onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Security, null, tint = Color(0xFF00FF9F), modifier = Modifier.size(64.dp))
-            Text("需要定位与通知权限", color = Color.White, modifier = Modifier.padding(top = 16.dp))
+            Icon(Icons.Default.Security, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+            Text("需要定位与通知权限", color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(top = 16.dp))
             Button(onClick = onRetry, modifier = Modifier.padding(top = 24.dp)) { Text("立即授权") }
         }
     }
