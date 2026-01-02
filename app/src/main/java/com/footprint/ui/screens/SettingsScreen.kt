@@ -81,7 +81,7 @@ fun SettingsScreen(
                 item {
                     ListItem(
                         headlineContent = { Text("版本信息") },
-                        supportingContent = { Text("v1.2.0-beta") },
+                        supportingContent = { Text("v1.2.0") },
                         leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null) }
                     )
                 }
