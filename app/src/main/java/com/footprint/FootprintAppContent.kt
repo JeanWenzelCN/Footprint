@@ -9,11 +9,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -49,212 +51,224 @@ fun FootprintApp() {
                 (uiState.themeMode == com.footprint.ui.theme.ThemeMode.SYSTEM && isSystemInDarkTheme())
 
     FootprintTheme(themeMode = uiState.themeMode) {
-        Scaffold(
-            modifier = Modifier.then(
-                if (isBlurActive) {
-                    Modifier
-                        .blur(16.dp)
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f))
-                        }
-                } else Modifier
-            ),
-            floatingActionButton = {
-                if (currentDestination != "map" && currentDestination != "export_trace" && currentDestination != "settings") {
-                    ExtendedFloatingActionButton(
-                        onClick = { showEntryDialog = true },
-                        icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
-                        text = { Text("记录足迹") }
-                    )
-                }
-            },
-            bottomBar = {
-                if (currentDestination != "export_trace" && currentDestination != "settings") {
-                    // 液态玻璃底部栏
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 20.dp)
-                            .height(72.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        if (isDark) Color.White.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.4f),
-                                        if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.1f)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                    ) {
-                        NavigationBar(
-                            containerColor = Color.Transparent,
-                            tonalElevation = 0.dp
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.then(
+                    if (isBlurActive) {
+                        Modifier
+                            .blur(16.dp)
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f))
+                            }
+                    } else Modifier
+                ),
+                floatingActionButton = {
+                    if (currentDestination != "map" && currentDestination != "export_trace" && currentDestination != "settings") {
+                        FloatingActionButton(
+                            onClick = { showEntryDialog = true },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White,
+                            shape = CircleShape,
+                            modifier = Modifier.padding(bottom = 80.dp) // Offset for bottom bar
                         ) {
-                            FootprintTab.entries.forEach { tab ->
-                                val selected = currentDestination == tab.route
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = {
-                                        navController.navigate(tab.route) {
-                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                    icon = {
-                                        Icon(
-                                            tab.icon,
-                                            contentDescription = tab.label,
-                                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            Icon(Icons.Outlined.Add, contentDescription = null)
+                        }
+                    }
+                },
+                bottomBar = {
+                    if (currentDestination != "export_trace" && currentDestination != "settings") {
+                        // 仿 Telegram 高级感悬浮导航
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 24.dp)
+                                .height(64.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                                .border(
+                                    width = 0.5.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
+                                            if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.02f)
                                         )
-                                    },
-                                    label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                    )
+                                    ),
+                                    shape = CircleShape
                                 )
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                FootprintTab.entries.forEach { tab ->
+                                    val selected = currentDestination == tab.route
+                                    IconButton(
+                                        onClick = {
+                                            navController.navigate(tab.route) {
+                                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(
+                                                tab.icon,
+                                                contentDescription = tab.label,
+                                                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            if (selected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MaterialTheme.colorScheme.primary)
+                                                        .padding(top = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = "dashboard",
-                modifier = Modifier.padding(
-                    bottom = if (currentDestination != "export_trace" && currentDestination != "settings") 
-                        innerPadding.calculateBottomPadding() else 0.dp
-                ),
-                enterTransition = { 
-                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + 
-                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
                 },
-                exitTransition = { 
-                    fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + 
-                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-                }
-            ) {
-                composable("dashboard") {
-                    DashboardScreen(
-                        state = uiState,
-                        onSearch = viewModel::updateSearch,
-                        onYearShift = viewModel::shiftYear,
-                        onMoodSelected = viewModel::toggleMoodFilter,
-                        onCreateGoal = { showGoalDialog = true },
-                        onExportTrace = { navController.navigate("export_trace") },
-                        onSettings = { navController.navigate("settings") },
-                        onEditEntry = { editingEntry = it },
-                        onEditGoal = { editingGoal = it }
-                    )
-                }
-                composable("settings") {
-                    SettingsScreen(
-                        currentThemeMode = uiState.themeMode,
-                        onThemeModeChange = viewModel::setThemeMode,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable("export_trace") {
-                    ExportTraceScreen(
-                        viewModel = viewModel,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable("map") { 
-                    MapScreen(entries = uiState.visibleEntries) 
-                }
-                composable("timeline") {
-                    TimelineScreen(
-                        entries = uiState.visibleEntries,
-                        filterState = uiState.filterState,
-                        onMoodFilterChange = viewModel::toggleMoodFilter,
-                        onSearch = viewModel::updateSearch,
-                        onEditEntry = { editingEntry = it }
-                    )
-                }
-                composable("planner") {
-                    GoalPlannerScreen(
-                        goals = uiState.goals,
-                        summary = uiState.summary,
-                        onToggleGoal = viewModel::toggleGoal,
-                        onAddGoal = { showGoalDialog = true },
-                        onEditGoal = { editingGoal = it }
-                    )
+                contentWindowInsets = WindowInsets(0, 0, 0, 0)
+            ) { innerPadding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = "dashboard",
+                    modifier = Modifier.fillMaxSize(),
+                    enterTransition = { 
+                        fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + 
+                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                    },
+                    exitTransition = { 
+                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + 
+                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                    }
+                ) {
+                    composable("dashboard") {
+                        DashboardScreen(
+                            state = uiState,
+                            onSearch = viewModel::updateSearch,
+                            onYearShift = viewModel::shiftYear,
+                            onMoodSelected = viewModel::toggleMoodFilter,
+                            onCreateGoal = { showGoalDialog = true },
+                            onExportTrace = { navController.navigate("export_trace") },
+                            onSettings = { navController.navigate("settings") },
+                            onEditEntry = { editingEntry = it },
+                            onEditGoal = { editingGoal = it }
+                        )
+                    }
+                    composable("settings") {
+                        SettingsScreen(
+                            currentThemeMode = uiState.themeMode,
+                            onThemeModeChange = viewModel::setThemeMode,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable("export_trace") {
+                        ExportTraceScreen(
+                            viewModel = viewModel,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable("map") { 
+                        MapScreen(entries = uiState.visibleEntries) 
+                    }
+                    composable("timeline") {
+                        TimelineScreen(
+                            entries = uiState.visibleEntries,
+                            filterState = uiState.filterState,
+                            onMoodFilterChange = viewModel::toggleMoodFilter,
+                            onSearch = viewModel::updateSearch,
+                            onEditEntry = { editingEntry = it }
+                        )
+                    }
+                    composable("planner") {
+                        GoalPlannerScreen(
+                            goals = uiState.goals,
+                            summary = uiState.summary,
+                            onToggleGoal = viewModel::toggleGoal,
+                            onAddGoal = { showGoalDialog = true },
+                            onEditGoal = { editingGoal = it }
+                        )
+                    }
                 }
             }
         }
-    }
 
-    // 处理添加/编辑对话框
-    if (showEntryDialog || editingEntry != null) {
-        AddFootprintDialog(
-            initialEntry = editingEntry,
-            onDismiss = { 
-                showEntryDialog = false
-                editingEntry = null
-            },
-            onSave = { payload ->
-                if (editingEntry != null) {
-                    viewModel.updateFootprint(editingEntry!!.copy(
-                        title = payload.title,
-                        location = payload.location,
-                        detail = payload.detail,
-                        mood = payload.mood,
-                        tags = payload.tags,
-                        distanceKm = payload.distance,
-                        energyLevel = payload.energy,
-                        happenedOn = payload.date,
-                        latitude = payload.latitude,
-                        longitude = payload.longitude
-                    ))
-                } else {
-                    viewModel.addFootprint(
-                        title = payload.title,
-                        location = payload.location,
-                        detail = payload.detail,
-                        mood = payload.mood,
-                        tags = payload.tags,
-                        distanceKm = payload.distance,
-                        photos = emptyList(),
-                        energyLevel = payload.energy,
-                        date = payload.date,
-                        latitude = payload.latitude,
-                        longitude = payload.longitude
-                    )
+        // 处理添加/编辑对话框
+        if (showEntryDialog || editingEntry != null) {
+            AddFootprintDialog(
+                initialEntry = editingEntry,
+                onDismiss = { 
+                    showEntryDialog = false
+                    editingEntry = null
+                },
+                onSave = { payload ->
+                    if (editingEntry != null) {
+                        viewModel.updateFootprint(editingEntry!!.copy(
+                            title = payload.title,
+                            location = payload.location,
+                            detail = payload.detail,
+                            mood = payload.mood,
+                            tags = payload.tags,
+                            distanceKm = payload.distance,
+                            energyLevel = payload.energy,
+                            happenedOn = payload.date,
+                            latitude = payload.latitude,
+                            longitude = payload.longitude
+                        ))
+                    } else {
+                        viewModel.addFootprint(
+                            title = payload.title,
+                            location = payload.location,
+                            detail = payload.detail,
+                            mood = payload.mood,
+                            tags = payload.tags,
+                            distanceKm = payload.distance,
+                            photos = emptyList(),
+                            energyLevel = payload.energy,
+                            date = payload.date,
+                            latitude = payload.latitude,
+                            longitude = payload.longitude
+                        )
+                    }
+                    showEntryDialog = false
+                    editingEntry = null
                 }
-                showEntryDialog = false
-                editingEntry = null
-            }
-        )
-    }
+            )
+        }
 
-    if (showGoalDialog || editingGoal != null) {
-        AddGoalDialog(
-            initialGoal = editingGoal,
-            onDismiss = { 
-                showGoalDialog = false
-                editingGoal = null
-            },
-            onSave = { goal ->
-                if (editingGoal != null) {
-                    viewModel.updateGoal(editingGoal!!.copy(
-                        title = goal.title,
-                        targetLocation = goal.location,
-                        targetDate = goal.date,
-                        notes = goal.notes
-                    ))
-                } else {
-                    viewModel.addGoal(goal.title, goal.location, goal.date, goal.notes)
+        if (showGoalDialog || editingGoal != null) {
+            AddGoalDialog(
+                initialGoal = editingGoal,
+                onDismiss = { 
+                    showGoalDialog = false
+                    editingGoal = null
+                },
+                onSave = { goal ->
+                    if (editingGoal != null) {
+                        viewModel.updateGoal(editingGoal!!.copy(
+                            title = goal.title,
+                            targetLocation = goal.location,
+                            targetDate = goal.date,
+                            notes = goal.notes
+                        ))
+                    } else {
+                        viewModel.addGoal(goal.title, goal.location, goal.date, goal.notes)
+                    }
+                    showGoalDialog = false
+                    editingGoal = null
                 }
-                showGoalDialog = false
-                editingGoal = null
-            }
-        )
+            )
+        }
     }
 }
 
