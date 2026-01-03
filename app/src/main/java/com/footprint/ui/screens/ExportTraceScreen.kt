@@ -153,7 +153,7 @@ fun ExportTraceScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "足迹回放 (精确到分钟)",
+                    "足迹回放",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface

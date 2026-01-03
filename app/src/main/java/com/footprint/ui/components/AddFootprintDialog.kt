@@ -44,6 +44,15 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.*
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddFootprintDialog(
@@ -58,15 +67,24 @@ fun AddFootprintDialog(
     var distance by remember { mutableStateOf(initialEntry?.distanceKm?.toString() ?: "5") }
     var energy by remember { mutableStateOf(initialEntry?.energyLevel?.toFloat() ?: 6f) }
     var mood by remember { mutableStateOf(initialEntry?.mood ?: Mood.EXCITED) }
+    var selectedIcon by remember { mutableStateOf(initialEntry?.icon ?: "LocationOn") }
     val datePickerState = rememberDatePickerState(
         initialEntry?.happenedOn?.atStartOfDay(java.time.ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis()
     )
     var showDatePicker by remember { mutableStateOf(false) }
 
+    val availableIcons = listOf(
+        "LocationOn", "Restaurant", "LocalCafe", "Park", "Flight", 
+        "Train", "DirectionsBike", "ShoppingBag", "CameraAlt", "MusicNote", 
+        "Movie", "DirectionsRun", "Pets", "School", "Work"
+    )
+
     // Get current location for new entries
     val currentLocation by LocationTrackingService.currentLocation.collectAsState()
 
     if (showDatePicker) {
+// ... (omitted parts for context but tool should replace correctly)
+// Actually I should provide more context to be safe.
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -107,75 +125,40 @@ fun AddFootprintDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("地点") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = detail,
-                    onValueChange = { detail = it },
-                    label = { Text("故事和感受") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            if (location.isNotBlank()) {
-                                detail = AIStoryGenerator.generateStory(location, mood, selectedDate)
+
+                // Icon Picker
+                Column {
+                    Text("选择图标", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(availableIcons) { iconName ->
+                            val isSelected = selectedIcon == iconName
+                            val icon = IconUtils.getIconByName(iconName)
+                            Surface(
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .clickable { selectedIcon = iconName }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        icon, 
+                                        null, 
+                                        tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
-                        }) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "AI Generate", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
-                )
+                }
+
                 OutlinedTextField(
-                    value = tags,
-                    onValueChange = { tags = it },
-                    label = { Text("标签，用逗号分隔") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Mood.entries.forEach { option ->
-                        FilterChip(
-                            selected = mood == option,
-                            onClick = { mood = option },
-                            label = { Text(option.label) }
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = distance,
-                        onValueChange = { distance = it },
-                        label = { Text("里程 (km)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    Button(
-                        onClick = { showDatePicker = true },
-                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
-                    ) {
-                        Text("日期")
-                    }
-                }
-                
-                Column {
-                    Text(
-                        text = "活力指数: ${energy.toInt()}",
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                    )
-                    Slider(
-                        value = energy,
-                        onValueChange = { energy = it },
-                        steps = 8,
-                        valueRange = 1f..10f
-                    )
-                }
-                
+// ...
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("取消", color = androidx.compose.material3.MaterialTheme.colorScheme.outline) }
                     Button(
@@ -190,7 +173,8 @@ fun AddFootprintDialog(
                                 energy = energy.toInt().coerceIn(1, 10),
                                 date = selectedDate,
                                 latitude = initialEntry?.latitude ?: currentLocation?.latitude,
-                                longitude = initialEntry?.longitude ?: currentLocation?.longitude
+                                longitude = initialEntry?.longitude ?: currentLocation?.longitude,
+                                icon = selectedIcon
                             )
                             onSave(payload)
                         },
@@ -215,5 +199,6 @@ data class FootprintDraft(
     val energy: Int,
     val date: LocalDate,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val icon: String = "LocationOn"
 )

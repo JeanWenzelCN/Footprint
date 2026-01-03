@@ -158,17 +158,20 @@ private fun TelegramGoalItem(
             verticalAlignment = Alignment.Top
         ) {
             // 自定义 Checkbox 效果
-            Surface(
-                onClick = onToggle,
-                shape = CircleShape,
-                color = if (goal.isCompleted) MaterialTheme.colorScheme.primary else Color.Transparent,
-                border = if (goal.isCompleted) null else androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (goal.isCompleted) Icons.Default.Check else com.footprint.ui.components.IconUtils.getIconByName(goal.icon),
+                null,
+                tint = if (goal.isCompleted) Color.White else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
-            ) {
-                if (goal.isCompleted) {
-                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.padding(4.dp))
-                }
-            }
+            )
+        }
             
             Spacer(modifier = Modifier.width(16.dp))
             

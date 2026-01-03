@@ -24,6 +24,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +46,18 @@ class FootprintViewModel(
     private val nickname = MutableStateFlow(preferenceManager.nickname)
     private val avatarId = MutableStateFlow(preferenceManager.avatarId)
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val yearlyTrackPointCount = yearFilter.flatMapLatest { year ->
+        flow {
+            emit(repository.getTrackPointCount(year))
+        }
+    }
+
+    private val monthlyTrackPointCount = flow {
+        val now = LocalDate.now()
+        emit(repository.getTrackPointCount(now.year, now.monthValue))
+    }
+
     val uiState = combine(
         repository.observeEntries(),
         repository.observeGoals(),
@@ -53,7 +67,9 @@ class FootprintViewModel(
         themeMode,
         themeStyle,
         nickname,
-        avatarId
+        avatarId,
+        yearlyTrackPointCount,
+        monthlyTrackPointCount
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val entries = args[0] as List<FootprintEntry>
@@ -66,8 +82,11 @@ class FootprintViewModel(
         val style = args[6] as com.footprint.ui.theme.AppThemeStyle
         val nk = args[7] as String
         val av = args[8] as String
+        val yPoints = args[9] as Int
+        val mPoints = args[10] as Int
 
         val visibleEntries = entries
+            .filter { if (search.isBlank()) it.happenedOn.year == year else true }
             .filter { mood == null || it.mood == mood }
             .filter {
                 if (search.isBlank()) true
@@ -79,6 +98,9 @@ class FootprintViewModel(
                 }
             }
         
+        val visibleGoals = goals
+            .filter { if (search.isBlank()) it.targetDate.year == year else true }
+
         // Memory of the day: "On This Day" from previous years
         val today = LocalDate.now()
         val historicalMemories = entries.filter { 
@@ -107,8 +129,8 @@ class FootprintViewModel(
         FootprintUiState(
             entries = entries,
             visibleEntries = visibleEntries,
-            goals = goals,
-            summary = FootprintAnalytics.buildSummary(entries, year),
+            goals = visibleGoals,
+            summary = FootprintAnalytics.buildSummary(entries, year, yPoints, mPoints),
             filterState = FilterState(mood, search, year),
             themeMode = theme,
             themeStyle = style,
@@ -236,7 +258,8 @@ class FootprintViewModel(
         energyLevel: Int,
         date: LocalDate,
         latitude: Double? = null,
-        longitude: Double? = null
+        longitude: Double? = null,
+        icon: String = "LocationOn"
     ) {
         viewModelScope.launch {
             val entry = FootprintEntry(
@@ -250,7 +273,8 @@ class FootprintViewModel(
                 energyLevel = energyLevel,
                 happenedOn = date,
                 latitude = latitude,
-                longitude = longitude
+                longitude = longitude,
+                icon = icon
             )
             repository.saveEntry(entry)
         }
@@ -260,7 +284,8 @@ class FootprintViewModel(
         title: String,
         targetLocation: String,
         targetDate: LocalDate,
-        notes: String
+        notes: String,
+        icon: String = "Flag"
     ) {
         viewModelScope.launch {
             val goal = TravelGoal(
@@ -269,7 +294,8 @@ class FootprintViewModel(
                 targetDate = targetDate,
                 notes = notes,
                 isCompleted = false,
-                progress = 5
+                progress = 5,
+                icon = icon
             )
             repository.saveGoal(goal)
         }

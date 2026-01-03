@@ -135,11 +135,11 @@ private fun TelegramEntryItem(
                 .background(entry.mood.color.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = entry.title.take(1),
-                style = MaterialTheme.typography.titleLarge,
-                color = entry.mood.color,
-                fontWeight = FontWeight.Bold
+            Icon(
+                com.footprint.ui.components.IconUtils.getIconByName(entry.icon),
+                contentDescription = null,
+                tint = entry.mood.color,
+                modifier = Modifier.size(28.dp)
             )
         }
 

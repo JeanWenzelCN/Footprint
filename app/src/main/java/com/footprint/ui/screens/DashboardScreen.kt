@@ -1,8 +1,11 @@
 package com.footprint.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -53,12 +56,12 @@ import java.time.format.DateTimeFormatter
 import java.time.LocalDate
 
 enum class StatType(val label: String, val icon: ImageVector) {
-    TOTAL_RECORDS("年度足迹记录", Icons.Default.Description),
-    MILEAGE("里程详情", Icons.Default.Route),
-    UNIQUE_PLACES("探索地点清单", Icons.Default.Place),
-    MONTHLY_RECORDS("本月详细记录", Icons.Default.Description),
-    ENERGY("能量/活力分布", Icons.Default.Bolt),
-    MOOD("心情分布统计", Icons.Default.EmojiEmotions)
+    TRACK_POINTS("年度足迹点数", Icons.Default.Route),
+    MILEAGE("年度总里程", Icons.Default.Map),
+    PLACES("探索地点总计", Icons.Default.Place),
+    RECORDS("年度记录明细", Icons.Default.Description),
+    ENERGY("年度活力指数", Icons.Default.Bolt),
+    MOOD("年度情绪分布", Icons.Default.EmojiEmotions)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,11 +110,25 @@ fun DashboardScreen(
                     .fillMaxSize()
                     .blur(if (isSearchFocused) 20.dp else 0.dp)
             ) {
+                // Year Navigator (Moved up)
+                item {
+                    YearNavigator(
+                        year = state.filterState.year,
+                        onBack = { onYearShift(-1) },
+                        onForward = { onYearShift(1) }
+                    )
+                }
+
                 // Statistics Grid
                 item {
                     StatisticsSection(
                         state = state,
-                        onStatClick = openStatDetail,
+                        onStatClick = { type ->
+                            when (type) {
+                                StatType.TRACK_POINTS -> onExportTrace()
+                                else -> openStatDetail(type)
+                            }
+                        },
                         df = df
                     )
                 }
@@ -135,22 +152,6 @@ fun DashboardScreen(
                     )
                 }
 
-                item {
-                    YearNavigator(
-                        year = state.filterState.year,
-                        onBack = { onYearShift(-1) },
-                        onForward = { onYearShift(1) }
-                    )
-                }
-
-                // Mood Radar
-                item {
-                    MoodRadarSection(
-                        currentMood = state.summary.yearly.dominantMood,
-                        onMoodSelected = onMoodSelected
-                    )
-                }
-
                 // Sections (Use visibleEntries for keyword filtering)
                 recentFootprintsSection(
                     entries = state.visibleEntries, 
@@ -159,6 +160,14 @@ fun DashboardScreen(
                     onDeleteEntry = onDeleteEntry
                 )
                 
+                item {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                }
+
                 goalsListSection(
                     goals = state.goals, 
                     onEditGoal = onEditGoal,
@@ -274,17 +283,39 @@ fun DashboardScreen(
                         }
 
                         Column {
+                            val greeting = remember {
+                                val hour = java.time.LocalTime.now().hour
+                                when {
+                                    hour < 6 -> "凌晨好"
+                                    hour < 12 -> "早安"
+                                    hour < 18 -> "午后时光"
+                                    else -> "晚安"
+                                }
+                            }
                             Text(
-                                text = "Hi, ${state.userNickname}",
+                                text = "$greeting, ${state.userNickname}",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Text(
-                                text = "探索你的世界",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            val levelInfo = remember(state.summary.yearly.totalDistance) {
+                                val dist = state.summary.yearly.totalDistance
+                                when {
+                                    dist < 10 -> "新手旅行者" to Icons.Default.DirectionsWalk
+                                    dist < 50 -> "进阶探索者" to Icons.Default.Explore
+                                    dist < 200 -> "里程达人" to Icons.Default.MilitaryTech
+                                    else -> "传奇旅行家" to Icons.Default.Public
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(levelInfo.second, null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.secondary)
+                                Text(
+                                    text = levelInfo.first,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                     
@@ -414,9 +445,9 @@ fun StatisticsSection(
     onStatClick: (StatType) -> Unit,
     df: DecimalFormat
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp).animateContentSize()) {
         Text(
-            "数据概览", 
+            "年度数据总览", 
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
@@ -429,9 +460,9 @@ fun StatisticsSection(
         ) {
             StatItem(
                 label = "足迹",
-                value = "${state.summary.yearly.totalEntries}",
+                value = "${state.summary.yearly.totalTrackPoints}",
                 modifier = Modifier.weight(1f),
-                onClick = { onStatClick(StatType.TOTAL_RECORDS) }
+                onClick = { onStatClick(StatType.TRACK_POINTS) }
             )
             StatItem(
                 label = "里程",
@@ -442,9 +473,9 @@ fun StatisticsSection(
             )
             StatItem(
                 label = "地点",
-                value = "${state.summary.yearly.uniquePlaces}",
+                value = "${state.summary.yearly.totalEntries}",
                 modifier = Modifier.weight(1f),
-                onClick = { onStatClick(StatType.UNIQUE_PLACES) }
+                onClick = { onStatClick(StatType.PLACES) }
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -454,20 +485,20 @@ fun StatisticsSection(
         ) {
             StatItem(
                 label = "记录",
-                value = "${state.summary.monthly.totalEntries}",
+                value = "${state.summary.yearly.totalEntries}",
                 modifier = Modifier.weight(1f),
-                onClick = { onStatClick(StatType.MONTHLY_RECORDS) }
+                onClick = { onStatClick(StatType.RECORDS) }
             )
             StatItem(
                 label = "活力",
-                value = "${state.summary.monthly.vitalityIndex}",
+                value = "${state.summary.yearly.vitalityIndex}",
                 unit = "指数",
                 modifier = Modifier.weight(1f),
                 onClick = { onStatClick(StatType.ENERGY) }
             )
             StatItem(
                 label = "主情绪",
-                value = state.summary.monthly.dominantMood?.label ?: "待发现",
+                value = state.summary.yearly.dominantMood?.label ?: "待发现",
                 modifier = Modifier.weight(1f),
                 onClick = { onStatClick(StatType.MOOD) }
             )
@@ -653,13 +684,7 @@ private fun StatDetailContent(
     val df = remember { DecimalFormat("0.0") }
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
     
-    val entries = when (type) {
-        StatType.TOTAL_RECORDS, StatType.MILEAGE, StatType.UNIQUE_PLACES -> state.visibleEntries
-        StatType.MONTHLY_RECORDS, StatType.ENERGY, StatType.MOOD -> {
-            val now = LocalDate.now()
-            state.entries.filter { it.happenedOn.year == now.year && it.happenedOn.monthValue == now.monthValue }
-        }
-    }
+    val entries = state.entries.filter { it.happenedOn.year == state.filterState.year }
 
     Column(
         modifier = Modifier
@@ -687,7 +712,7 @@ private fun StatDetailContent(
         }
 
         when (type) {
-            StatType.UNIQUE_PLACES -> {
+            StatType.PLACES -> {
                 val places = entries.groupBy { it.location }
                     .mapValues { it.value.size }
                     .toList()
@@ -797,6 +822,7 @@ private fun StatDetailContent(
     }
 }
 
+
 @Composable
 private fun YearNavigator(year: Int, onBack: () -> Unit, onForward: () -> Unit) {
     Row(
@@ -819,58 +845,152 @@ private fun YearNavigator(year: Int, onBack: () -> Unit, onForward: () -> Unit) 
     }
 }
 
+@Composable
+private fun ExpandableMonthHeader(
+    month: Int,
+    isExpanded: Boolean,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "${month}月",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+        Icon(
+            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = color.copy(alpha = 0.6f)
+        )
+    }
+}
+
 private fun LazyListScope.goalsListSection(
     goals: List<com.footprint.data.model.TravelGoal>,
     onEditGoal: (com.footprint.data.model.TravelGoal) -> Unit,
     onDeleteGoal: (com.footprint.data.model.TravelGoal) -> Unit
 ) {
-    if (goals.isEmpty()) return
-    
+    val grouped = goals.groupBy { it.targetDate.monthValue }
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    
     item {
-        Text(
-            text = "旅行目标", 
-            style = MaterialTheme.typography.labelMedium, 
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-    items(goals) { goal ->
-        SwipeableItem(
-            onEdit = { onEditGoal(goal) },
-            onDelete = { onDeleteGoal(goal) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clickable { onEditGoal(goal) }
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            Icon(Icons.Default.Flag, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+            Text(
+                text = "年度旅行目标", 
+                style = MaterialTheme.typography.labelMedium, 
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+    }
+
+    if (goals.isEmpty()) return
+
+    grouped.forEach { (month, monthGoals) ->
+        item {
+            var isExpanded by remember { mutableStateOf(true) }
+            Column(modifier = Modifier.animateContentSize()) {
+                ExpandableMonthHeader(
+                    month = month,
+                    isExpanded = isExpanded,
+                    color = MaterialTheme.colorScheme.secondary,
+                    onToggle = { isExpanded = !isExpanded }
+                )
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            if (goal.isCompleted) Icons.Default.Check else Icons.Default.Flag,
-                            null,
-                            tint = if (goal.isCompleted) Color.White else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(goal.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("${goal.targetLocation} · ${goal.targetDate.format(formatter)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                        monthGoals.forEach { goal ->
+                            SwipeableItem(
+                                onEdit = { onEditGoal(goal) },
+                                onDelete = { onDeleteGoal(goal) }
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .clickable { onEditGoal(goal) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(if (goal.isCompleted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondaryContainer),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                if (goal.isCompleted) Icons.Default.Check else com.footprint.ui.components.IconUtils.getIconByName(goal.icon),
+                                                null,
+                                                tint = if (goal.isCompleted) Color.White else MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+// ...
+@Composable
+private fun TelegramEntryItem(
+    entry: FootprintEntry, 
+    dateFormatter: DateTimeFormatter, 
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(entry.mood.color.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                com.footprint.ui.components.IconUtils.getIconByName(entry.icon),
+                contentDescription = null,
+                tint = entry.mood.color,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+
+                                        Column {
+                                            Text(goal.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                            Text("${goal.targetLocation} · ${goal.targetDate.format(formatter)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -884,17 +1004,21 @@ private fun LazyListScope.recentFootprintsSection(
     onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
     onDeleteEntry: (com.footprint.data.model.FootprintEntry) -> Unit
 ) {
-    if (entries.isEmpty()) return
+    val grouped = entries.groupBy { it.happenedOn.monthValue }
     val formatter = DateTimeFormatter.ofPattern("MM-dd")
+    
     item {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "最近足迹", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Route, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Text(text = "年度足迹轨迹", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
             Text(
                 text = "新建 +", 
                 style = MaterialTheme.typography.labelMedium, 
@@ -903,12 +1027,36 @@ private fun LazyListScope.recentFootprintsSection(
             )
         }
     }
-    items(entries.take(5)) { entry ->
-        SwipeableItem(
-            onEdit = { onEditEntry(entry) },
-            onDelete = { onDeleteEntry(entry) }
-        ) {
-            TelegramEntryItem(entry, formatter, { onEditEntry(entry) })
+
+    if (entries.isEmpty()) return
+
+    grouped.forEach { (month, monthEntries) ->
+        item {
+            var isExpanded by remember { mutableStateOf(true) }
+            Column(modifier = Modifier.animateContentSize()) {
+                ExpandableMonthHeader(
+                    month = month,
+                    isExpanded = isExpanded,
+                    color = MaterialTheme.colorScheme.primary,
+                    onToggle = { isExpanded = !isExpanded }
+                )
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                        monthEntries.forEach { entry ->
+                            SwipeableItem(
+                                onEdit = { onEditEntry(entry) },
+                                onDelete = { onDeleteEntry(entry) }
+                            ) {
+                                TelegramEntryItem(entry, formatter, { onEditEntry(entry) })
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

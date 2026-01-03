@@ -45,6 +45,23 @@ class FootprintRepository(
         return trackPointDao.getPointsInRange(startTime, endTime)
     }
 
+    suspend fun getTrackPointCount(year: Int, month: Int? = null): Int {
+        val start = if (month == null) {
+            LocalDate.of(year, 1, 1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        } else {
+            LocalDate.of(year, month, 1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        }
+        
+        val end = if (month == null) {
+            LocalDate.of(year, 12, 31).atTime(23, 59, 59).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        } else {
+            val lastDay = LocalDate.of(year, month, 1).lengthOfMonth()
+            LocalDate.of(year, month, lastDay).atTime(23, 59, 59).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        }
+        
+        return trackPointDao.getCountInRange(start, end)
+    }
+
     suspend fun prepareBackup(): com.footprint.data.model.BackupData {
         return com.footprint.data.model.BackupData(
             footprints = footprintDao.getAll(),
@@ -104,7 +121,8 @@ class FootprintRepository(
         weather = weather,
         temperature = temperature,
         transportType = try { com.footprint.data.model.TransportType.valueOf(transportType) } catch (e: Exception) { com.footprint.data.model.TransportType.UNKNOWN },
-        carbonSavedKg = carbonSaved
+        carbonSavedKg = carbonSaved,
+        icon = icon
     )
 
     private fun FootprintEntry.toEntity() = FootprintEntity(
@@ -124,7 +142,8 @@ class FootprintRepository(
         weather = weather,
         temperature = temperature,
         transportType = transportType.name,
-        carbonSaved = carbonSavedKg
+        carbonSaved = carbonSavedKg,
+        icon = icon
     )
 
     private fun TravelGoalEntity.toModel() = TravelGoal(
@@ -134,7 +153,8 @@ class FootprintRepository(
         targetDate = targetDate,
         notes = notes,
         isCompleted = isCompleted,
-        progress = progress
+        progress = progress,
+        icon = icon
     )
 
     private fun TravelGoal.toEntity() = TravelGoalEntity(
@@ -144,7 +164,8 @@ class FootprintRepository(
         targetDate = targetDate,
         notes = notes,
         isCompleted = isCompleted,
-        progress = progress
+        progress = progress,
+        icon = icon
     )
 }
 

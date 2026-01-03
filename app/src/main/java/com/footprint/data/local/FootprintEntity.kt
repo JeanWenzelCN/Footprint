@@ -24,5 +24,6 @@ data class FootprintEntity(
     val weather: String? = null,
     val temperature: Double? = null,
     @ColumnInfo(name = "transport_type") val transportType: String = "UNKNOWN",
-    @ColumnInfo(name = "carbon_saved") val carbonSaved: Double = 0.0
+    @ColumnInfo(name = "carbon_saved") val carbonSaved: Double = 0.0,
+    val icon: String = "LocationOn"
 )

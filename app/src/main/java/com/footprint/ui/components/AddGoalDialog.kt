@@ -27,6 +27,23 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGoalDialog(
@@ -37,13 +54,21 @@ fun AddGoalDialog(
     var title by remember { mutableStateOf(initialGoal?.title ?: "") }
     var location by remember { mutableStateOf(initialGoal?.targetLocation ?: "") }
     var notes by remember { mutableStateOf(initialGoal?.notes ?: "想要达成的体验…") }
+    var selectedIcon by remember { mutableStateOf(initialGoal?.icon ?: "Flag") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
         initialGoal?.targetDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
             ?: System.currentTimeMillis()
     )
 
+    val availableIcons = listOf(
+        "Flag", "Star", "Favorite", "Explore", "Flight", 
+        "Train", "DirectionsBike", "CameraAlt", "Map", "Landscape", 
+        "Hotel", "Restaurant", "LocalActivity", "Event", "BeachAccess"
+    )
+
     if (showDatePicker) {
+// ... (omitted parts for context but tool should replace correctly)
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -84,6 +109,38 @@ fun AddGoalDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                // Icon Picker
+                Column {
+                    Text("选择图标", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(availableIcons) { iconName ->
+                            val isSelected = selectedIcon == iconName
+                            val icon = IconUtils.getIconByName(iconName)
+                            Surface(
+                                color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .clickable { selectedIcon = iconName }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        icon, 
+                                        null, 
+                                        tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = location,
                     onValueChange = { location = it },
@@ -118,7 +175,8 @@ fun AddGoalDialog(
                                     title = title,
                                     location = location,
                                     date = selectedDate,
-                                    notes = notes
+                                    notes = notes,
+                                    icon = selectedIcon
                                 )
                             )
                         },
@@ -135,5 +193,6 @@ data class GoalDraft(
     val title: String,
     val location: String,
     val date: LocalDate,
-    val notes: String
+    val notes: String,
+    val icon: String = "Flag"
 )

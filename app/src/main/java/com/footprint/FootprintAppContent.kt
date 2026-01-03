@@ -288,7 +288,8 @@ fun FootprintApp() {
                             energyLevel = payload.energy,
                             happenedOn = payload.date,
                             latitude = payload.latitude,
-                            longitude = payload.longitude
+                            longitude = payload.longitude,
+                            icon = payload.icon
                         ))
                     } else {
                         viewModel.addFootprint(
@@ -302,7 +303,8 @@ fun FootprintApp() {
                             energyLevel = payload.energy,
                             date = payload.date,
                             latitude = payload.latitude,
-                            longitude = payload.longitude
+                            longitude = payload.longitude,
+                            icon = payload.icon
                         )
                     }
                     showEntryDialog = false
@@ -324,10 +326,11 @@ fun FootprintApp() {
                             title = goal.title,
                             targetLocation = goal.location,
                             targetDate = goal.date,
-                            notes = goal.notes
+                            notes = goal.notes,
+                            icon = goal.icon
                         ))
                     } else {
-                        viewModel.addGoal(goal.title, goal.location, goal.date, goal.notes)
+                        viewModel.addGoal(goal.title, goal.location, goal.date, goal.notes, goal.icon)
                     }
                     showGoalDialog = false
                     editingGoal = null

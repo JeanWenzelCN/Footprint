@@ -22,6 +22,9 @@ interface TrackPointDao {
     @Query("SELECT * FROM track_points")
     suspend fun getAll(): List<TrackPointEntity>
 
+    @Query("SELECT COUNT(*) FROM track_points WHERE timestamp BETWEEN :start AND :end")
+    suspend fun getCountInRange(start: Long, end: Long): Int
+
     @Insert
     suspend fun insertAll(points: List<TrackPointEntity>)
 }

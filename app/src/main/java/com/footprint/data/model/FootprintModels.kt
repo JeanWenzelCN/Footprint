@@ -19,7 +19,8 @@ data class FootprintEntry(
     val weather: String? = null,
     val temperature: Double? = null,
     val transportType: TransportType = TransportType.UNKNOWN,
-    val carbonSavedKg: Double = 0.0
+    val carbonSavedKg: Double = 0.0,
+    val icon: String = "LocationOn"
 )
 
 enum class TransportType(val label: String) {
@@ -33,7 +34,8 @@ data class TravelGoal(
     val targetDate: LocalDate,
     val notes: String,
     val isCompleted: Boolean = false,
-    val progress: Int = 0
+    val progress: Int = 0,
+    val icon: String = "Flag"
 )
 
 data class FootprintSummary(
@@ -50,7 +52,8 @@ data class Stats(
     val dominantMood: Mood? = null,
     val energyAverage: Double = 0.0,
     val vitalityIndex: Int = 0,
-    val topLocations: List<Pair<String, Int>> = emptyList()
+    val topLocations: List<Pair<String, Int>> = emptyList(),
+    val totalTrackPoints: Int = 0
 )
 
 data class PeriodStats(

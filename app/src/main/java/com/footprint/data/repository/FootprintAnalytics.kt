@@ -7,7 +7,12 @@ import com.footprint.data.model.Mood
 import java.time.LocalDate
 
 object FootprintAnalytics {
-    fun buildSummary(entries: List<FootprintEntry>, targetYear: Int = LocalDate.now().year): FootprintSummary {
+    fun buildSummary(
+        entries: List<FootprintEntry>, 
+        targetYear: Int = LocalDate.now().year,
+        yearlyTrackPoints: Int = 0,
+        monthlyTrackPoints: Int = 0
+    ): FootprintSummary {
         val now = LocalDate.now()
         val currentMonth = now.monthValue
 
@@ -15,15 +20,15 @@ object FootprintAnalytics {
         val monthly = yearly.filter { it.happenedOn.monthValue == currentMonth }
 
         return FootprintSummary(
-            yearly = calculateStats(yearly),
-            monthly = calculateStats(monthly),
+            yearly = calculateStats(yearly, yearlyTrackPoints),
+            monthly = calculateStats(monthly, monthlyTrackPoints),
             streakDays = computeStreak(entries.map { it.happenedOn }),
             daysActiveThisYear = yearly.map { it.happenedOn }.distinct().size
         )
     }
 
-    private fun calculateStats(entries: List<FootprintEntry>): Stats {
-        if (entries.isEmpty()) return Stats()
+    private fun calculateStats(entries: List<FootprintEntry>, trackPoints: Int = 0): Stats {
+        if (entries.isEmpty()) return Stats(totalTrackPoints = trackPoints)
         
         val totalDistance = entries.sumOf { it.distanceKm }
         val energyAverage = entries.map { it.energyLevel }.average().takeIf { !it.isNaN() } ?: 0.0
@@ -49,7 +54,8 @@ object FootprintAnalytics {
             dominantMood = entries.groupBy { it.mood }.maxByOrNull { it.value.size }?.key,
             energyAverage = energyAverage,
             vitalityIndex = vitalityIndex,
-            topLocations = topLocations
+            topLocations = topLocations,
+            totalTrackPoints = trackPoints
         )
     }
 

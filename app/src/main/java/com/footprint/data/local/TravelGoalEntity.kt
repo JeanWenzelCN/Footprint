@@ -13,5 +13,6 @@ data class TravelGoalEntity(
     @ColumnInfo(name = "target_date") val targetDate: LocalDate,
     val notes: String,
     @ColumnInfo(name = "is_completed") val isCompleted: Boolean,
-    val progress: Int
+    val progress: Int,
+    val icon: String = "Flag"
 )
