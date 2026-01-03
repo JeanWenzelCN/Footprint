@@ -32,11 +32,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import java.io.File
 import com.footprint.data.model.Mood
 import com.footprint.data.model.FootprintEntry
 import com.footprint.ui.state.FootprintUiState
@@ -188,12 +192,6 @@ fun DashboardScreen(
                 }
             }
 
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import java.io.File
-
-// ...
-
             // Layer 4: Top Bar & Search Bar (Fixed & Clear)
             Column(
                 modifier = Modifier
@@ -225,7 +223,7 @@ import java.io.File
                         ) {
                             if (File(avatarId).exists()) {
                                 AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
+                                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
                                         .data(File(avatarId))
                                         .crossfade(true)
                                         .build(),

@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import java.io.File
 import com.footprint.ui.theme.ThemeMode
 import com.footprint.ui.components.AppBackground
 
@@ -237,106 +240,100 @@ fun ThemeOption(
         Spacer(modifier = Modifier.width(8.dp))
         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-        
-        import coil.compose.AsyncImage
-        import coil.request.ImageRequest
-        import java.io.File
-        
-        // ... imports ...
-        
-        @Composable
-        fun ProfileEditor(
-            nickname: String, 
-            avatarId: String, 
-            onUpdate: (String, String) -> Unit,
-            onPickImage: () -> Unit
-        ) {
-            var name by remember { mutableStateOf(nickname) }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+fun ProfileEditor(
+    nickname: String, 
+    avatarId: String, 
+    onUpdate: (String, String) -> Unit,
+    onPickImage: () -> Unit
+) {
+    var name by remember { mutableStateOf(nickname) }
+    
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { 
+                    name = it
+                    onUpdate(it, avatarId)
+                },
+                label = { Text("代号 (Nickname)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
             
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { 
-                            name = it
-                            onUpdate(it, avatarId)
-                        },
-                        label = { Text("代号 (Nickname)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                Text("头像接入点", style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = onPickImage) {
+                    Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("上传图片")
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Custom Avatar Preview (if avatarId is a file path)
+            if (File(avatarId).exists()) {
+                 Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .clickable { onPickImage() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                            .data(File(avatarId))
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "User Avatar",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("预设头像", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                val avatars = listOf("avatar_1" to Icons.Default.Face, "avatar_2" to Icons.Default.AccountCircle, "avatar_3" to Icons.Default.SmartToy, "avatar_4" to Icons.Default.Fingerprint)
+                avatars.forEach { (id, icon) ->
+                    val selected = id == avatarId
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onUpdate(name, id) },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("头像接入点", style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = onPickImage) {
-                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("上传图片")
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Custom Avatar Preview (if avatarId is a file path)
-                    if (File(avatarId).exists()) {
-                         Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .clickable { onPickImage() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(File(avatarId))
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = "User Avatar",
-                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("预设头像", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-        
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        val avatars = listOf("avatar_1" to Icons.Default.Face, "avatar_2" to Icons.Default.AccountCircle, "avatar_3" to Icons.Default.SmartToy, "avatar_4" to Icons.Default.Fingerprint)
-                        avatars.forEach { (id, icon) ->
-                            val selected = id == avatarId
-                            Box(
-                                modifier = Modifier
-                                    .size(50.dp)
-                                    .clip(CircleShape)
-                                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                                    .clickable { onUpdate(name, id) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    icon, 
-                                    contentDescription = null, 
-                                    tint = if (selected) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        Icon(
+                            icon, 
+                            contentDescription = null, 
+                            tint = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
-        }        
+        }
+    }
+}
