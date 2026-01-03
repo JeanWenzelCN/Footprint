@@ -26,12 +26,10 @@ object AIStoryGenerator {
         val timeDesc = timeDescriptors.random().second
         
         val moodDesc = when(mood) {
-            Mood.HAPPY -> "心中充满愉悦的频率。"
-            Mood.SAD -> "思绪像断连的数据包一样零乱。"
+            Mood.RELAXED -> "心中充满愉悦的频率，感受着数据流的宁静。"
+            Mood.REFLECTIVE -> "思绪像断连的数据包一样零乱，陷入了深层的思考。"
             Mood.EXCITED -> "肾上腺素随着城市的脉搏一起跳动。"
-            Mood.TIRED -> "义体似乎发出了过载的警告，急需充能。"
-            Mood.NEUTRAL -> "保持着观察者的冷静与疏离。"
-            else -> "情绪模块运转正常。"
+            Mood.CURIOUS -> "每一个角落都藏着未解的加密信息，令人着迷。"
         }
 
         val templates = listOf(
