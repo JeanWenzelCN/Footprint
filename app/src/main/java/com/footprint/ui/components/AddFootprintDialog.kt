@@ -1,5 +1,6 @@
 package com.footprint.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +41,19 @@ import com.footprint.utils.AIStoryGenerator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import com.footprint.utils.ImageUtils
+
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -45,6 +62,9 @@ fun AddFootprintDialog(
     onDismiss: () -> Unit,
     onSave: (FootprintDraft) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
     var title by remember { mutableStateOf(initialEntry?.title ?: "") }
     var location by remember { mutableStateOf(initialEntry?.location ?: "") }
     var detail by remember { mutableStateOf(initialEntry?.detail ?: "") }
@@ -53,6 +73,21 @@ fun AddFootprintDialog(
     var energy by remember { mutableStateOf(initialEntry?.energyLevel?.toFloat() ?: 6f) }
     var mood by remember { mutableStateOf(initialEntry?.mood ?: Mood.EXCITED) }
     var selectedIcon by remember { mutableStateOf(initialEntry?.icon ?: "LocationOn") }
+    var photoPaths by remember { mutableStateOf(initialEntry?.photos ?: emptyList<String>()) }
+    
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        scope.launch(Dispatchers.IO) {
+            val newPaths = uris.mapNotNull { uri ->
+                ImageUtils.saveFootprintImage(context, uri)
+            }
+            withContext(Dispatchers.Main) {
+                photoPaths = photoPaths + newPaths
+            }
+        }
+    }
+
     val datePickerState = rememberDatePickerState(
         initialEntry?.happenedOn?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis()
     )
@@ -87,10 +122,15 @@ fun AddFootprintDialog(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         GlassMorphicCard(
             shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth().padding(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .heightIn(max = 600.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -133,6 +173,51 @@ fun AddFootprintDialog(
                                         tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp)
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Photo Picker
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("足迹图片", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        TextButton(onClick = { photoPickerLauncher.launch("image/*") }) {
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("添加图片")
+                        }
+                    }
+                    
+                    if (photoPaths.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(100.dp)
+                        ) {
+                            items(photoPaths) { path ->
+                                Box {
+                                    AsyncImage(
+                                        model = path,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    IconButton(
+                                        onClick = { photoPaths = photoPaths - path },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .size(24.dp)
+                                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    }
                                 }
                             }
                         }
@@ -223,7 +308,8 @@ fun AddFootprintDialog(
                                 date = selectedDate,
                                 latitude = initialEntry?.latitude ?: currentLocation?.latitude,
                                 longitude = initialEntry?.longitude ?: currentLocation?.longitude,
-                                icon = selectedIcon
+                                icon = selectedIcon,
+                                photos = photoPaths
                             )
                             onSave(payload)
                         },
@@ -249,5 +335,6 @@ data class FootprintDraft(
     val date: LocalDate,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val icon: String = "LocationOn"
+    val icon: String = "LocationOn",
+    val photos: List<String> = emptyList()
 )

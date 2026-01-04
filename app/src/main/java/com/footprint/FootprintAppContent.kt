@@ -32,11 +32,21 @@ import com.footprint.ui.components.AddGoalDialog
 import com.footprint.ui.screens.*
 import com.footprint.ui.theme.FootprintTheme
 
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+
 @Composable
 fun FootprintApp() {
     val navController = rememberNavController()
     val viewModel: FootprintViewModel = viewModel(factory = FootprintViewModel.Factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptic = LocalHapticFeedback.current
+
+    val performHaptic = {
+        if (uiState.hapticFeedbackEnabled) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress) // Using LongPress for a distinct "tick" feel
+        }
+    }
     
     var showEntryDialog by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<com.footprint.data.model.FootprintEntry?>(null) }
@@ -62,7 +72,7 @@ fun FootprintApp() {
                 modifier = Modifier.then(
                     if (isBlurActive) {
                         Modifier
-                            .blur(16.dp)
+                            .blur(uiState.blurStrength.dp)
                             .drawWithContent {
                                 drawContent()
                                 drawRect(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f))
@@ -72,7 +82,10 @@ fun FootprintApp() {
                 floatingActionButton = {
                     if (currentDestination == "dashboard" || currentDestination == "timeline" || currentDestination == "planner") {
                         FloatingActionButton(
-                            onClick = { showEntryDialog = true },
+                            onClick = { 
+                                performHaptic()
+                                showEntryDialog = true 
+                            },
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.White,
                             shape = CircleShape,
@@ -118,6 +131,7 @@ fun FootprintApp() {
                                     
                                     IconButton(
                                         onClick = {
+                                            performHaptic()
                                             navController.navigate(tab.route) {
                                                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                                                 launchSingleTop = true
@@ -163,14 +177,22 @@ fun FootprintApp() {
                         val fromIndex = tabOrder.indexOf(fromRoute)
                         val toIndex = tabOrder.indexOf(toRoute)
                         
+                        // iOS-style Silky Smooth Transition
+                        // Slower duration (500ms) with a sophisticated easing curve (FastOutSlowIn)
                         if (fromIndex != -1 && toIndex != -1) {
                             if (toIndex > fromIndex) {
-                                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()
+                                slideIntoContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.Start, 
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(500))
                             } else {
-                                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()
+                                slideIntoContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.End, 
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(500))
                             }
                         } else {
-                            fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                            fadeIn(animationSpec = tween(500))
                         }
                     },
                     exitTransition = { 
@@ -179,14 +201,21 @@ fun FootprintApp() {
                         val fromIndex = tabOrder.indexOf(fromRoute)
                         val toIndex = tabOrder.indexOf(toRoute)
                         
+                        // Parallax-like exit (slower fade, scale down slightly if possible, but slide works best here)
                         if (fromIndex != -1 && toIndex != -1) {
                             if (toIndex > fromIndex) {
-                                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
+                                slideOutOfContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.Start, 
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(500))
                             } else {
-                                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
+                                slideOutOfContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.End, 
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(500))
                             }
                         } else {
-                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                            fadeOut(animationSpec = tween(500))
                         }
                     }
                 ) {
@@ -222,8 +251,12 @@ fun FootprintApp() {
                             currentThemeStyle = uiState.themeStyle,
                             currentNickname = uiState.userNickname,
                             currentAvatarId = uiState.userAvatarId,
+                            currentBlurStrength = uiState.blurStrength,
+                            currentHapticFeedback = uiState.hapticFeedbackEnabled,
                             onThemeModeChange = viewModel::setThemeMode,
                             onThemeStyleChange = viewModel::setThemeStyle,
+                            onBlurStrengthChange = viewModel::setBlurStrength,
+                            onHapticFeedbackChange = viewModel::setHapticFeedback,
                             onUpdateProfile = viewModel::updateProfile,
                             onUpdateAvatar = viewModel::updateAvatar,
                             onExportData = { uri ->
@@ -267,6 +300,7 @@ fun FootprintApp() {
                         TimelineScreen(
                             entries = if (uiState.filterState.searchQuery.isBlank()) uiState.entries else uiState.visibleEntries,
                             filterState = uiState.filterState,
+                            hapticFeedbackEnabled = uiState.hapticFeedbackEnabled,
                             onMoodFilterChange = viewModel::toggleMoodFilter,
                             onSearch = viewModel::updateSearch,
                             onEditEntry = { editingEntry = it },
@@ -277,6 +311,7 @@ fun FootprintApp() {
                         GoalPlannerScreen(
                             goals = uiState.goals,
                             summary = uiState.summary,
+                            hapticFeedbackEnabled = uiState.hapticFeedbackEnabled,
                             onToggleGoal = viewModel::toggleGoal,
                             onAddGoal = { showGoalDialog = true },
                             onEditGoal = { editingGoal = it },
@@ -308,7 +343,8 @@ fun FootprintApp() {
                             happenedOn = payload.date,
                             latitude = payload.latitude,
                             longitude = payload.longitude,
-                            icon = payload.icon
+                            icon = payload.icon,
+                            photos = payload.photos
                         ))
                     } else {
                         viewModel.addFootprint(
@@ -318,7 +354,7 @@ fun FootprintApp() {
                             mood = payload.mood,
                             tags = payload.tags,
                             distanceKm = payload.distance,
-                            photos = emptyList(),
+                            photos = payload.photos,
                             energyLevel = payload.energy,
                             date = payload.date,
                             latitude = payload.latitude,

@@ -53,7 +53,8 @@ data class Stats(
     val energyAverage: Double = 0.0,
     val vitalityIndex: Int = 0,
     val topLocations: List<Pair<String, Int>> = emptyList(),
-    val totalTrackPoints: Int = 0
+    val totalTrackPoints: Int = 0,
+    val travelStyle: String = "探索者"
 )
 
 data class PeriodStats(

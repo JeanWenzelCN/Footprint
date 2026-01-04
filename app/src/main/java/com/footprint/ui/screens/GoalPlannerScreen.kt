@@ -34,12 +34,20 @@ fun GoalPlannerScreen(
     modifier: Modifier = Modifier,
     goals: List<TravelGoal>,
     summary: FootprintSummary,
+    hapticFeedbackEnabled: Boolean,
     onToggleGoal: (TravelGoal) -> Unit,
     onAddGoal: () -> Unit,
     onEditGoal: (TravelGoal) -> Unit,
     onDeleteGoal: (TravelGoal) -> Unit
 ) {
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val performHaptic = {
+        if (hapticFeedbackEnabled) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        }
+    }
     
     AppBackground(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -70,7 +78,10 @@ fun GoalPlannerScreen(
                     }
                     
                     SmallFloatingActionButton(
-                        onClick = onAddGoal,
+                        onClick = {
+                            performHaptic()
+                            onAddGoal()
+                        },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White,
                         shape = CircleShape
@@ -114,14 +125,23 @@ fun GoalPlannerScreen(
 
                 items(goals) { goal ->
                     SwipeableItem(
-                        onEdit = { onEditGoal(goal) },
+                        onEdit = { 
+                            performHaptic()
+                            onEditGoal(goal) 
+                        },
                         onDelete = { onDeleteGoal(goal) }
                     ) {
                         TelegramGoalItem(
                             goal = goal,
                             formatter = formatter,
-                            onToggle = { onToggleGoal(goal) },
-                            onEdit = { onEditGoal(goal) }
+                            onToggle = { 
+                                performHaptic()
+                                onToggleGoal(goal) 
+                            },
+                            onEdit = { 
+                                performHaptic()
+                                onEditGoal(goal) 
+                            }
                         )
                     }
                 }

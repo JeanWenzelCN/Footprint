@@ -40,6 +40,8 @@ class FootprintViewModel(
     private val themeStyle = MutableStateFlow(preferenceManager.themeStyle)
     private val nickname = MutableStateFlow(preferenceManager.nickname)
     private val avatarId = MutableStateFlow(preferenceManager.avatarId)
+    private val blurStrength = MutableStateFlow(preferenceManager.blurStrength)
+    private val hapticFeedback = MutableStateFlow(preferenceManager.hapticFeedbackEnabled)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val yearlyTrackPointCount: Flow<Int> = yearFilter.flatMapLatest { year ->
@@ -56,7 +58,7 @@ class FootprintViewModel(
     // 定义显式的数据组结构
     private data class DataGroup(val entries: List<FootprintEntry>, val goals: List<TravelGoal>, val yPoints: Int, val mPoints: Int)
     private data class FilterGroup(val mood: Mood?, val search: String, val year: Int)
-    private data class PrefsGroup(val theme: ThemeMode, val style: com.footprint.ui.theme.AppThemeStyle, val nk: String, val av: String)
+    private data class PrefsGroup(val theme: ThemeMode, val style: com.footprint.ui.theme.AppThemeStyle, val nk: String, val av: String, val blur: Float, val haptic: Boolean)
 
     // 强类型合并流
     private val dataFlow: Flow<DataGroup> = combine(
@@ -76,19 +78,31 @@ class FootprintViewModel(
         FilterGroup(mood, search, year)
     }
 
+    private val appearanceFlow = combine(themeMode, themeStyle, blurStrength) { mode, style, blur ->
+        Triple(mode, style, blur)
+    }
+    
+    private val userFlow = combine(nickname, avatarId, hapticFeedback) { nk, av, haptic ->
+        Triple(nk, av, haptic)
+    }
+
     private val prefsFlow: Flow<PrefsGroup> = combine(
-        themeMode,
-        themeStyle,
-        nickname,
-        avatarId
-    ) { theme, style, nk, av ->
-        PrefsGroup(theme, style, nk, av)
+        appearanceFlow,
+        userFlow
+    ) { appearance, user ->
+        PrefsGroup(
+            theme = appearance.first,
+            style = appearance.second,
+            blur = appearance.third,
+            nk = user.first,
+            av = user.second,
+            haptic = user.third
+        )
     }
 
     // 最终合并，参数减少到 3 个，编译器推断不再压力
     val uiState: StateFlow<FootprintUiState> = combine(dataFlow, filterFlow, prefsFlow) { data, filter, prefs ->
         val visibleEntries = data.entries
-            .filter { if (filter.search.isBlank()) it.happenedOn.year == filter.year else true }
             .filter { filter.mood == null || it.mood == filter.mood }
             .filter {
                 if (filter.search.isBlank()) true
@@ -101,7 +115,15 @@ class FootprintViewModel(
             }
         
         val visibleGoals = data.goals
-            .filter { if (filter.search.isBlank()) it.targetDate.year == filter.year else true }
+            .filter {
+                if (filter.search.isBlank()) true
+                else {
+                    val queryText = filter.search.trim().lowercase()
+                    it.title.lowercase().contains(queryText) ||
+                        it.targetLocation.lowercase().contains(queryText) ||
+                        it.notes.lowercase().contains(queryText)
+                }
+            }
 
         val today = LocalDate.now()
         val historicalMemories = data.entries.filter { 
@@ -137,6 +159,8 @@ class FootprintViewModel(
             themeStyle = prefs.style,
             userNickname = prefs.nk,
             userAvatarId = prefs.av,
+            blurStrength = prefs.blur,
+            hapticFeedbackEnabled = prefs.haptic,
             randomMemory = randomMemory,
             memoryQuote = memoryQuote,
             isLoading = false
@@ -159,6 +183,16 @@ class FootprintViewModel(
         avatarId.value = newAvatarId
         preferenceManager.nickname = newNickname
         preferenceManager.avatarId = newAvatarId
+    }
+
+    fun setBlurStrength(strength: Float) {
+        blurStrength.value = strength
+        preferenceManager.blurStrength = strength
+    }
+
+    fun setHapticFeedback(enabled: Boolean) {
+        hapticFeedback.value = enabled
+        preferenceManager.hapticFeedbackEnabled = enabled
     }
 
     fun updateAvatar(uri: Uri) {

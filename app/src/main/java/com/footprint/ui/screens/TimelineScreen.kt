@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,8 @@ import com.footprint.ui.components.GlassMorphicCard
 import java.time.format.DateTimeFormatter
 
 import com.footprint.ui.components.SwipeableItem
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -37,6 +40,7 @@ fun TimelineScreen(
     modifier: Modifier = Modifier,
     entries: List<com.footprint.data.model.FootprintEntry>,
     filterState: com.footprint.ui.state.FilterState,
+    hapticFeedbackEnabled: Boolean,
     onMoodFilterChange: (Mood?) -> Unit,
     onSearch: (String) -> Unit,
     onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
@@ -47,6 +51,13 @@ fun TimelineScreen(
     val formatter = DateTimeFormatter.ofPattern("M月d日")
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     val headerFormatter = DateTimeFormatter.ofPattern("yyyy年 MM月")
+
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val performHaptic = {
+        if (hapticFeedbackEnabled) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        }
+    }
 
     AppBackground(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -96,14 +107,20 @@ fun TimelineScreen(
                     }
                     items(items) { entry ->
                         SwipeableItem(
-                            onEdit = { onEditEntry(entry) },
+                            onEdit = { 
+                                performHaptic()
+                                onEditEntry(entry) 
+                            },
                             onDelete = { onDeleteEntry(entry) }
                         ) {
                             TelegramEntryItem(
                                 entry = entry, 
                                 dateFormatter = formatter, 
                                 timeFormatter = timeFormatter,
-                                onClick = { onEditEntry(entry) }
+                                onClick = { 
+                                    performHaptic()
+                                    onEditEntry(entry) 
+                                }
                             )
                         }
                     }
@@ -180,6 +197,27 @@ private fun TelegramEntryItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
+            // 图片预览
+            val validPhotos = entry.photos.filter { it.isNotBlank() }
+            if (validPhotos.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth().height(80.dp)
+                ) {
+                    items(validPhotos) { photoPath ->
+                        AsyncImage(
+                            model = photoPath,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+            }
+
             // 底部元数据
             Row(
                 modifier = Modifier.padding(top = 4.dp),

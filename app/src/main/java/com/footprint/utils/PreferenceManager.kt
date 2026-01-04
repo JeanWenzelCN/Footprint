@@ -48,4 +48,12 @@ class PreferenceManager(context: Context) {
     var hasSeededV5: Boolean
         get() = prefs.getBoolean("has_seeded_v5", false)
         set(value) = prefs.edit().putBoolean("has_seeded_v5", value).apply()
+
+    var blurStrength: Float
+        get() = prefs.getFloat("blur_strength", 16f)
+        set(value) = prefs.edit().putFloat("blur_strength", value).apply()
+
+    var hapticFeedbackEnabled: Boolean
+        get() = prefs.getBoolean("haptic_feedback", true)
+        set(value) = prefs.edit().putBoolean("haptic_feedback", value).apply()
 }

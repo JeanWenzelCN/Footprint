@@ -9,9 +9,16 @@ import java.util.UUID
 
 object ImageUtils {
     fun saveImageToInternalStorage(context: Context, uri: Uri): String? {
+        return saveImage(context, uri, "avatar_${UUID.randomUUID()}.jpg")
+    }
+
+    fun saveFootprintImage(context: Context, uri: Uri): String? {
+        return saveImage(context, uri, "footprint_${UUID.randomUUID()}.jpg")
+    }
+
+    private fun saveImage(context: Context, uri: Uri, fileName: String): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val fileName = "avatar_${UUID.randomUUID()}.jpg"
             val file = File(context.filesDir, fileName)
             val outputStream = FileOutputStream(file)
             

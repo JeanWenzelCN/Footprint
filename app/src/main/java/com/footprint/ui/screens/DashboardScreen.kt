@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +30,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
@@ -91,28 +94,40 @@ fun DashboardScreen(
     var showBottomSheet by remember { mutableStateOf(false) }
     
     var isSearchFocused by remember { mutableStateOf(false) }
+    
+    val haptic = LocalHapticFeedback.current
+    val performHaptic = {
+        if (state.hapticFeedbackEnabled) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
 
     val openStatDetail = { type: StatType ->
+        performHaptic()
         selectedStatType = type
         showBottomSheet = true
     }
 
     AppBackground(modifier = modifier) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Layer 1: Content (Scrollable & Blurred on focus)
+            // Layer 1: Content (Scrollable)
             LazyColumn(
                 contentPadding = PaddingValues(top = 190.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(if (isSearchFocused) 20.dp else 0.dp)
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Year Navigator
                 item {
                     YearNavigator(
                         year = state.filterState.year,
-                        onBack = { onYearShift(-1) },
-                        onForward = { onYearShift(1) }
+                        onBack = { 
+                            performHaptic()
+                            onYearShift(-1) 
+                        },
+                        onForward = { 
+                            performHaptic()
+                            onYearShift(1) 
+                        }
                     )
                 }
 
@@ -122,7 +137,10 @@ fun DashboardScreen(
                         state = state,
                         onStatClick = { type ->
                             when (type) {
-                                StatType.TRACK_POINTS -> onExportTrace(state.filterState.year)
+                                StatType.TRACK_POINTS -> {
+                                    performHaptic()
+                                    onExportTrace(state.filterState.year)
+                                }
                                 else -> openStatDetail(type)
                             }
                         },
@@ -135,7 +153,10 @@ fun DashboardScreen(
                     MemoryLaneSection(
                         memory = state.randomMemory,
                         quote = state.memoryQuote,
-                        onClick = onMemoryLaneClick
+                        onClick = {
+                            performHaptic()
+                            onMemoryLaneClick()
+                        }
                     )
                 }
 
@@ -145,15 +166,24 @@ fun DashboardScreen(
                         title = "时光足迹回放",
                         subtitle = "查看历史移动轨迹与时空分布",
                         icon = Icons.Default.History,
-                        onClick = { onExportTrace(state.filterState.year) }
+                        onClick = { 
+                            performHaptic()
+                            onExportTrace(state.filterState.year) 
+                        }
                     )
                 }
 
                 // Sections (Footprints)
                 recentFootprintsSection(
-                    entries = state.visibleEntries, 
-                    onCreateGoal = onCreateGoal, 
-                    onEditEntry = onEditEntry,
+                    entries = state.visibleEntries.filter { it.happenedOn.year == state.filterState.year }, 
+                    onCreateGoal = {
+                        performHaptic()
+                        onCreateGoal()
+                    }, 
+                    onEditEntry = {
+                        performHaptic()
+                        onEditEntry(it)
+                    },
                     onDeleteEntry = onDeleteEntry
                 )
                 
@@ -167,8 +197,11 @@ fun DashboardScreen(
 
                 // Sections (Goals)
                 goalsListSection(
-                    goals = state.goals, 
-                    onEditGoal = onEditGoal,
+                    goals = state.goals.filter { it.targetDate.year == state.filterState.year }, 
+                    onEditGoal = {
+                        performHaptic()
+                        onEditGoal(it)
+                    },
                     onDeleteGoal = onDeleteGoal
                 )
             }
@@ -313,6 +346,18 @@ fun DashboardScreen(
                                     color = MaterialTheme.colorScheme.secondary,
                                     fontWeight = FontWeight.Bold
                                 )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = state.summary.yearly.travelStyle,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -501,6 +546,12 @@ fun StatisticsSection(
                 onClick = { onStatClick(StatType.MOOD) }
             )
         }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        com.footprint.ui.components.MoodHeatmap(
+            entries = state.entries,
+            year = state.filterState.year
+        )
     }
 }
 
@@ -1072,52 +1123,73 @@ private fun TelegramEntryItem(
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .clickable { onClick() }
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(entry.mood.color.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    IconUtils.getIconByName(entry.icon),
-                    contentDescription = null,
-                    tint = entry.mood.color,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(entry.mood.color.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = entry.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = entry.happenedOn.format(dateFormatter),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                    Icon(
+                        IconUtils.getIconByName(entry.icon),
+                        contentDescription = null,
+                        tint = entry.mood.color,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-                Text(
-                    text = entry.location,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = entry.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = entry.happenedOn.format(dateFormatter),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    Text(
+                        text = entry.location,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            
+            val validPhotos = entry.photos.filter { it.isNotBlank() }
+            if (validPhotos.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth().height(60.dp)
+                ) {
+                    items(validPhotos) { photoPath ->
+                        AsyncImage(
+                            model = photoPath,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
+                }
             }
         }
     }

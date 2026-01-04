@@ -47,6 +47,8 @@ object FootprintAnalytics {
             .sortedByDescending { it.second }
             .take(3)
 
+        val travelStyle = calculateTravelStyle(entries)
+
         return Stats(
             totalEntries = entries.size,
             totalDistance = totalDistance,
@@ -55,8 +57,25 @@ object FootprintAnalytics {
             energyAverage = energyAverage,
             vitalityIndex = vitalityIndex,
             topLocations = topLocations,
-            totalTrackPoints = trackPoints
+            totalTrackPoints = trackPoints,
+            travelStyle = travelStyle
         )
+    }
+
+    private fun calculateTravelStyle(entries: List<FootprintEntry>): String {
+        if (entries.isEmpty()) return "独行侠"
+        val tags = entries.flatMap { it.tags }.groupBy { it }.mapValues { it.value.size }
+        val topTag = tags.maxByOrNull { it.value }?.key?.lowercase() ?: ""
+        
+        return when {
+            topTag.contains("美食") || topTag.contains("吃") -> "美食饕餮"
+            topTag.contains("自然") || topTag.contains("山") || topTag.contains("水") -> "自然之友"
+            topTag.contains("城市") || topTag.contains("街") -> "都市漫游者"
+            topTag.contains("运动") || topTag.contains("跑") -> "运动达人"
+            topTag.contains("艺术") || topTag.contains("展") -> "文艺青年"
+            entries.size > 10 && entries.sumOf { it.distanceKm } > 100 -> "硬核旅者"
+            else -> "时光记录者"
+        }
     }
 
     private fun computeStreak(dates: List<LocalDate>): Int {

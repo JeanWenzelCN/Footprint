@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,8 +37,12 @@ fun SettingsScreen(
     currentThemeStyle: com.footprint.ui.theme.AppThemeStyle,
     currentNickname: String,
     currentAvatarId: String,
+    currentBlurStrength: Float = 16f,
+    currentHapticFeedback: Boolean = true,
     onThemeModeChange: (ThemeMode) -> Unit,
     onThemeStyleChange: (com.footprint.ui.theme.AppThemeStyle) -> Unit,
+    onBlurStrengthChange: (Float) -> Unit,
+    onHapticFeedbackChange: (Boolean) -> Unit,
     onUpdateProfile: (String, String) -> Unit,
     onUpdateAvatar: (Uri) -> Unit,
     onExportData: (Uri) -> Unit,
@@ -44,6 +50,12 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val performHaptic = {
+        if (currentHapticFeedback) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
     
     // File Launchers
     val exportLauncher = rememberLauncherForActivityResult(
@@ -115,14 +127,73 @@ fun SettingsScreen(
                         Text("系统模式", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                         ThemeModeSelector(
                             selectedMode = currentThemeMode,
-                            onModeSelected = onThemeModeChange
+                            onModeSelected = {
+                                performHaptic()
+                                onThemeModeChange(it)
+                            }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("视觉风格", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                         ThemeStyleSelector(
                             selectedStyle = currentThemeStyle,
-                            onStyleSelected = onThemeStyleChange
+                            onStyleSelected = {
+                                performHaptic()
+                                onThemeStyleChange(it)
+                            }
                         )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("玻璃模糊强度 (Glass Blur)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            tonalElevation = 2.dp,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("强度: ${currentBlurStrength.toInt()}dp", style = MaterialTheme.typography.bodyMedium)
+                                }
+                                Slider(
+                                    value = currentBlurStrength,
+                                    onValueChange = onBlurStrengthChange, // Slider usually handles haptic internally or too frequent
+                                    onValueChangeFinished = { performHaptic() },
+                                    valueRange = 0f..30f,
+                                    steps = 29
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            tonalElevation = 2.dp,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Vibration, null, tint = MaterialTheme.colorScheme.outline)
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text("触感反馈 (Haptic Feedback)", style = MaterialTheme.typography.bodyLarge)
+                                }
+                                Switch(
+                                    checked = currentHapticFeedback,
+                                    onCheckedChange = {
+                                        performHaptic()
+                                        onHapticFeedbackChange(it)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -162,11 +233,11 @@ fun SettingsScreen(
                     SettingsSectionTitle("关于应用")
                 }
                 item {
-                    ListItem(
-                        headlineContent = { Text("版本信息") },
-                        supportingContent = { Text("v1.4.0") },
-                        leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null) }
-                    )
+                ListItem(
+                    headlineContent = { Text("软件版本") },
+                    supportingContent = { Text("v1.8.0") },
+                    leadingContent = { Icon(Icons.Default.Info, null) }
+                )
                 }
             }
         }

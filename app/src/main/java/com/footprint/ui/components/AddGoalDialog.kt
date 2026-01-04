@@ -17,6 +17,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGoalDialog(
@@ -24,6 +27,7 @@ fun AddGoalDialog(
     onDismiss: () -> Unit,
     onSave: (GoalDraft) -> Unit
 ) {
+    val scrollState = rememberScrollState()
     var title by remember { mutableStateOf(initialGoal?.title ?: "") }
     var location by remember { mutableStateOf(initialGoal?.targetLocation ?: "") }
     var notes by remember { mutableStateOf(initialGoal?.notes ?: "想要达成的体验…") }
@@ -61,10 +65,15 @@ fun AddGoalDialog(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         GlassMorphicCard(
             shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .heightIn(max = 500.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
