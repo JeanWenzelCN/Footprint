@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeState
+import com.footprint.ui.theme.LocalHazeState
 import dev.chrisbanes.haze.hazeChild
 import kotlin.math.PI
 import kotlin.math.cos
@@ -28,10 +28,10 @@ import kotlin.math.sin
 @Composable
 fun LiquidGlassCard(
     modifier: Modifier = Modifier,
-    hazeState: HazeState,
     shape: Shape = RoundedCornerShape(32.dp),
     content: @Composable () -> Unit
 ) {
+    val hazeState = LocalHazeState.current
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
     // Lower alpha for more translucency, letting the blur and noise show through.

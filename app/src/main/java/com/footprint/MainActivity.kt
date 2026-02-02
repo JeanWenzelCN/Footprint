@@ -3,8 +3,11 @@ package com.footprint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.view.WindowCompat
 import com.footprint.ui.theme.FootprintTheme
+import com.footprint.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.rememberHazeState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -13,7 +16,10 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
         setContent {
-            FootprintApp()
+            val hazeState = rememberHazeState()
+            CompositionLocalProvider(LocalHazeState provides hazeState) {
+                FootprintApp()
+            }
         }
     }
 }
