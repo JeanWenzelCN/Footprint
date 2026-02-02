@@ -11,6 +11,8 @@ import com.amap.api.location.AMapLocation
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
 import com.amap.api.location.AMapLocationListener
+import com.footprint.data.model.Mood
+import com.footprint.data.model.TransportType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,10 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
     private var locationClient: AMapLocationClient? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private lateinit var repository: com.footprint.data.repository.FootprintRepository
+
+    private var _totalDistanceTraveled = MutableStateFlow(0.0f)
+    private var _lastLocation: AMapLocation? = null
     
     companion object {
         const val NOTIFICATION_ID = 1001
@@ -40,11 +46,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
             val intent = Intent(context, LocationTrackingService::class.java).apply {
                 action = ACTION_START_TRACKING
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            // Always start as a regular service first. The service will promote itself to foreground.
+            context.startService(intent)
         }
 
         fun stopTracking(context: Context) {
@@ -57,6 +60,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
     override fun onCreate() {
         super.onCreate()
+        repository = (application as com.footprint.FootprintApplication).repository
         initLocationClient()
         
         serviceScope.launch {
@@ -104,6 +108,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START_TRACKING -> {
+                _totalDistanceTraveled.value = 0.0f
+                _lastLocation = null
                 startForeground(NOTIFICATION_ID, buildNotification(0))
                 locationClient?.startLocation()
                 _sharedIsTracking.value = true
@@ -112,6 +118,9 @@ class LocationTrackingService : Service(), AMapLocationListener {
             ACTION_STOP_TRACKING -> {
                 locationClient?.stopLocation()
                 _sharedIsTracking.value = false
+                serviceScope.launch {
+                    saveTrackingSessionAsFootprint()
+                }
                 stopSelf()
             }
         }
@@ -125,6 +134,17 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 if (location.latitude > 1.0 && location.longitude > 1.0) {
                     _sharedCurrentLocation.value = location
                     if (_sharedIsTracking.value) {
+                        // Calculate distance
+                        _lastLocation?.let { lastLoc ->
+                            val distance = location.distanceTo(lastLoc)
+                            _totalDistanceTraveled.value += distance
+                            Log.d("FootprintLoc", "Distance added: $distance, Total: ${_totalDistanceTraveled.value}")
+                        }
+                        _lastLocation = location
+
+                        // Update notification with distance
+                        startForeground(NOTIFICATION_ID, buildNotification(_totalDistanceTraveled.value.toInt()))
+
                         // 2. 持久化存储 (DB) - UI会在Flow收集器中自动更新
                         serviceScope.launch {
                             try {
@@ -159,21 +179,53 @@ class LocationTrackingService : Service(), AMapLocationListener {
         }
     }
 
-    private fun buildNotification(count: Int): Notification {
+    private fun buildNotification(distanceKm: Int): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "足迹记录", NotificationManager.IMPORTANCE_LOW)
             manager.createNotificationChannel(channel)
         }
 
+        val text = if (distanceKm > 0) "已记录 ${"%.2f".format(distanceKm / 1000.0)} 公里" else "正在后台记录你的轨迹..."
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("正在探索世界")
-            .setContentText("正在后台记录你的轨迹...")
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .build()
     }
 
+    private suspend fun saveTrackingSessionAsFootprint() {
+        if (_totalDistanceTraveled.value > 0) {
+            val lastLocation = _sharedCurrentLocation.value
+            val today = java.time.LocalDate.now()
+
+            val entry = com.footprint.data.model.FootprintEntry(
+                title = "自动追踪",
+                location = lastLocation?.toAddressString() ?: "未知地点",
+                detail = "通过自动追踪功能记录的行程",
+                mood = Mood.RELAXED, // Default mood
+                tags = listOf("自动追踪"),
+                distanceKm = (_totalDistanceTraveled.value / 1000.0), // Convert meters to kilometers
+                photos = emptyList(),
+                energyLevel = 5, // Default energy level
+                happenedOn = today,
+                latitude = lastLocation?.latitude,
+                longitude = lastLocation?.longitude,
+                altitude = lastLocation?.altitude,
+                weather = null,
+                temperature = null,
+                transportType = com.footprint.data.model.TransportType.WALK, // Default transport type
+                carbonSavedKg = 0.0,
+                icon = "RunCircle" // Default icon
+            )
+            repository.saveEntry(entry)
+            Log.d("FootprintLoc", "Tracking session saved as FootprintEntry: ${entry.distanceKm} km")
+            _totalDistanceTraveled.value = 0.0f // Reset after saving
+        }
+    }
+    
     override fun onBind(intent: Intent?): IBinder? = null
     
     override fun onDestroy() {
@@ -181,5 +233,18 @@ class LocationTrackingService : Service(), AMapLocationListener {
         locationClient?.onDestroy()
         serviceScope.cancel()
         super.onDestroy()
+    }
+}
+
+// Extension function to convert AMapLocation to address string (if available)
+fun AMapLocation.toAddressString(): String {
+    return if (!this.address.isNullOrEmpty()) {
+        this.address
+    } else if (!this.city.isNullOrEmpty() && !this.district.isNullOrEmpty()) {
+        "${this.city} ${this.district}"
+    } else if (!this.poiName.isNullOrEmpty()) {
+        this.poiName
+    } else {
+        "(${this.latitude}, ${this.longitude})"
     }
 }

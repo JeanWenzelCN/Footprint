@@ -498,51 +498,51 @@ fun StatisticsSection(
         )
         
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatItem(
                 label = "足迹",
                 value = "${state.summary.yearly.totalTrackPoints}",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.TRACK_POINTS) }
             )
             StatItem(
                 label = "里程",
                 value = "${df.format(state.summary.yearly.totalDistance)}",
                 unit = "km",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.MILEAGE) }
             )
             StatItem(
                 label = "地点",
                 value = "${state.summary.yearly.totalEntries}",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.PLACES) }
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatItem(
                 label = "记录",
                 value = "${state.summary.yearly.totalEntries}",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.RECORDS) }
             )
             StatItem(
                 label = "活力",
                 value = "${state.summary.yearly.vitalityIndex}",
                 unit = "指数",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.ENERGY) }
             )
             StatItem(
                 label = "主情绪",
                 value = state.summary.yearly.dominantMood?.label ?: "待发现",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.MOOD) }
             )
         }
@@ -674,7 +674,8 @@ fun StatItem(
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(text = value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
             if (unit.isNotEmpty()) {
