@@ -17,6 +17,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+import com.footprint.ui.components.LiquidGlassCard
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 
@@ -63,8 +64,8 @@ fun AddGoalDialog(
     } ?: (initialGoal?.targetDate ?: LocalDate.now().plusWeeks(2))
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        GlassMorphicCard(
-            shape = RoundedCornerShape(24.dp),
+        LiquidGlassCard(
+            shape = RoundedCornerShape(28.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)

@@ -42,7 +42,7 @@ import com.amap.api.maps.AMap
 import com.footprint.data.model.FootprintEntry
 import com.footprint.service.LocationTrackingService
 import com.footprint.utils.ApiKeyManager
-import com.footprint.ui.components.GlassMorphicCard
+import com.footprint.ui.components.LiquidGlassCard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.clickable
@@ -222,9 +222,9 @@ fun MapScreen(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = bottomPadding + 100.dp, start = 24.dp, end = 24.dp)
         ) {
             selectedEntry?.let { entry ->
-                GlassMorphicCard(
+                LiquidGlassCard(
                     modifier = Modifier.fillMaxWidth().height(100.dp),
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(28.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -244,7 +244,7 @@ fun MapScreen(
 
         // API Key 设置按钮
         Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 48.dp, end = 20.dp)) {
-            GlassMorphicCard(
+            LiquidGlassCard(
                 shape = CircleShape,
                 modifier = Modifier.size(48.dp)
             ) {
@@ -259,7 +259,7 @@ fun MapScreen(
 
         // 定位回正按钮
         Box(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 20.dp)) {
-            GlassMorphicCard(
+            LiquidGlassCard(
                 shape = CircleShape,
                 modifier = Modifier.size(56.dp)
             ) {
@@ -289,9 +289,9 @@ fun MapScreen(
                 .fillMaxWidth()
                 .height(88.dp)
         ) {
-            GlassMorphicCard(
+            LiquidGlassCard(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(28.dp)
+                shape = RoundedCornerShape(32.dp)
             ) {
                 Row(
                     Modifier.fillMaxSize().padding(horizontal = 24.dp), 
@@ -363,7 +363,7 @@ fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> 
     val sha1 = remember { AppUtils.getAppSignature(context) }
     
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        GlassMorphicCard(
+        LiquidGlassCard(
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {

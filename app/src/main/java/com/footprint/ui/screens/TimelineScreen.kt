@@ -27,7 +27,7 @@ import com.footprint.data.model.FootprintEntry
 import com.footprint.data.model.Mood
 import com.footprint.ui.state.FilterState
 import com.footprint.ui.components.AppBackground
-import com.footprint.ui.components.GlassMorphicCard
+
 import java.time.format.DateTimeFormatter
 
 import com.footprint.ui.components.SwipeableItem

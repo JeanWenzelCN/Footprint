@@ -64,7 +64,7 @@
 ## 📂 项目结构
 
 - `app/src/main/java/com/footprint/ui/theme`：定制的液态玻璃主题与赛博朋克调色板。
-- `app/src/main/java/com/footprint/ui/components`：核心 UI 组件库，包含 `GlassMorphicCard` 和 `AppBackground`。
+- `app/src/main/java/com/footprint/ui/components`：核心 UI 组件库，包含 `LiquidGlassCard` 和 `AppBackground`。
 - `app/src/main/java/com/footprint/service`：高性能后台定位追踪服务。
 - `app/src/main/java/com/footprint/utils`：API Key 安全管理工具。
 - `app/src/main/java/com/footprint/ui/screens/MapScreen`：核心地图交互逻辑。

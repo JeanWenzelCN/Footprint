@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.footprint.data.model.FootprintSummary
 import com.footprint.data.model.TravelGoal
 import com.footprint.ui.components.AppBackground
-import com.footprint.ui.components.GlassMorphicCard
+
 import java.time.format.DateTimeFormatter
 
 import com.footprint.ui.components.SwipeableItem

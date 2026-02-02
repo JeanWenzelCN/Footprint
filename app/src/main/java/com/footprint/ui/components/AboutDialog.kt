@@ -21,6 +21,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.footprint.R
+import com.footprint.ui.components.LiquidGlassCard
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun AboutDialog(
@@ -30,7 +32,7 @@ fun AboutDialog(
     val authorUrl = "https://github.com/StarsUnsurpass"
 
     Dialog(onDismissRequest = onDismiss) {
-        GlassMorphicCard {
+        LiquidGlassCard(shape = RoundedCornerShape(28.dp)) {
             Column(
                 modifier = Modifier
                     .padding(24.dp)

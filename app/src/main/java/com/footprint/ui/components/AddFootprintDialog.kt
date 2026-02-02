@@ -48,6 +48,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import com.footprint.ui.components.LiquidGlassCard
 import com.footprint.utils.ImageUtils
 
 import androidx.compose.runtime.rememberCoroutineScope
@@ -120,8 +121,8 @@ fun AddFootprintDialog(
     } ?: LocalDate.now()
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        GlassMorphicCard(
-            shape = RoundedCornerShape(24.dp),
+        LiquidGlassCard(
+            shape = RoundedCornerShape(28.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)

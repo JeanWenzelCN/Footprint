@@ -27,7 +27,7 @@ import com.amap.api.maps.model.LatLngBounds
 import com.amap.api.maps.model.PolylineOptions
 import com.amap.api.maps.AMap
 import com.footprint.FootprintViewModel
-import com.footprint.ui.components.GlassMorphicCard
+import com.footprint.ui.components.LiquidGlassCard
 import androidx.compose.ui.graphics.luminance
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -156,12 +156,12 @@ fun ExportTraceScreen(
         }
 
         // Controls
-        GlassMorphicCard(
+        LiquidGlassCard(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
                 .fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(28.dp)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),

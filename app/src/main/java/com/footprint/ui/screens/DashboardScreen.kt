@@ -48,7 +48,7 @@ import com.footprint.data.model.Mood
 import com.footprint.data.model.FootprintEntry
 import com.footprint.ui.state.FootprintUiState
 import com.footprint.ui.components.AppBackground
-import com.footprint.ui.components.GlassMorphicCard
+import com.footprint.ui.components.LiquidGlassCard
 import com.footprint.ui.components.AboutDialog
 import com.footprint.ui.components.IconUtils
 import java.text.DecimalFormat
@@ -651,8 +651,8 @@ fun StatItem(
         label = "Scale"
     )
 
-    GlassMorphicCard(
-        shape = RoundedCornerShape(20.dp),
+    LiquidGlassCard(
+        shape = RoundedCornerShape(28.dp),
         modifier = modifier
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .clickable(
@@ -673,7 +673,7 @@ fun StatItem(
             }
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -693,8 +693,8 @@ fun TelegramActionCard(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
-    GlassMorphicCard(
-        shape = RoundedCornerShape(24.dp),
+    LiquidGlassCard(
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
@@ -1007,8 +1007,8 @@ private fun LazyListScope.goalsListSection(
                                 onEdit = { onEditGoal(goal) },
                                 onDelete = { onDeleteGoal(goal) }
                             ) {
-                                GlassMorphicCard(
-                                    shape = RoundedCornerShape(16.dp),
+                                LiquidGlassCard(
+                                    shape = RoundedCornerShape(22.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp)
@@ -1117,8 +1117,8 @@ private fun TelegramEntryItem(
     dateFormatter: DateTimeFormatter, 
     onClick: () -> Unit
 ) {
-    GlassMorphicCard(
-        shape = RoundedCornerShape(16.dp),
+    LiquidGlassCard(
+        shape = RoundedCornerShape(22.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
