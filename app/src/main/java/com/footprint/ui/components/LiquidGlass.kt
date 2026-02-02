@@ -1,4 +1,3 @@
-
 package com.footprint.ui.components
 
 import androidx.compose.animation.core.*
@@ -20,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeChild
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -27,8 +28,8 @@ import kotlin.math.sin
 @Composable
 fun LiquidGlassCard(
     modifier: Modifier = Modifier,
+    hazeState: HazeState,
     shape: Shape = RoundedCornerShape(32.dp),
-    blurRadius: Dp = 100.dp,
     content: @Composable () -> Unit
 ) {
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
@@ -62,6 +63,7 @@ fun LiquidGlassCard(
 
     Box(
         modifier = modifier
+            .hazeChild(hazeState, shape = shape)
             .shadow(
                 elevation = 24.dp,
                 shape = shape,

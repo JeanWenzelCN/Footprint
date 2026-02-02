@@ -54,6 +54,9 @@ import com.footprint.ui.components.IconUtils
 import java.text.DecimalFormat
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.rememberHazeState
 
 enum class StatType(val label: String, val icon: ImageVector) {
     TRACK_POINTS("年度足迹点数", Icons.Default.Route),
@@ -81,6 +84,7 @@ fun DashboardScreen(
     onDeleteGoal: (com.footprint.data.model.TravelGoal) -> Unit,
     onMemoryLaneClick: () -> Unit
 ) {
+    val hazeState = rememberHazeState()
     var query by rememberSaveable { mutableStateOf(state.filterState.searchQuery) }
     val df = remember { DecimalFormat("0.0") }
     val focusManager = LocalFocusManager.current
@@ -114,7 +118,7 @@ fun DashboardScreen(
             LazyColumn(
                 contentPadding = PaddingValues(top = 190.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().haze(hazeState)
             ) {
                 // Year Navigator
                 item {
@@ -144,7 +148,8 @@ fun DashboardScreen(
                                 else -> openStatDetail(type)
                             }
                         },
-                        df = df
+                        df = df,
+                        hazeState = hazeState
                     )
                 }
 
@@ -163,6 +168,7 @@ fun DashboardScreen(
                 // History Trace Action
                 item {
                     TelegramActionCard(
+                        hazeState = hazeState,
                         title = "时光足迹回放",
                         subtitle = "查看历史移动轨迹与时空分布",
                         icon = Icons.Default.History,
@@ -175,6 +181,7 @@ fun DashboardScreen(
 
                 // Sections (Footprints)
                 recentFootprintsSection(
+                    hazeState = hazeState,
                     entries = state.visibleEntries.filter { it.happenedOn.year == state.filterState.year }, 
                     onCreateGoal = {
                         performHaptic()
@@ -197,6 +204,7 @@ fun DashboardScreen(
 
                 // Sections (Goals)
                 goalsListSection(
+                    hazeState = hazeState,
                     goals = state.goals.filter { it.targetDate.year == state.filterState.year }, 
                     onEditGoal = {
                         performHaptic()
@@ -486,7 +494,8 @@ fun SearchBar(
 fun StatisticsSection(
     state: FootprintUiState,
     onStatClick: (StatType) -> Unit,
-    df: DecimalFormat
+    df: DecimalFormat,
+    hazeState: HazeState
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp).animateContentSize()) {
         Text(
@@ -502,12 +511,14 @@ fun StatisticsSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatItem(
+                hazeState = hazeState,
                 label = "足迹",
                 value = "${state.summary.yearly.totalTrackPoints}",
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.TRACK_POINTS) }
             )
             StatItem(
+                hazeState = hazeState,
                 label = "里程",
                 value = "${df.format(state.summary.yearly.totalDistance)}",
                 unit = "km",
@@ -515,6 +526,7 @@ fun StatisticsSection(
                 onClick = { onStatClick(StatType.MILEAGE) }
             )
             StatItem(
+                hazeState = hazeState,
                 label = "地点",
                 value = "${state.summary.yearly.totalEntries}",
                 modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -527,12 +539,14 @@ fun StatisticsSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatItem(
+                hazeState = hazeState,
                 label = "记录",
                 value = "${state.summary.yearly.totalEntries}",
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 onClick = { onStatClick(StatType.RECORDS) }
             )
             StatItem(
+                hazeState = hazeState,
                 label = "活力",
                 value = "${state.summary.yearly.vitalityIndex}",
                 unit = "指数",
@@ -540,6 +554,7 @@ fun StatisticsSection(
                 onClick = { onStatClick(StatType.ENERGY) }
             )
             StatItem(
+                hazeState = hazeState,
                 label = "主情绪",
                 value = state.summary.yearly.dominantMood?.label ?: "待发现",
                 modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -636,8 +651,8 @@ fun MemoryLaneSection(
     }
 }
 
-@Composable
 fun StatItem(
+    hazeState: HazeState,
     label: String,
     value: String,
     unit: String = "",
@@ -652,6 +667,7 @@ fun StatItem(
     )
 
     LiquidGlassCard(
+        hazeState = hazeState,
         shape = RoundedCornerShape(28.dp),
         modifier = modifier
             .graphicsLayer(scaleX = scale, scaleY = scale)
@@ -688,12 +704,14 @@ fun StatItem(
 
 @Composable
 fun TelegramActionCard(
+    hazeState: HazeState,
     title: String,
     subtitle: String,
     icon: ImageVector,
     onClick: () -> Unit
 ) {
     LiquidGlassCard(
+        hazeState = hazeState,
         shape = RoundedCornerShape(28.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -959,6 +977,7 @@ private fun ExpandableMonthHeader(
 }
 
 private fun LazyListScope.goalsListSection(
+    hazeState: HazeState,
     goals: List<com.footprint.data.model.TravelGoal>,
     onEditGoal: (com.footprint.data.model.TravelGoal) -> Unit,
     onDeleteGoal: (com.footprint.data.model.TravelGoal) -> Unit
@@ -1008,6 +1027,7 @@ private fun LazyListScope.goalsListSection(
                                 onDelete = { onDeleteGoal(goal) }
                             ) {
                                 LiquidGlassCard(
+                                    hazeState = hazeState,
                                     shape = RoundedCornerShape(22.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1049,6 +1069,7 @@ private fun LazyListScope.goalsListSection(
 }
 
 private fun LazyListScope.recentFootprintsSection(
+    hazeState: HazeState,
     entries: List<com.footprint.data.model.FootprintEntry>, 
     onCreateGoal: () -> Unit,
     onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
@@ -1101,7 +1122,7 @@ private fun LazyListScope.recentFootprintsSection(
                                 onEdit = { onEditEntry(entry) },
                                 onDelete = { onDeleteEntry(entry) }
                             ) {
-                                TelegramEntryItem(entry, formatter, { onEditEntry(entry) })
+                                TelegramEntryItem(hazeState, entry, formatter, { onEditEntry(entry) })
                             }
                         }
                     }
@@ -1113,11 +1134,13 @@ private fun LazyListScope.recentFootprintsSection(
 
 @Composable
 private fun TelegramEntryItem(
+    hazeState: HazeState,
     entry: FootprintEntry, 
     dateFormatter: DateTimeFormatter, 
     onClick: () -> Unit
 ) {
     LiquidGlassCard(
+        hazeState = hazeState,
         shape = RoundedCornerShape(22.dp),
         modifier = Modifier
             .fillMaxWidth()

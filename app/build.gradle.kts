@@ -120,4 +120,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    // Haze (Glassmorphism)
+    implementation("dev.chrisbanes.haze:haze-jetpack-compose:0.5.2")
 }
