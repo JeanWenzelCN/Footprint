@@ -1,5 +1,8 @@
 package com.footprint.ui.components
 
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -12,7 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
 import kotlin.math.sin
 
 @Composable
@@ -29,7 +35,7 @@ fun AppBackground(
     // Animate blob positions
     val time by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = Math.PI.toFloat() * 2,
+        targetValue = (Math.PI.toFloat() * 2),
         animationSpec = infiniteRepeatable(
             animation = tween(10000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
@@ -41,6 +47,7 @@ fun AppBackground(
         modifier = modifier
             .fillMaxSize()
             .background(baseColor)
+            .noiseGrain()
     ) {
         // Layer 1: Liquid Blobs
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -92,6 +99,21 @@ fun AppBackground(
                 )
             )
         }
+        
+        MetaballAnimation(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    alpha = 0.3f,
+                    renderEffect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        RenderEffect
+                            .createBlurEffect(32f, 32f, Shader.TileMode.DECAL)
+                            .asComposeRenderEffect()
+                    } else {
+                        null
+                    }
+                )
+        )
 
         // Layer 2: Subtle Noise/Grain Overlay
         // Layer 3: Content

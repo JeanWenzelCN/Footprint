@@ -34,17 +34,21 @@ fun LiquidGlassCard(
 ) {
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
+    // Lower alpha for more translucency, letting the blur and noise show through.
     val surfaceColor = if (isDark) {
-        Color.Black.copy(alpha = 0.2f)
+        Color.Black.copy(alpha = 0.15f)
     } else {
-        Color.White.copy(alpha = 0.4f)
+        Color.White.copy(alpha = 0.3f)
     }
 
+    // A more complex border that simulates a sharp highlight and Fresnel effect.
     val borderBrush = remember(isDark) {
         Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = if (isDark) 0.15f else 0.5f),
-                Color.White.copy(alpha = 0.05f)
+                Color.White.copy(alpha = if (isDark) 0.4f else 0.8f), // Sharp top-left highlight
+                Color.White.copy(alpha = if (isDark) 0.05f else 0.1f), // Mid-gradient
+                Color.Transparent,
+                Color.White.copy(alpha = 0.05f) // Subtle bottom-right highlight
             ),
             start = Offset(0f, 0f),
             end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
@@ -72,12 +76,26 @@ fun LiquidGlassCard(
             )
             .background(surfaceColor, shape)
             .border(
-                width = 1.dp,
+                width = 1.5.dp, // Thicker border for a more pronounced effect
                 brush = borderBrush,
                 shape = shape
             )
             .clip(shape)
     ) {
+        // Inner shine from the top, adding depth.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (isDark) 0.1f else 0.2f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
         // Inner content
         content()
 
