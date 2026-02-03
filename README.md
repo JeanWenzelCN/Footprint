@@ -73,6 +73,15 @@
 
 ## 🕒 更新日志 (Changelog)
 
+### 2026-02-03: UI组件与效果重构 (v1.9.1)
+
+#### ✨ 新增特性 (Features)
+- **视觉重构 (Visual Overhaul)**:
+    - 重构和更新了各种UI组件和效果，以改善结构和可维护性。
+    - 删除了已弃用或已重构的UI组件：`LiquidGlass`, `Metaball`, `Noise`。
+    - 引入了新的UI组件和屏幕：`GlassmorphismEffectScreen`, `LegacyCompatibility`和与效果相关的文件。
+    - 调整了构建配置、主应用程序内容和主题以进行集成。
+
 ### 2026-01-04: 稳定性与布局健壮性优化 (v1.9.0)
 
 #### 🐛 修复日志 (Bug Fixes)

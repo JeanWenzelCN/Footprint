@@ -468,8 +468,7 @@ fun SearchBar(
         onFocusChange: (Boolean) -> Unit,
         modifier: Modifier = Modifier
 ) {
-    Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+    LiquidGlassCard(
             shape = RoundedCornerShape(12.dp),
             modifier = modifier.fillMaxWidth()
     ) {
@@ -602,8 +601,7 @@ fun MemoryLaneSection(memory: FootprintEntry?, quote: String?, onClick: () -> Un
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
         )
-        Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+        LiquidGlassCard(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth().clickable { onClick() }
         ) {
