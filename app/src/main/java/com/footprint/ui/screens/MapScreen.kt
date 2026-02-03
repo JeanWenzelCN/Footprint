@@ -131,8 +131,16 @@ fun MapScreen(
     val isTracking by LocationTrackingService.isTracking.collectAsState()
     val currentLocation by LocationTrackingService.currentLocation.collectAsState()
     val trackingPath by LocationTrackingService.trackingPath.collectAsState()
+    val locationError by LocationTrackingService.locationError.collectAsState()
     
     var showApiKeyDialog by remember { mutableStateOf(false) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(locationError) {
+        if (locationError != null) {
+            showErrorDialog = true
+        }
+    }
 
     // Auto-centering logic: handles both switching back and first-time fix
     LaunchedEffect(currentLocation) {
@@ -149,7 +157,7 @@ fun MapScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .then(
-                if (showApiKeyDialog) {
+                if (showApiKeyDialog || showErrorDialog) {
                     Modifier
                         .blur(16.dp)
                         .drawWithContent {
@@ -339,7 +347,11 @@ fun MapScreen(
     if (showApiKeyDialog) {
         ApiKeyDialog(
             initialKey = ApiKeyManager.getApiKey(context) ?: "",
-            onDismiss = { showApiKeyDialog = false },
+            onDismiss = { 
+                showApiKeyDialog = false 
+                // Reset error state if user cancels
+                LocationTrackingService.clearError()
+            },
             onSave = { key ->
                 ApiKeyManager.setApiKey(context, key)
                 try {
@@ -349,11 +361,48 @@ fun MapScreen(
                     e.printStackTrace()
                 }
                 showApiKeyDialog = false
+                LocationTrackingService.clearError()
                 android.widget.Toast.makeText(context, "API Key 已保存并立即生效", android.widget.Toast.LENGTH_LONG).show()
             }
         )
     }
+
+    if (showErrorDialog) {
+        LocationErrorDialog(
+            error = locationError,
+            onDismiss = {
+                showErrorDialog = false
+                LocationTrackingService.clearError()
+            },
+            onGoToSettings = {
+                showErrorDialog = false
+                showApiKeyDialog = true
+            }
+        )
+    }
 }
+
+@Composable
+fun LocationErrorDialog(error: String?, onDismiss: () -> Unit, onGoToSettings: () -> Unit) {
+    if (error == null) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("定位失败") },
+        text = { Text("$error\n\n请检查您的网络连接，并确保已在“设置”中正确配置了高德API Key。") },
+        confirmButton = {
+            TextButton(onClick = onGoToSettings) {
+                Text("前往设置")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
 
 @Composable
 fun ApiKeyDialog(initialKey: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {

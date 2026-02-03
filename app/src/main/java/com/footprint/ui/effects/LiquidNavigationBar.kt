@@ -93,7 +93,7 @@ data class LiquidNavItem(val route: String, val label: String, val icon: ImageVe
 @Composable
 private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int) {
         val density = LocalDensity.current
-        val primaryColor = MaterialTheme.colorScheme.primary
+        // val primaryColor = MaterialTheme.colorScheme.primary // Removed as per request to remove blue background
 
         val animatedIndex by
                 animateFloatAsState(
@@ -126,7 +126,7 @@ private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int
                 // clamp?
                 // Actually our shader is hard-unrolled, so we just populate the slots.
 
-                shader.setColorUniform("uColor", primaryColor.toArgb())
+                shader.setColorUniform("uColor", Color.White.copy(alpha = 0.01f).toArgb()) // Changed to very low alpha white for liquid effect source
                 shader.setFloatUniform("uSmoothness", 30f) // Viscosity factor (pixels)
 
                 val blobCoords = FloatArray(12) // 6 blobs * 2 coords (x,y)
@@ -167,43 +167,43 @@ private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int
 /** Universal Layout using Blur + Threshold */
 @Composable
 private fun LiquidNavLayout(items: List<LiquidNavItem>, selectedIndex: Int) {
-        val primaryColor = MaterialTheme.colorScheme.primary
+    // val primaryColor = MaterialTheme.colorScheme.primary // Removed as per request to remove blue background
 
-        Box(Modifier.fillMaxSize()) {
-                Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                        // Static anchors removed to prevent "blue background" behind every icon.
-                        // Only the active indicator is drawn below.
-                        Box(modifier = Modifier.fillMaxSize())
-                }
+    val animatedIndex by
+        animateFloatAsState(
+            targetValue = selectedIndex.toFloat(),
+            animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "LiquidMove"
+        )
 
-                val animatedIndex by
-                        animateFloatAsState(
-                                targetValue = selectedIndex.toFloat(),
-                                animationSpec =
-                                        spring(
-                                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                                stiffness = Spring.StiffnessLow
-                                        ),
-                                label = "LiquidMove"
-                        )
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val slotWidth = size.width / items.size
+        val staticBlobRadius = 24.dp.toPx() / 2
+        val movingBlobRadius = 56.dp.toPx() / 2
+        val cy = size.height / 2
 
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                        val slotWidth = size.width / items.size
-                        val blobSize = 56.dp.toPx()
-                        val cy = size.height / 2
-                        val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
-
-                        drawCircle(
-                                color = primaryColor,
-                                radius = blobSize / 2,
-                                center = Offset(targetX, cy)
-                        )
-                }
+        // Draw static anchors for all items
+        for (i in items.indices) {
+            val cx = (slotWidth * i) + (slotWidth / 2)
+            drawCircle(
+                color = Color.White.copy(alpha = 0.01f), // Changed to very low alpha white for liquid effect source
+                radius = staticBlobRadius,
+                center = Offset(cx, cy)
+            )
         }
+
+        // Draw the moving blob
+        val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
+        drawCircle(
+            color = Color.White.copy(alpha = 0.01f), // Changed to very low alpha white for liquid effect source
+            radius = movingBlobRadius,
+            center = Offset(targetX, cy)
+        )
+    }
 }
 
 /** Universal Overlay for Gloss */

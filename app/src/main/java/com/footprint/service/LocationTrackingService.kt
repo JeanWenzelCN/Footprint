@@ -42,6 +42,13 @@ class LocationTrackingService : Service(), AMapLocationListener {
         private val _sharedTrackingPath = MutableStateFlow<List<AMapLocation>>(emptyList())
         val trackingPath: StateFlow<List<AMapLocation>> = _sharedTrackingPath.asStateFlow()
 
+        private val _locationError = MutableStateFlow<String?>(null)
+        val locationError: StateFlow<String?> = _locationError.asStateFlow()
+
+        fun clearError() {
+            _locationError.value = null
+        }
+
         fun startTracking(context: Context) {
             val intent = Intent(context, LocationTrackingService::class.java).apply {
                 action = ACTION_START_TRACKING
@@ -133,6 +140,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
                 if (location.latitude > 1.0 && location.longitude > 1.0) {
                     _sharedCurrentLocation.value = location
+                    _locationError.value = null // Clear previous errors
                     if (_sharedIsTracking.value) {
                         // Calculate distance
                         _lastLocation?.let { lastLoc ->
@@ -167,13 +175,9 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     val userMsg = when (location.errorCode) {
                         7 -> "Key鉴权失败：请检查高德后台包名是否为 com.footprint"
                         12 -> "缺少定位权限：请在设置中授予权限"
-                        else -> ""
+                        else -> "未知定位错误: ${location.errorCode}"
                     }
-                    if (userMsg.isNotEmpty()) {
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            android.widget.Toast.makeText(applicationContext, userMsg, android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    }
+                    _locationError.value = userMsg
                 }
             }
         }
