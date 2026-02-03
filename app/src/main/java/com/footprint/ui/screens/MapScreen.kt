@@ -48,6 +48,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
 import com.footprint.utils.AppUtils
 
 @Composable
@@ -319,24 +326,44 @@ fun MapScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Button(
-                        onClick = {
-                            if (isTracking) LocationTrackingService.stopTracking(context)
-                            else {
-                                isPendingCenter = true // Start tracking and center map on first fix
-                                LocationTrackingService.startTracking(context)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isTracking) Color(0xFFFF4D4F) else MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
+                    var isPressed by remember { mutableStateOf(false) }
+                    val scale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.96f else 1f,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
+                        label = "Scale"
+                    )
+
+                    LiquidGlassCard(
                         shape = RoundedCornerShape(16.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                        modifier = Modifier
+                            .graphicsLayer(scaleX = scale, scaleY = scale)
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        when (event.type) {
+                                            PointerEventType.Press -> isPressed = true
+                                            PointerEventType.Release, PointerEventType.Exit -> isPressed = false
+                                        }
+                                    }
+                                }
+                            }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                if (isTracking) LocationTrackingService.stopTracking(context)
+                                else {
+                                    isPendingCenter = true // Start tracking and center map on first fix
+                                    LocationTrackingService.startTracking(context)
+                                }
+                            }
                     ) {
                         Text(
-                            if (isTracking) "停止" else "开始", 
-                            fontWeight = FontWeight.Bold
+                            if (isTracking) "停止" else "开始",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isTracking) Color(0xFFFF4D4F) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                         )
                     }
                 }

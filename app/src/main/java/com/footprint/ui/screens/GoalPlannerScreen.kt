@@ -78,16 +78,19 @@ fun GoalPlannerScreen(
                         )
                     }
                     
-                    SmallFloatingActionButton(
-                        onClick = {
+                    LiquidGlassCard(
+                        shape = CircleShape,
+                        modifier = Modifier.clickable {
                             performHaptic()
                             onAddGoal()
-                        },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White,
-                        shape = CircleShape
+                        }
                     ) {
-                        Icon(Icons.Default.Add, null)
+                        Icon(
+                            Icons.Default.Add, 
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(12.dp)
+                        )
                     }
                 }
             }

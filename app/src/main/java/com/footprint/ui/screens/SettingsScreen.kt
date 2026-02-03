@@ -29,6 +29,7 @@ import coil.request.ImageRequest
 import java.io.File
 import com.footprint.ui.theme.ThemeMode
 import com.footprint.ui.components.AppBackground
+import com.footprint.ui.components.LiquidGlassCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,10 +145,8 @@ fun SettingsScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("玻璃模糊强度 (Glass Blur)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            tonalElevation = 2.dp,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                        LiquidGlassCard(
+                            shape = MaterialTheme.shapes.medium
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(
@@ -168,10 +167,8 @@ fun SettingsScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            tonalElevation = 2.dp,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                        LiquidGlassCard(
+                            shape = MaterialTheme.shapes.medium
                         ) {
                             Row(
                                 modifier = Modifier
@@ -204,9 +201,8 @@ fun SettingsScreen(
                     SettingsSectionTitle("数据管理")
                 }
                 item {
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                    LiquidGlassCard(
+                        shape = MaterialTheme.shapes.medium
                     ) {
                         Column {
                             SettingsActionItem(
@@ -275,10 +271,8 @@ fun ThemeModeSelector(
     selectedMode: ThemeMode,
     onModeSelected: (ThemeMode) -> Unit
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    LiquidGlassCard(
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             ThemeOption(
@@ -308,10 +302,8 @@ fun ThemeStyleSelector(
     selectedStyle: com.footprint.ui.theme.AppThemeStyle,
     onStyleSelected: (com.footprint.ui.theme.AppThemeStyle) -> Unit
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    LiquidGlassCard(
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             ThemeStyleOption(
@@ -419,9 +411,8 @@ fun ProfileEditor(
 ) {
     var name by remember { mutableStateOf(nickname) }
     
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    LiquidGlassCard(
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             OutlinedTextField(

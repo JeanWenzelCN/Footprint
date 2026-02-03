@@ -1241,12 +1241,17 @@ private fun LazyListScope.recentFootprintsSection(
                         color = MaterialTheme.colorScheme.primary
                 )
             }
-            Text(
+            LiquidGlassCard(
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.clickable { onCreateGoal() }
+            ) {
+                Text(
                     text = "新建 +",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onCreateGoal() }
-            )
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
         }
     }
 
