@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.footprint.data.model.FootprintSummary
 import com.footprint.data.model.TravelGoal
 import com.footprint.ui.components.AppBackground
+import com.footprint.ui.components.LiquidGlassCard // Added import statement
 
 import java.time.format.DateTimeFormatter
 
@@ -98,8 +99,7 @@ fun GoalPlannerScreen(
             ) {
                 // 概览摘要卡片
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                    LiquidGlassCard(
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -166,8 +166,7 @@ private fun TelegramGoalItem(
     onToggle: () -> Unit,
     onEdit: () -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+    LiquidGlassCard(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
