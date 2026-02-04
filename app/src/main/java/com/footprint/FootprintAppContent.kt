@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -22,11 +23,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import com.footprint.ui.components.AddFootprintDialog
 import com.footprint.ui.components.AddGoalDialog
+import com.footprint.ui.components.LiquidGlassCard
 import com.footprint.ui.effects.LiquidNavItem
 import com.footprint.ui.effects.LiquidNavigationBar
 import com.footprint.ui.screens.*
 import com.footprint.ui.theme.FootprintTheme
 import com.footprint.ui.theme.LocalHazeState
+import com.footprint.ui.effects.bouncyClick
 
 @Composable
 fun FootprintApp() {
@@ -84,16 +87,25 @@ fun FootprintApp() {
                                         currentDestination == "timeline" ||
                                         currentDestination == "planner"
                         ) {
-                            FloatingActionButton(
-                                    onClick = {
-                                        performHaptic()
-                                        showEntryDialog = true
-                                    },
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White,
+                            LiquidGlassCard(
                                     shape = CircleShape,
-                                    modifier = Modifier.padding(bottom = 80.dp)
-                            ) { Icon(Icons.Outlined.Add, contentDescription = null) }
+                                    modifier = Modifier
+                                        .padding(bottom = 80.dp)
+                                        .bouncyClick()
+                                        .clickable {
+                                            performHaptic()
+                                            showEntryDialog = true
+                                        }
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Add,
+                                    contentDescription = "添加足迹",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .size(56.dp) // Standard FAB size
+                                        .padding(16.dp) // Inner padding for icon
+                                )
+                            }
                         }
                     },
 

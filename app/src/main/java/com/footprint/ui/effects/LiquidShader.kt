@@ -26,6 +26,8 @@ const val LIQUID_SHADER =
     uniform float uRadii[6];
     uniform vec4 uColor; 
     uniform float uSmoothness; 
+    uniform float uScaleX;
+    uniform float uScaleY;
 
     // Polynomial Smooth Min
     float smin(float a, float b, float k) {
@@ -34,7 +36,8 @@ const val LIQUID_SHADER =
     }
 
     float sdCircle(vec2 p, vec2 center, float r) {
-        return length(p - center) - r;
+        vec2 scaled_p = (p - center) / vec2(uScaleX, uScaleY);
+        return length(scaled_p) - r;
     }
 
     vec4 main(vec2 fragCoord) {

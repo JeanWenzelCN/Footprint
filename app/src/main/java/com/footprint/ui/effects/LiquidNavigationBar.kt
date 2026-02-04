@@ -5,8 +5,11 @@ import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -20,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,6 +42,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import com.footprint.ui.effects.bouncyClick
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * An advanced Liquid Navigation Bar using Metaballs for the selection indicator and Refraction
@@ -59,20 +66,24 @@ fun LiquidNavigationBar(
                 backgroundColor = Color.Transparent,
                 noiseOpacity = 0.05f
         ) {
-                // High-Fidelity Rendering for API 33+ (AGSL Shader)
-                // We use the new "Robust" shader with unrolled loops to ensure driver stability.
-                // Universal High-Fidelity Rendering (Blur + Threshold + Refraction Overlay)
-                // We use the "Metaball Threshold" technique (Blur + high-contrast ColorMatrix)
-                // which gives
-                // the exact same liquid fusion effect but is 100% stable on all devices/emulators.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        // High-Fidelity Rendering for API 33+ (AGSL Shader)
+                        // This path uses the robust, unrolled AGSL shader for hardware-accelerated
+                        // SDF, metaballs, and normal-mapped lighting.
+                        LiquidNavShaderLayout(items = items, selectedIndex = selectedIndex)
+                } else {
+                        // Universal High-Fidelity Rendering (Blur + Threshold + Refraction Overlay)
+                        // This fallback uses the "Metaball Threshold" technique (Blur + high-contrast ColorMatrix)
+                        // which gives the exact same liquid fusion effect but is 100% stable on all devices/emulators.
 
-                // 1. Metaball Layer (Fused Geometry)
-                Box(modifier = Modifier.fillMaxSize().liquidRenderEffect()) {
-                        LiquidNavLayout(items = items, selectedIndex = selectedIndex)
+                        // 1. Metaball Layer (Fused Geometry)
+                        Box(modifier = Modifier.fillMaxSize().liquidRenderEffect()) {
+                                LiquidNavLayout(items = items, selectedIndex = selectedIndex)
+                        }
+
+                        // 2. Refraction/Gloss Overlay (lighting details)
+                        LiquidRefractionLayer(items = items, selectedIndex = selectedIndex)
                 }
-
-                // 2. Refraction/Gloss Overlay (lighting details)
-                LiquidRefractionLayer(items = items, selectedIndex = selectedIndex)
 
                 // Layer 4: Icons (Always on top)
                 LiquidNavIcons(
@@ -93,70 +104,86 @@ data class LiquidNavItem(val route: String, val label: String, val icon: ImageVe
 @Composable
 private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int) {
         val density = LocalDensity.current
-        // val primaryColor = MaterialTheme.colorScheme.primary // Removed as per request to remove blue background
+        
+        val animatedIndex = remember { Animatable(selectedIndex.toFloat()) }
+        val stretch = remember { Animatable(1f) }
+        val squash = remember { Animatable(1f) }
 
-        val animatedIndex by
-                animateFloatAsState(
-                        targetValue = selectedIndex.toFloat(),
-                        animationSpec =
-                                spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
+        LaunchedEffect(selectedIndex) {
+                // Reset stretch/squash before starting
+                launch { stretch.snapTo(1f) }
+                launch { squash.snapTo(1f) }
+
+                launch {
+                        animatedIndex.animateTo(
+                                targetValue = selectedIndex.toFloat(),
+                                animationSpec = spring(
+                                        dampingRatio = 0.4f, // More bouncy
                                         stiffness = Spring.StiffnessLow
-                                ),
-                        label = "LiquidMove"
-                )
-
-        // Compile the shader once
+                                )
+                        ) {
+                                // Stretch based on velocity
+                                val stretchValue = (1f + abs(velocity) / 1000f).coerceIn(1f, 2.0f)
+                                launch { stretch.snapTo(stretchValue) }
+                        }
+                        
+                        // Squash and rebound when finished
+                        launch {
+                                squash.animateTo(
+                                        targetValue = 0.7f, // Deeper squash
+                                        animationSpec = spring(dampingRatio = 0.2f, stiffness = Spring.StiffnessMedium)
+                                )
+                                squash.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)
+                                )
+                        }
+                }
+        }
+        
         val shader = remember { RuntimeShader(LIQUID_SHADER) }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
                 val itemCount = items.size
-                // Guard against zero-size or empty items to prevent NaN propagation
                 if (itemCount == 0 || w <= 0f || h <= 0f) return@Canvas
 
                 val slotWidth = w / itemCount
                 val activeBlobSize = with(density) { 56.dp.toPx() } / 2f
                 val anchorSize = with(density) { 24.dp.toPx() } / 2f
 
-                // Update Shader Uniforms
                 shader.setFloatUniform("uResolution", w, h)
-                // Uniforms for robust shader: blob count isn't strictly looped but good for logical
-                // clamp?
-                // Actually our shader is hard-unrolled, so we just populate the slots.
+                val liquidColor = Color.Transparent
+                shader.setFloatUniform("uColor", liquidColor.red, liquidColor.green, liquidColor.blue, liquidColor.alpha)
+                shader.setFloatUniform("uSmoothness", 60f)
 
-                shader.setColorUniform("uColor", Color.White.copy(alpha = 0.01f).toArgb()) // Changed to very low alpha white for liquid effect source
-                shader.setFloatUniform("uSmoothness", 30f) // Viscosity factor (pixels)
+                val scaleX = stretch.value * squash.value
+                val scaleY = (1f / stretch.value) * squash.value
+                shader.setFloatUniform("uScaleX", scaleX)
+                shader.setFloatUniform("uScaleY", scaleY)
 
-                val blobCoords = FloatArray(12) // 6 blobs * 2 coords (x,y)
-                val blobRadii = FloatArray(6) // 6 blobs * 1 radius
+                val blobCoords = FloatArray(12)
+                val blobRadii = FloatArray(6)
 
-                // 1. Static Anchors (Slots 0-4)
                 for (i in 0 until itemCount) {
-                        if (i >= 5) break // Max 5 anchors supported by unrolled shader
-
+                        if (i >= 5) break
                         val cx = (slotWidth * i) + (slotWidth / 2)
                         val cy = h / 2
                         blobCoords[i * 2] = cx
                         blobCoords[i * 2 + 1] = cy
-                        blobRadii[i] = anchorSize // Normal anchor size
+                        blobRadii[i] = anchorSize
                 }
 
-                // Zero out remaining unused anchor slots (if any) to hide them
-                // The shader logic will compute them but radius 0 or far away makes them invisible.
                 for (i in itemCount until 5) {
-                        // Keep them at 0,0 with 0 radius -> effectively invisible
                         blobRadii[i] = 0f
                 }
 
-                // 2. Active Cursor (Slot 5) - Strictly the 6th element
-                val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
-                blobCoords[10] = targetX // Index 5 * 2 = 10
+                val targetX = (slotWidth * animatedIndex.value) + (slotWidth / 2)
+                blobCoords[10] = targetX
                 blobCoords[11] = h / 2
                 blobRadii[5] = activeBlobSize
-
-                // Pass flattened arrays
+                
                 shader.setFloatUniform("uBlobCoords", blobCoords)
                 shader.setFloatUniform("uRadii", blobRadii)
 
@@ -172,11 +199,11 @@ private fun LiquidNavLayout(items: List<LiquidNavItem>, selectedIndex: Int) {
     val animatedIndex by
         animateFloatAsState(
             targetValue = selectedIndex.toFloat(),
-            animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessLow
-            ),
+                        animationSpec =
+                                spring(
+                                        dampingRatio = 0.6f,
+                                        stiffness = Spring.StiffnessLow
+                                ),
             label = "LiquidMove"
         )
 
@@ -216,12 +243,11 @@ private fun LiquidRefractionLayer(
         val animatedIndex by
                 animateFloatAsState(
                         targetValue = selectedIndex.toFloat(),
-                        animationSpec =
-                                spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                    animationSpec =
+                                    spring(
+                                        dampingRatio = 0.6f,
                                         stiffness = Spring.StiffnessLow
-                                ),
-                        label = "LiquidMove"
+                                    ),                        label = "LiquidMove"
                 )
 
         Canvas(modifier = modifier.fillMaxSize()) {
@@ -288,6 +314,7 @@ private fun LiquidNavIcons(
                                         Modifier.weight(1f)
                                                 .height(64.dp)
                                                 .clip(CircleShape)
+                                                .bouncyClick()
                                                 .clickable { onItemSelected(index) },
                                 contentAlignment = Alignment.Center
                         ) {
@@ -298,7 +325,7 @@ private fun LiquidNavIcons(
                                                 if (isSelected) MaterialTheme.colorScheme.onPrimary
                                                 else
                                                         MaterialTheme.colorScheme.onSurfaceVariant
-                                                                .copy(alpha = 0.6f),
+                                                                .copy(alpha = 0.8f),
                                         modifier = Modifier.size(24.dp)
                                 )
                         }
