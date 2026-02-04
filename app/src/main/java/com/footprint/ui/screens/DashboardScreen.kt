@@ -1224,22 +1224,28 @@ private fun LazyListScope.recentFootprintsSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            LiquidGlassCard(
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.wrapContentSize() // Use wrapContentSize to let content define size
             ) {
-                Icon(
-                        Icons.Default.Route,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                )
-                Text(
-                        text = "年度足迹轨迹",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                            Icons.Default.Route,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                            text = "年度足迹轨迹",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             LiquidGlassCard(
                 shape = RoundedCornerShape(8.dp),

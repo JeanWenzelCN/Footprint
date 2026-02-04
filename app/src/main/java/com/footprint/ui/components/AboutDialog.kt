@@ -66,7 +66,7 @@ fun AboutDialog(
                 ) {
                     // Local Resource for Instant Loading
                     Image(
-                        painter = painterResource(id = R.drawable.author_avatar),
+                        painter = painterResource(id = R.drawable.ic_author_placeholder),
                         contentDescription = "Author Avatar",
                         modifier = Modifier
                             .size(64.dp)
