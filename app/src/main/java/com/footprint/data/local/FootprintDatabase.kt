@@ -14,7 +14,7 @@ import androidx.room.TypeConverters
         PrivacyFenceEntity::class,
         TrackPointEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

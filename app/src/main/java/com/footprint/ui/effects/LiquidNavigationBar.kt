@@ -7,9 +7,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -37,14 +35,12 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
-import com.footprint.ui.effects.bouncyClick
-import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 /**
  * An advanced Liquid Navigation Bar using Metaballs for the selection indicator and Refraction
@@ -63,7 +59,7 @@ fun LiquidNavigationBar(
                 modifier = modifier,
                 hazeState = hazeState,
                 shape = CircleShape,
-                backgroundColor = Color.Transparent,
+                backgroundColor = Color.White.copy(alpha = 0.0f),
                 noiseOpacity = 0.05f
         ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -73,8 +69,10 @@ fun LiquidNavigationBar(
                         LiquidNavShaderLayout(items = items, selectedIndex = selectedIndex)
                 } else {
                         // Universal High-Fidelity Rendering (Blur + Threshold + Refraction Overlay)
-                        // This fallback uses the "Metaball Threshold" technique (Blur + high-contrast ColorMatrix)
-                        // which gives the exact same liquid fusion effect but is 100% stable on all devices/emulators.
+                        // This fallback uses the "Metaball Threshold" technique (Blur +
+                        // high-contrast ColorMatrix)
+                        // which gives the exact same liquid fusion effect but is 100% stable on all
+                        // devices/emulators.
 
                         // 1. Metaball Layer (Fused Geometry)
                         Box(modifier = Modifier.fillMaxSize().liquidRenderEffect()) {
@@ -104,7 +102,7 @@ data class LiquidNavItem(val route: String, val label: String, val icon: ImageVe
 @Composable
 private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int) {
         val density = LocalDensity.current
-        
+
         val animatedIndex = remember { Animatable(selectedIndex.toFloat()) }
         val stretch = remember { Animatable(1f) }
         val squash = remember { Animatable(1f) }
@@ -117,30 +115,39 @@ private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int
                 launch {
                         animatedIndex.animateTo(
                                 targetValue = selectedIndex.toFloat(),
-                                animationSpec = spring(
-                                        dampingRatio = 0.4f, // More bouncy
-                                        stiffness = Spring.StiffnessLow
-                                )
+                                animationSpec =
+                                        spring(
+                                                dampingRatio = 0.4f, // More bouncy
+                                                stiffness = Spring.StiffnessLow
+                                        )
                         ) {
                                 // Stretch based on velocity
                                 val stretchValue = (1f + abs(velocity) / 1000f).coerceIn(1f, 2.0f)
                                 launch { stretch.snapTo(stretchValue) }
                         }
-                        
+
                         // Squash and rebound when finished
                         launch {
                                 squash.animateTo(
                                         targetValue = 0.7f, // Deeper squash
-                                        animationSpec = spring(dampingRatio = 0.2f, stiffness = Spring.StiffnessMedium)
+                                        animationSpec =
+                                                spring(
+                                                        dampingRatio = 0.2f,
+                                                        stiffness = Spring.StiffnessMedium
+                                                )
                                 )
                                 squash.animateTo(
                                         targetValue = 1f,
-                                        animationSpec = spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)
+                                        animationSpec =
+                                                spring(
+                                                        dampingRatio = 0.4f,
+                                                        stiffness = Spring.StiffnessMedium
+                                                )
                                 )
                         }
                 }
         }
-        
+
         val shader = remember { RuntimeShader(LIQUID_SHADER) }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -154,8 +161,15 @@ private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int
                 val anchorSize = with(density) { 24.dp.toPx() } / 2f
 
                 shader.setFloatUniform("uResolution", w, h)
-                val liquidColor = Color.Transparent
-                shader.setFloatUniform("uColor", liquidColor.red, liquidColor.green, liquidColor.blue, liquidColor.alpha)
+                val liquidColor =
+                        Color.White.copy(alpha = 0.15f) // Glassy transparency (mostly clear)
+                shader.setFloatUniform(
+                        "uColor",
+                        liquidColor.red,
+                        liquidColor.green,
+                        liquidColor.blue,
+                        liquidColor.alpha
+                )
                 shader.setFloatUniform("uSmoothness", 60f)
 
                 val scaleX = stretch.value * squash.value
@@ -183,7 +197,7 @@ private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int
                 blobCoords[10] = targetX
                 blobCoords[11] = h / 2
                 blobRadii[5] = activeBlobSize
-                
+
                 shader.setFloatUniform("uBlobCoords", blobCoords)
                 shader.setFloatUniform("uRadii", blobRadii)
 
@@ -194,43 +208,48 @@ private fun LiquidNavShaderLayout(items: List<LiquidNavItem>, selectedIndex: Int
 /** Universal Layout using Blur + Threshold */
 @Composable
 private fun LiquidNavLayout(items: List<LiquidNavItem>, selectedIndex: Int) {
-    // val primaryColor = MaterialTheme.colorScheme.primary // Removed as per request to remove blue background
+        // val primaryColor = MaterialTheme.colorScheme.primary // Removed as per request to remove
+        // blue background
 
-    val animatedIndex by
-        animateFloatAsState(
-            targetValue = selectedIndex.toFloat(),
+        val animatedIndex by
+                animateFloatAsState(
+                        targetValue = selectedIndex.toFloat(),
                         animationSpec =
-                                spring(
-                                        dampingRatio = 0.6f,
-                                        stiffness = Spring.StiffnessLow
-                                ),
-            label = "LiquidMove"
-        )
+                                spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+                        label = "LiquidMove"
+                )
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val slotWidth = size.width / items.size
-        val staticBlobRadius = 24.dp.toPx() / 2
-        val movingBlobRadius = 56.dp.toPx() / 2
-        val cy = size.height / 2
+        Canvas(modifier = Modifier.fillMaxSize()) {
+                val slotWidth = size.width / items.size
+                val staticBlobRadius = 24.dp.toPx() / 2
+                val movingBlobRadius = 56.dp.toPx() / 2
+                val cy = size.height / 2
 
-        // Draw static anchors for all items
-        for (i in items.indices) {
-            val cx = (slotWidth * i) + (slotWidth / 2)
-            drawCircle(
-                color = Color.White.copy(alpha = 0.01f), // Changed to very low alpha white for liquid effect source
-                radius = staticBlobRadius,
-                center = Offset(cx, cy)
-            )
+                // Draw static anchors for all items
+                for (i in items.indices) {
+                        val cx = (slotWidth * i) + (slotWidth / 2)
+                        drawCircle(
+                                color =
+                                        Color.White.copy(
+                                                alpha = 0.01f
+                                        ), // Changed to very low alpha white for liquid effect
+                                // source
+                                radius = staticBlobRadius,
+                                center = Offset(cx, cy)
+                        )
+                }
+
+                // Draw the moving blob
+                val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
+                drawCircle(
+                        color =
+                                Color.White.copy(
+                                        alpha = 0.01f
+                                ), // Changed to very low alpha white for liquid effect source
+                        radius = movingBlobRadius,
+                        center = Offset(targetX, cy)
+                )
         }
-
-        // Draw the moving blob
-        val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
-        drawCircle(
-            color = Color.White.copy(alpha = 0.01f), // Changed to very low alpha white for liquid effect source
-            radius = movingBlobRadius,
-            center = Offset(targetX, cy)
-        )
-    }
 }
 
 /** Universal Overlay for Gloss */
@@ -243,11 +262,9 @@ private fun LiquidRefractionLayer(
         val animatedIndex by
                 animateFloatAsState(
                         targetValue = selectedIndex.toFloat(),
-                                    animationSpec =
-                                    spring(
-                                        dampingRatio = 0.6f,
-                                        stiffness = Spring.StiffnessLow
-                                    ),                        label = "LiquidMove"
+                        animationSpec =
+                                spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+                        label = "LiquidMove"
                 )
 
         Canvas(modifier = modifier.fillMaxSize()) {
@@ -256,24 +273,14 @@ private fun LiquidRefractionLayer(
                 val cy = size.height / 2
                 val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
 
+                // Removed black shadow gradient to ensure transparency
+                // We only want the white highlight (specular) below
+
+                /*
                 drawCircle(
-                        brush =
-                                Brush.radialGradient(
-                                        colors =
-                                                listOf(
-                                                        Color.Transparent,
-                                                        Color.Black.copy(alpha = 0.3f)
-                                                ),
-                                        center =
-                                                Offset(
-                                                        targetX - blobSize * 0.1f,
-                                                        cy - blobSize * 0.1f
-                                                ),
-                                        radius = blobSize * 0.6f
-                                ),
-                        radius = blobSize * 0.45f,
-                        center = Offset(targetX, cy)
+                        brush = Brush.radialGradient(...)
                 )
+                */
 
                 drawCircle(
                         brush =

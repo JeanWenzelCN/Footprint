@@ -101,15 +101,20 @@ const val LIQUID_SHADER =
         vec3 reflectDir = reflect(-lightDir, normal);
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
         
-        // Fresnel / Inner Shadow
+        // Fresnel / Rim Light (Glowing Edges)
         float rim = 1.0 - max(dot(viewDir, normal), 0.0);
-        float innerShadow = smoothstep(0.4, 0.8, rim) * 0.4;
+        float rimIntensity = smoothstep(0.5, 1.0, rim) * 0.6; // Glow at extreme angles
 
         vec4 finalColor = uColor;
         finalColor.rgb += spec * 0.9; // Strong gloss
-        finalColor.rgb -= innerShadow;
+        finalColor.rgb += rimIntensity; // ADD light at edges (Rim Light)
         
-        finalColor.a = alpha;
+        // Calculate transparency: 
+        // Base Opacity (uColor.a) + Highlight Opacity (spec + rim)
+        // Clamped to 1.0
+        float contentAlpha = clamp(uColor.a + spec + rimIntensity, 0.0, 1.0);
+        
+        finalColor.a = alpha * contentAlpha;
         return finalColor;
     }
 """

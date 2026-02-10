@@ -2,7 +2,6 @@ package com.footprint.ui.effects
 
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -31,51 +30,47 @@ import dev.chrisbanes.haze.hazeChild
 import kotlin.random.Random
 
 /**
- * A container that applies the "Glassmorphism" effect:
+ * A container that applies a realistic "Glassmorphism" effect.
+ *
+ * Features:
  * - Real-time background blur (using Haze)
- * - Noise texture overlay
- * - Specular highlight border
- * - Tinting
+ * - Noise texture overlay for material feel
+ * - Specular highlight border (simulating light edge)
+ * - Surface reflection gradient (simulating curved/shiny surface)
+ * - Inner glow/shadow for depth
  */
 @Composable
 fun GlassCard(
         modifier: Modifier = Modifier,
-        hazeState: HazeState,
+        hazeState: HazeState?,
         shape: Shape = RoundedCornerShape(24.dp),
-        backgroundColor: Color = Color.White.copy(alpha = 0.2f),
+        backgroundColor: Color =
+                Color.White.copy(alpha = 0.08f), // Lower opacity for better see-through
         borderWidth: Dp = 1.dp,
-        borderColor: Color = Color.White.copy(alpha = 0.5f),
-        noiseOpacity: Float = 0.05f,
-        blurRadius: Dp = 20.dp,
+        borderColor: Color = Color.White.copy(alpha = 0.4f),
+        noiseOpacity: Float = 0.03f, // Subtler noise
+        blurRadius: Dp =
+                20.dp, // Note: Haze blur radius is set on the hazeChild or global HazeState
         content: @Composable BoxScope.() -> Unit
 ) {
     Box(
             modifier =
-                    modifier.glassBorder(
-                                    width = borderWidth,
-                                    color = borderColor, // Fallback solid color, but we prefer
-                                    // gradient usually
-                                    shape = shape
+                    modifier.glassBorder(width = borderWidth, color = borderColor, shape = shape)
+                            .then(
+                                    if (hazeState != null) {
+                                        Modifier.hazeChild(state = hazeState, shape = shape)
+                                    } else {
+                                        Modifier // Fallback if no haze state
+                                    }
                             )
-                            .hazeChild(
-                                    state = hazeState,
-                                    shape = shape,
-                                    // Haze doesn't support blur radius config directly in hazeChild
-                                    // yet in some versions,
-                                    // but usually it mimics the background blur.
-                                    // We rely on the global HazeState configuration or defaults.
-                                    )
-                            // Clip content to shape, but removed noise here to avoid covering content
-                            .clip(shape) 
+                            .clip(shape)
+                            .background(backgroundColor) // Base tint
+                            .glassReflection() // Add surface reflection
     ) {
-        // Tint layer (drawn on top of blur, behind content)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(backgroundColor, shape)
-                // Add Noise Texture here so it is behind the content
-                .noiseTexture(opacity = noiseOpacity)
-        )
+        // Noise Texture Layer
+        Box(modifier = Modifier.matchParentSize().noiseTexture(opacity = noiseOpacity))
+
+        // Content
         content()
     }
 }
@@ -127,12 +122,6 @@ private class NoiseModifierNode(var opacity: Float) : DrawModifierNode, Modifier
                             android.graphics.Shader.TileMode.REPEAT
                     )
             androidPaint.shader = shader
-            // Use Overlay or SoftLight blend mode if possible, but standard SrcOver with low alpha
-            // works for generic noise
-            // Android Canvas BlendModes require API 29+ for some.
-            // For simple noise, normal blending with low alpha is usually sufficient "film grain"
-            // look.
-
             nativeCanvas.drawRect(0f, 0f, size.width, size.height, androidPaint)
         }
     }
@@ -156,18 +145,42 @@ private fun generateNoiseBitmap(size: Int): ImageBitmap {
 
 /**
  * Modifier to apply a gradient border that simulates light reflection (specular highlight).
- * Top-left is brighter (light source), Bottom-right is subtler.
+ * Top-Left is brighter (light source), Bottom-Right is subtle.
  */
 fun Modifier.glassBorder(width: Dp, color: Color, shape: Shape): Modifier {
     // Custom gradient for "Glass" look
+    // Simulates a light source from Top-Left
     val brush =
             Brush.linearGradient(
-                    0f to color.copy(alpha = 0.7f), // Top-Left Highlight
-                    0.5f to color.copy(alpha = 0.1f), // Middle transparent
-                    1f to color.copy(alpha = 0.3f), // Bottom-Right Refraction
+                    0.0f to color.copy(alpha = 0.7f), // Strong highlight top-left
+                    0.15f to color.copy(alpha = 0.2f), // Fade out quickly
+                    0.5f to color.copy(alpha = 0.05f), // Almost transparent middle
+                    0.85f to color.copy(alpha = 0.2f), // Slight return
+                    1.0f to color.copy(alpha = 0.5f), // Bottom-right rim light
                     start = Offset.Zero,
-                    end = Offset.Infinite // Uses DrawScope size basically, mimics diagonal
+                    end = Offset.Infinite
             )
 
     return this.border(width = width, brush = brush, shape = shape)
+}
+
+/**
+ * Modifier that adds a subtle linear gradient to simulate a reflection on the glass surface. This
+ * gives the "bulge" or "sheen" look often seen in iOS glassmorphism.
+ */
+fun Modifier.glassReflection(): Modifier {
+    val reflectionBrush =
+            Brush.linearGradient(
+                    colors =
+                            listOf(
+                                    Color.White.copy(alpha = 0.15f), // Top-left shine
+                                    Color.White.copy(alpha = 0.05f),
+                                    Color.Transparent, // Fades out to nothing
+                                    Color.Transparent
+                            ),
+                    start = Offset(0f, 0f),
+                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+            )
+
+    return this.background(brush = reflectionBrush)
 }
