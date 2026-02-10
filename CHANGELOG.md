@@ -1,5 +1,21 @@
 # 更新日志 (Changelog)
 
+### 2026-02-10: 高级液态折射与光学校正 (v2.2.0)
+
+#### ✨ 新增特性 (Features)
+- **高级液态折射 (Advanced Liquid Refraction)**:
+  - 引入 `AGSL` (Android Graphics Shading Language) 着色器，实现真实物理折射效果。
+  - **色散 (Chromatic Aberration)**: 模拟真实玻璃的光谱分离效果（RGB通道偏移）。
+  - **菲涅尔效应 (Fresnel Effect)**: 增强边缘光照，使液态球体更具立体感。
+  - **呼吸动效 (Breathing Animation)**: 选中态的水滴球体增加微妙的呼吸律动，提升生命感。
+- **兼容性优化**:
+  - Android 13+ 设备启用全功能 AGSL 折射渲染。
+  - Android 12 及以下设备自动回退到高性能模糊/阈值渲染方案。
+
+#### 🐛 修复 (Bug Fixes)
+- **构建修复**: 解决了 `LiquidNavigationBar` 缺失 `spring` 动画库引用导致的编译失败。
+- **KAPT 问题**: 修复了由着色器代码引起的 KAPT存根生成错误。
+
 ### 2026-02-04: UI动效增强与稳定性修复 (v2.1.0)
 
 #### ✨ 新增特性 (Features)
