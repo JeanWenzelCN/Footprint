@@ -14,25 +14,27 @@ import androidx.room.TypeConverters
                         BadgeEntity::class,
                         PrivacyFenceEntity::class,
                         TrackPointEntity::class],
-        version = 6,
+        version = 7,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class FootprintDatabase : RoomDatabase() {
-    abstract fun footprintDao(): FootprintDao
-    abstract fun travelGoalDao(): TravelGoalDao
-    abstract fun premiumDao(): PremiumDao
-    abstract fun trackPointDao(): TrackPointDao
+        abstract fun footprintDao(): FootprintDao
+        abstract fun travelGoalDao(): TravelGoalDao
+        abstract fun premiumDao(): PremiumDao
+        abstract fun trackPointDao(): TrackPointDao
 
-    companion object {
-        @Volatile private var instance: FootprintDatabase? = null
+        companion object {
+                @Volatile private var instance: FootprintDatabase? = null
 
-        val MIGRATION_5_6 =
-                object : androidx.room.migration.Migration(5, 6) {
-                    override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
-                        // Create Badges table
-                        database.execSQL(
-                                """
+                val MIGRATION_5_6 =
+                        object : androidx.room.migration.Migration(5, 6) {
+                                override fun migrate(
+                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        // Create Badges table
+                                        database.execSQL(
+                                                """
                     CREATE TABLE IF NOT EXISTS `badges` (
                         `id` TEXT NOT NULL,
                         `name` TEXT NOT NULL,
@@ -46,11 +48,11 @@ abstract class FootprintDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`)
                     )
                 """
-                        )
+                                        )
 
-                        // Create Privacy Fences table
-                        database.execSQL(
-                                """
+                                        // Create Privacy Fences table
+                                        database.execSQL(
+                                                """
                     CREATE TABLE IF NOT EXISTS `privacy_fences` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         `label` TEXT NOT NULL,
@@ -60,11 +62,11 @@ abstract class FootprintDatabase : RoomDatabase() {
                         `isActive` INTEGER NOT NULL
                     )
                 """
-                        )
+                                        )
 
-                        // Create Track Points table (if not exists)
-                        database.execSQL(
-                                """
+                                        // Create Track Points table (if not exists)
+                                        database.execSQL(
+                                                """
                     CREATE TABLE IF NOT EXISTS `track_points` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         `latitude` REAL NOT NULL,
@@ -75,20 +77,62 @@ abstract class FootprintDatabase : RoomDatabase() {
                         `altitude` REAL NOT NULL
                     )
                 """
-                        )
-                    }
-                }
+                                        )
+                                }
+                        }
 
-        fun getInstance(context: Context): FootprintDatabase =
-                instance ?: synchronized(this) { instance ?: build(context).also { instance = it } }
+                val MIGRATION_6_7 =
+                        object : androidx.room.migration.Migration(6, 7) {
+                                override fun migrate(
+                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        // Safely add columns to footprints table
+                                        try {
+                                                database.execSQL(
+                                                        "ALTER TABLE footprints ADD COLUMN transport_type TEXT NOT NULL DEFAULT 'UNKNOWN'"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                        try {
+                                                database.execSQL(
+                                                        "ALTER TABLE footprints ADD COLUMN carbon_saved REAL NOT NULL DEFAULT 0.0"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                        try {
+                                                database.execSQL(
+                                                        "ALTER TABLE footprints ADD COLUMN icon TEXT NOT NULL DEFAULT 'LocationOn'"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
 
-        private fun build(context: Context): FootprintDatabase =
-                Room.databaseBuilder(
-                                context.applicationContext,
-                                FootprintDatabase::class.java,
-                                "footprint-db"
-                        )
-                        .addMigrations(MIGRATION_5_6)
-                        .build()
-    }
+                                        // Safely add columns to travel_goals table
+                                        try {
+                                                database.execSQL(
+                                                        "ALTER TABLE travel_goals ADD COLUMN icon TEXT NOT NULL DEFAULT 'Flag'"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                }
+                        }
+
+                fun getInstance(context: Context): FootprintDatabase =
+                        instance
+                                ?: synchronized(this) {
+                                        instance ?: build(context).also { instance = it }
+                                }
+
+                private fun build(context: Context): FootprintDatabase =
+                        Room.databaseBuilder(
+                                        context.applicationContext,
+                                        FootprintDatabase::class.java,
+                                        "footprint-db"
+                                )
+                                .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                                .build()
+        }
 }
