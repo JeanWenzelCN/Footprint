@@ -5,8 +5,8 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.footprint.data.model.FootprintEntry
 import com.footprint.data.model.Mood
 import com.footprint.data.model.TravelGoal
@@ -26,13 +26,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class FootprintViewModel(
-    application: Application,
-    private val repository: FootprintRepository = (application as FootprintApplication).repository
+        application: Application,
+        private val repository: FootprintRepository =
+                (application as FootprintApplication).repository
 ) : AndroidViewModel(application) {
 
     private val preferenceManager = PreferenceManager(application)
     private val gson = Gson()
-    
+
     private val moodFilter = MutableStateFlow<Mood?>(null)
     private val searchQuery = MutableStateFlow("")
     private val yearFilter = MutableStateFlow(LocalDate.now().year)
@@ -44,135 +45,162 @@ class FootprintViewModel(
     private val hapticFeedback = MutableStateFlow(preferenceManager.hapticFeedbackEnabled)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private val yearlyTrackPointCount: Flow<Int> = yearFilter.flatMapLatest { year ->
-        flow<Int> {
-            emit(repository.getTrackPointCount(year))
-        }
-    }
+    private val yearlyTrackPointCount: Flow<Int> =
+            yearFilter.flatMapLatest { year ->
+                flow<Int> { emit(repository.getTrackPointCount(year)) }
+            }
 
-    private val monthlyTrackPointCount: Flow<Int> = flow<Int> {
-        val now = LocalDate.now()
-        emit(repository.getTrackPointCount(now.year, now.monthValue))
-    }
+    private val monthlyTrackPointCount: Flow<Int> =
+            flow<Int> {
+                val now = LocalDate.now()
+                emit(repository.getTrackPointCount(now.year, now.monthValue))
+            }
 
     // 定义显式的数据组结构
-    private data class DataGroup(val entries: List<FootprintEntry>, val goals: List<TravelGoal>, val yPoints: Int, val mPoints: Int)
+    private data class DataGroup(
+            val entries: List<FootprintEntry>,
+            val goals: List<TravelGoal>,
+            val yPoints: Int,
+            val mPoints: Int
+    )
     private data class FilterGroup(val mood: Mood?, val search: String, val year: Int)
-    private data class PrefsGroup(val theme: ThemeMode, val style: com.footprint.ui.theme.AppThemeStyle, val nk: String, val av: String, val blur: Float, val haptic: Boolean)
+    private data class PrefsGroup(
+            val theme: ThemeMode,
+            val style: com.footprint.ui.theme.AppThemeStyle,
+            val nk: String,
+            val av: String,
+            val blur: Float,
+            val haptic: Boolean
+    )
 
     // 强类型合并流
-    private val dataFlow: Flow<DataGroup> = combine(
-        repository.observeEntries(),
-        repository.observeGoals(),
-        yearlyTrackPointCount,
-        monthlyTrackPointCount
-    ) { entries, goals, yPoints, mPoints ->
-        DataGroup(entries, goals, yPoints, mPoints)
-    }
+    private val dataFlow: Flow<DataGroup> =
+            combine(
+                    repository.observeEntries(),
+                    repository.observeGoals(),
+                    yearlyTrackPointCount,
+                    monthlyTrackPointCount
+            ) { entries, goals, yPoints, mPoints -> DataGroup(entries, goals, yPoints, mPoints) }
 
-    private val filterFlow: Flow<FilterGroup> = combine(
-        moodFilter,
-        searchQuery,
-        yearFilter
-    ) { mood, search, year ->
-        FilterGroup(mood, search, year)
-    }
+    private val filterFlow: Flow<FilterGroup> =
+            combine(moodFilter, searchQuery, yearFilter) { mood, search, year ->
+                FilterGroup(mood, search, year)
+            }
 
-    private val appearanceFlow = combine(themeMode, themeStyle, blurStrength) { mode, style, blur ->
-        Triple(mode, style, blur)
-    }
-    
-    private val userFlow = combine(nickname, avatarId, hapticFeedback) { nk, av, haptic ->
-        Triple(nk, av, haptic)
-    }
+    private val appearanceFlow =
+            combine(themeMode, themeStyle, blurStrength) { mode, style, blur ->
+                Triple(mode, style, blur)
+            }
 
-    private val prefsFlow: Flow<PrefsGroup> = combine(
-        appearanceFlow,
-        userFlow
-    ) { appearance, user ->
-        PrefsGroup(
-            theme = appearance.first,
-            style = appearance.second,
-            blur = appearance.third,
-            nk = user.first,
-            av = user.second,
-            haptic = user.third
-        )
-    }
+    private val userFlow =
+            combine(nickname, avatarId, hapticFeedback) { nk, av, haptic -> Triple(nk, av, haptic) }
+
+    private val prefsFlow: Flow<PrefsGroup> =
+            combine(appearanceFlow, userFlow) { appearance, user ->
+                PrefsGroup(
+                        theme = appearance.first,
+                        style = appearance.second,
+                        blur = appearance.third,
+                        nk = user.first,
+                        av = user.second,
+                        haptic = user.third
+                )
+            }
 
     // 最终合并，参数减少到 3 个，编译器推断不再压力
-    val uiState: StateFlow<FootprintUiState> = combine(dataFlow, filterFlow, prefsFlow) { data, filter, prefs ->
-        val visibleEntries = data.entries
-            .filter { filter.mood == null || it.mood == filter.mood }
-            .filter {
-                if (filter.search.isBlank()) true
-                else {
-                    val queryText = filter.search.trim().lowercase()
-                    it.title.lowercase().contains(queryText) ||
-                        it.location.lowercase().contains(queryText) ||
-                        it.tags.any { tag -> tag.lowercase().contains(queryText) }
-                }
-            }
-        
-        val visibleGoals = data.goals
-            .filter {
-                if (filter.search.isBlank()) true
-                else {
-                    val queryText = filter.search.trim().lowercase()
-                    it.title.lowercase().contains(queryText) ||
-                        it.targetLocation.lowercase().contains(queryText) ||
-                        it.notes.lowercase().contains(queryText)
-                }
-            }
+    val uiState: StateFlow<FootprintUiState> =
+            combine(dataFlow, filterFlow, prefsFlow) { data, filter, prefs ->
+                        val visibleEntries =
+                                data.entries
+                                        .filter { filter.mood == null || it.mood == filter.mood }
+                                        .filter {
+                                            if (filter.search.isBlank()) true
+                                            else {
+                                                val queryText = filter.search.trim().lowercase()
+                                                it.title.lowercase().contains(queryText) ||
+                                                        it.location
+                                                                .lowercase()
+                                                                .contains(queryText) ||
+                                                        it.tags.any { tag ->
+                                                            tag.lowercase().contains(queryText)
+                                                        }
+                                            }
+                                        }
 
-        val today = LocalDate.now()
-        val historicalMemories = data.entries.filter { 
-            it.happenedOn.monthValue == today.monthValue && 
-            it.happenedOn.dayOfMonth == today.dayOfMonth &&
-            it.happenedOn.year < today.year
-        }
-        
-        val randomMemory = if (historicalMemories.isNotEmpty()) historicalMemories.random() else null
+                        val visibleGoals =
+                                data.goals.filter {
+                                    if (filter.search.isBlank()) true
+                                    else {
+                                        val queryText = filter.search.trim().lowercase()
+                                        it.title.lowercase().contains(queryText) ||
+                                                it.targetLocation.lowercase().contains(queryText) ||
+                                                it.notes.lowercase().contains(queryText)
+                                    }
+                                }
 
-        val memoryQuote = if (randomMemory == null) {
-            val quotes = listOf(
-                "所有的昨日，都是为了迎接更好的明天。",
-                "记忆是阵阵花香，我们说好永远不能忘。",
-                "时光荏苒，唯有足迹证明我们曾热烈地活过。",
-                "那些被翻阅过的日子，都成了生命里的光。",
-                "生活不在于走了多少路，而在于留下了多少回忆。",
-                "去发现，去记录，去成为更好的自己。",
-                "每一个今天，都是未来最想回到的昨天。"
-            )
-            quotes[(today.toEpochDay() % quotes.size).toInt()]
-        } else null
+                        val today = LocalDate.now()
+                        val historicalMemories =
+                                data.entries.filter {
+                                    it.happenedOn.monthValue == today.monthValue &&
+                                            it.happenedOn.dayOfMonth == today.dayOfMonth &&
+                                            it.happenedOn.year < today.year
+                                }
 
-        FootprintUiState(
-            entries = data.entries,
-            visibleEntries = visibleEntries,
-            goals = visibleGoals,
-            yearlyEntries = data.entries.filter { it.happenedOn.year == filter.year },
-            yearlyGoals = data.goals.filter { it.targetDate.year == filter.year },
-            summary = FootprintAnalytics.buildSummary(data.entries, filter.year, data.yPoints, data.mPoints),
-            filterState = FilterState(filter.mood, filter.search, filter.year),
-            themeMode = prefs.theme,
-            themeStyle = prefs.style,
-            userNickname = prefs.nk,
-            userAvatarId = prefs.av,
-            blurStrength = prefs.blur,
-            hapticFeedbackEnabled = prefs.haptic,
-            randomMemory = randomMemory,
-            memoryQuote = memoryQuote,
-            isLoading = false
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = FootprintUiState(
-            themeMode = preferenceManager.themeMode,
-            themeStyle = preferenceManager.themeStyle
-        )
-    )
+                        val randomMemory =
+                                if (historicalMemories.isNotEmpty()) historicalMemories.random()
+                                else null
+
+                        val memoryQuote =
+                                if (randomMemory == null) {
+                                    val quotes =
+                                            listOf(
+                                                    "所有的昨日，都是为了迎接更好的明天。",
+                                                    "记忆是阵阵花香，我们说好永远不能忘。",
+                                                    "时光荏苒，唯有足迹证明我们曾热烈地活过。",
+                                                    "那些被翻阅过的日子，都成了生命里的光。",
+                                                    "生活不在于走了多少路，而在于留下了多少回忆。",
+                                                    "去发现，去记录，去成为更好的自己。",
+                                                    "每一个今天，都是未来最想回到的昨天。"
+                                            )
+                                    quotes[(today.toEpochDay() % quotes.size).toInt()]
+                                } else null
+
+                        FootprintUiState(
+                                entries = data.entries,
+                                visibleEntries = visibleEntries,
+                                goals = visibleGoals,
+                                yearlyEntries =
+                                        data.entries.filter { it.happenedOn.year == filter.year },
+                                yearlyGoals =
+                                        data.goals.filter { it.targetDate.year == filter.year },
+                                summary =
+                                        FootprintAnalytics.buildSummary(
+                                                data.entries,
+                                                filter.year,
+                                                data.yPoints,
+                                                data.mPoints
+                                        ),
+                                filterState = FilterState(filter.mood, filter.search, filter.year),
+                                themeMode = prefs.theme,
+                                themeStyle = prefs.style,
+                                userNickname = prefs.nk,
+                                userAvatarId = prefs.av,
+                                blurStrength = prefs.blur,
+                                hapticFeedbackEnabled = prefs.haptic,
+                                randomMemory = randomMemory,
+                                memoryQuote = memoryQuote,
+                                isLoading = false
+                        )
+                    }
+                    .stateIn(
+                            scope = viewModelScope,
+                            started = SharingStarted.WhileSubscribed(5_000),
+                            initialValue =
+                                    FootprintUiState(
+                                            themeMode = preferenceManager.themeMode,
+                                            themeStyle = preferenceManager.themeStyle
+                                    )
+                    )
 
     init {
         repository.ensureSeedData()
@@ -198,11 +226,13 @@ class FootprintViewModel(
     fun updateAvatar(uri: Uri) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val path = com.footprint.utils.ImageUtils.saveImageToInternalStorage(getApplication(), uri)
+                val path =
+                        com.footprint.utils.ImageUtils.saveImageToInternalStorage(
+                                getApplication(),
+                                uri
+                        )
                 if (path != null) {
-                    withContext(Dispatchers.Main) {
-                        updateProfile(nickname.value, path)
-                    }
+                    withContext(Dispatchers.Main) { updateProfile(nickname.value, path) }
                 }
             }
         }
@@ -214,10 +244,9 @@ class FootprintViewModel(
                 val backup = repository.prepareBackup()
                 val json = gson.toJson(backup)
                 withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use { outputStream ->
-                        OutputStreamWriter(outputStream).use { writer ->
-                            writer.write(json)
-                        }
+                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
+                            outputStream ->
+                        OutputStreamWriter(outputStream).use { writer -> writer.write(json) }
                     }
                 }
                 onSuccess()
@@ -230,14 +259,19 @@ class FootprintViewModel(
     fun importData(uri: Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val json = withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { inputStream ->
-                        InputStreamReader(inputStream).use { reader ->
-                            reader.readText()
+                val json =
+                        withContext(Dispatchers.IO) {
+                            getApplication<Application>()
+                                    .contentResolver
+                                    .openInputStream(uri)
+                                    ?.use { inputStream ->
+                                        InputStreamReader(inputStream).use { reader ->
+                                            reader.readText()
+                                        }
+                                    }
                         }
-                    }
-                } ?: throw Exception("无法读取文件")
-                
+                                ?: throw Exception("无法读取文件")
+
                 val backup = gson.fromJson(json, com.footprint.data.model.BackupData::class.java)
                 repository.restoreFromBackup(backup)
                 onSuccess()
@@ -271,100 +305,164 @@ class FootprintViewModel(
     }
 
     fun updateFootprint(entry: com.footprint.data.model.FootprintEntry) {
-        viewModelScope.launch {
-            repository.saveEntry(entry)
-        }
+        viewModelScope.launch { repository.saveEntry(entry) }
     }
 
     fun deleteFootprint(entry: com.footprint.data.model.FootprintEntry) {
-        viewModelScope.launch {
-            repository.deleteEntry(entry.id)
-        }
+        viewModelScope.launch { repository.deleteEntry(entry.id) }
     }
 
     fun addFootprint(
-        title: String,
-        location: String,
-        detail: String,
-        mood: Mood,
-        tags: List<String>,
-        distanceKm: Double,
-        photos: List<String>,
-        energyLevel: Int,
-        date: LocalDate,
-        latitude: Double? = null,
-        longitude: Double? = null,
-        icon: String = "LocationOn"
+            title: String,
+            location: String,
+            detail: String,
+            mood: Mood,
+            tags: List<String>,
+            distanceKm: Double,
+            photos: List<String>,
+            energyLevel: Int,
+            date: LocalDate,
+            latitude: Double? = null,
+            longitude: Double? = null,
+            icon: String = "LocationOn"
     ) {
         viewModelScope.launch {
-            val entry = FootprintEntry(
-                title = title,
-                location = location,
-                detail = detail,
-                mood = mood,
-                tags = tags,
-                distanceKm = distanceKm,
-                photos = photos,
-                energyLevel = energyLevel,
-                happenedOn = date,
-                latitude = latitude,
-                longitude = longitude,
-                icon = icon
-            )
+            val entry =
+                    FootprintEntry(
+                            title = title,
+                            location = location,
+                            detail = detail,
+                            mood = mood,
+                            tags = tags,
+                            distanceKm = distanceKm,
+                            photos = photos,
+                            energyLevel = energyLevel,
+                            happenedOn = date,
+                            latitude = latitude,
+                            longitude = longitude,
+                            icon = icon
+                    )
             repository.saveEntry(entry)
         }
     }
 
     fun addGoal(
-        title: String,
-        targetLocation: String,
-        targetDate: LocalDate,
-        notes: String,
-        icon: String = "Flag"
+            title: String,
+            targetLocation: String,
+            targetDate: LocalDate,
+            notes: String,
+            icon: String = "Flag"
     ) {
         viewModelScope.launch {
-            val goal = TravelGoal(
-                title = title,
-                targetLocation = targetLocation,
-                targetDate = targetDate,
-                notes = notes,
-                isCompleted = false,
-                progress = 5,
-                icon = icon
-            )
+            val goal =
+                    TravelGoal(
+                            title = title,
+                            targetLocation = targetLocation,
+                            targetDate = targetDate,
+                            notes = notes,
+                            isCompleted = false,
+                            progress = 5,
+                            icon = icon
+                    )
             repository.saveGoal(goal)
         }
     }
 
     fun updateGoal(goal: TravelGoal) {
-        viewModelScope.launch {
-            repository.saveGoal(goal)
-        }
+        viewModelScope.launch { repository.saveGoal(goal) }
     }
 
     fun toggleGoal(goal: TravelGoal) {
-        viewModelScope.launch {
-            repository.updateGoalCompletion(goal, !goal.isCompleted)
-        }
+        viewModelScope.launch { repository.updateGoalCompletion(goal, !goal.isCompleted) }
     }
 
     fun deleteGoal(goal: TravelGoal) {
-        viewModelScope.launch {
-            repository.deleteGoal(goal.id)
-        }
+        viewModelScope.launch { repository.deleteGoal(goal.id) }
     }
 
     fun getTrackPoints(start: Long, end: Long) = repository.getTrackPoints(start, end)
 
-    companion object {
-        val Factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-                val application = checkNotNull(
-                    extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
-                ) { "Application was not provided in ViewModel extras" }
-                @Suppress("UNCHECKED_CAST")
-                return FootprintViewModel(application as FootprintApplication) as T
+    // --- Time Capsule Logic ---
+    val unlockedCapsules =
+            repository
+                    .observeUnlockedCapsules()
+                    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val lockedCapsules =
+            repository
+                    .observeLockedCapsules()
+                    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun buryTimeCapsule(
+            message: String,
+            contentUri: String?,
+            latitude: Double,
+            longitude: Double,
+            unlockDurationMs: Long,
+            radius: Double = 50.0
+    ) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val capsule =
+                    com.footprint.data.local.TimeCapsuleEntity(
+                            latitude = latitude,
+                            longitude = longitude,
+                            message = message,
+                            contentUri = contentUri,
+                            creationTime = now,
+                            unlockTime = now + unlockDurationMs,
+                            isUnlocked = false,
+                            radius = radius
+                    )
+            repository.saveTimeCapsule(capsule)
+        }
+    }
+
+    fun checkTimeCapsuleUnlock(location: android.location.Location) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val readyCapsules = repository.getReadyToUnlockCapsules(now)
+
+            readyCapsules.forEach { capsule ->
+                val results = floatArrayOf(0f)
+                android.location.Location.distanceBetween(
+                        location.latitude,
+                        location.longitude,
+                        capsule.latitude,
+                        capsule.longitude,
+                        results
+                )
+                if (results[0] <= capsule.radius) {
+                    repository.unlockCapsule(capsule.id)
+                }
             }
         }
+    }
+
+    // For Heatmap: Get all points from last year
+    fun getHeatmapPoints(): Flow<List<com.footprint.data.local.TrackPointEntity>> {
+        val end = System.currentTimeMillis()
+        val start = end - 365L * 24 * 60 * 60 * 1000 // 1 year
+        return repository.getTrackPoints(start, end)
+    }
+    // ----------------
+
+    companion object {
+        val Factory =
+                object : ViewModelProvider.Factory {
+                    override fun <T : ViewModel> create(
+                            modelClass: Class<T>,
+                            extras: CreationExtras
+                    ): T {
+                        val application =
+                                checkNotNull(
+                                        extras[
+                                                ViewModelProvider.AndroidViewModelFactory
+                                                        .APPLICATION_KEY]
+                                ) { "Application was not provided in ViewModel extras" }
+                        @Suppress("UNCHECKED_CAST")
+                        return FootprintViewModel(application as FootprintApplication) as T
+                    }
+                }
     }
 }

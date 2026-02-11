@@ -13,8 +13,9 @@ import androidx.room.TypeConverters
                         TravelGoalEntity::class,
                         BadgeEntity::class,
                         PrivacyFenceEntity::class,
-                        TrackPointEntity::class],
-        version = 7,
+                        TrackPointEntity::class,
+                        TimeCapsuleEntity::class],
+        version = 8,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -23,6 +24,7 @@ abstract class FootprintDatabase : RoomDatabase() {
         abstract fun travelGoalDao(): TravelGoalDao
         abstract fun premiumDao(): PremiumDao
         abstract fun trackPointDao(): TrackPointDao
+        abstract fun timeCapsuleDao(): TimeCapsuleDao
 
         companion object {
                 @Volatile private var instance: FootprintDatabase? = null
@@ -120,6 +122,30 @@ abstract class FootprintDatabase : RoomDatabase() {
                                 }
                         }
 
+                val MIGRATION_7_8 =
+                        object : androidx.room.migration.Migration(7, 8) {
+                                override fun migrate(
+                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        // Create Time Capsules table
+                                        database.execSQL(
+                                                """
+                    CREATE TABLE IF NOT EXISTS `time_capsules` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `latitude` REAL NOT NULL,
+                        `longitude` REAL NOT NULL,
+                        `message` TEXT NOT NULL,
+                        `contentUri` TEXT,
+                        `creationTime` INTEGER NOT NULL,
+                        `unlockTime` INTEGER NOT NULL,
+                        `isUnlocked` INTEGER NOT NULL,
+                        `radius` REAL NOT NULL
+                    )
+                """
+                                        )
+                                }
+                        }
+
                 fun getInstance(context: Context): FootprintDatabase =
                         instance
                                 ?: synchronized(this) {
@@ -132,7 +158,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         FootprintDatabase::class.java,
                                         "footprint-db"
                                 )
-                                .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                                .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                                 .build()
         }
 }

@@ -13,7 +13,7 @@ class FootprintApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         // 设置自定义 API Key
         ApiKeyManager.getApiKey(this)?.let { key ->
             if (key.isNotBlank()) {
@@ -30,11 +30,13 @@ class FootprintApplication : Application() {
 
         val database = FootprintDatabase.getInstance(this)
         val preferenceManager = com.footprint.utils.PreferenceManager(this)
-        repository = FootprintRepository(
-            database.footprintDao(), 
-            database.travelGoalDao(),
-            database.trackPointDao(),
-            preferenceManager
-        )
+        repository =
+                FootprintRepository(
+                        database.footprintDao(),
+                        database.travelGoalDao(),
+                        database.trackPointDao(),
+                        database.timeCapsuleDao(),
+                        preferenceManager
+                )
     }
 }

@@ -2,10 +2,10 @@ package com.footprint
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -26,10 +26,10 @@ import com.footprint.ui.components.AddGoalDialog
 import com.footprint.ui.components.LiquidGlassCard
 import com.footprint.ui.effects.LiquidNavItem
 import com.footprint.ui.effects.LiquidNavigationBar
+import com.footprint.ui.effects.bouncyClick
 import com.footprint.ui.screens.*
 import com.footprint.ui.theme.FootprintTheme
 import com.footprint.ui.theme.LocalHazeState
-import com.footprint.ui.effects.bouncyClick
 
 @Composable
 fun FootprintApp() {
@@ -89,21 +89,21 @@ fun FootprintApp() {
                         ) {
                             LiquidGlassCard(
                                     shape = CircleShape,
-                                    modifier = Modifier
-                                        .padding(bottom = 80.dp)
-                                        .bouncyClick()
-                                        .clickable {
-                                            performHaptic()
-                                            showEntryDialog = true
-                                        }
+                                    modifier =
+                                            Modifier.padding(bottom = 80.dp)
+                                                    .bouncyClick()
+                                                    .clickable {
+                                                        performHaptic()
+                                                        showEntryDialog = true
+                                                    }
                             ) {
                                 Icon(
-                                    Icons.Outlined.Add,
-                                    contentDescription = "添加足迹",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .size(56.dp) // Standard FAB size
-                                        .padding(16.dp) // Inner padding for icon
+                                        Icons.Outlined.Add,
+                                        contentDescription = "添加足迹",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier =
+                                                Modifier.size(56.dp) // Standard FAB size
+                                                        .padding(16.dp) // Inner padding for icon
                                 )
                             }
                         }
@@ -292,6 +292,7 @@ fun FootprintApp() {
                                             }
                                     )
                                 },
+                                onGenerativeArt = { navController.navigate("generative_art") },
                                 onBack = { navController.popBackStack() }
                         )
                     }
@@ -309,8 +310,21 @@ fun FootprintApp() {
                                 onBack = { navController.popBackStack() }
                         )
                     }
+                    composable("generative_art") {
+                        GenerativeArtScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                        )
+                    }
                     composable("map") {
-                        MapScreen(entries = uiState.visibleEntries, contentPadding = innerPadding)
+                        MapScreen(
+                                viewModel = viewModel,
+                                onNavigateToDetail = { id ->
+                                    editingEntry = uiState.entries.find { it.id == id }
+                                },
+                                entries = uiState.visibleEntries,
+                                contentPadding = innerPadding
+                        )
                     }
                     composable("timeline") {
                         TimelineScreen(
