@@ -552,16 +552,33 @@ fun MapScreen(
                                 // Location Centering FAB
                                 FloatingActionButton(
                                         onClick = {
-                                                currentLocation?.let { loc ->
+                                                if (currentLocation != null) {
                                                         mapView.map.animateCamera(
                                                                 CameraUpdateFactory.newLatLngZoom(
                                                                         LatLng(
-                                                                                loc.latitude,
-                                                                                loc.longitude
+                                                                                currentLocation!!
+                                                                                        .latitude,
+                                                                                currentLocation!!
+                                                                                        .longitude
                                                                         ),
                                                                         17f
                                                                 )
                                                         )
+                                                } else {
+                                                        // Fallback to internal AMap location if
+                                                        // service isn't tracking
+                                                        amapInstance?.myLocation?.let { loc ->
+                                                                mapView.map.animateCamera(
+                                                                        CameraUpdateFactory
+                                                                                .newLatLngZoom(
+                                                                                        LatLng(
+                                                                                                loc.latitude,
+                                                                                                loc.longitude
+                                                                                        ),
+                                                                                        17f
+                                                                                )
+                                                                )
+                                                        }
                                                 }
                                         },
                                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
