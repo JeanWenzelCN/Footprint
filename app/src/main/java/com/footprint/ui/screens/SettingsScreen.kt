@@ -346,7 +346,7 @@ fun SettingsScreen(
                                 item {
                                         ListItem(
                                                 headlineContent = { Text("软件版本") },
-                                                supportingContent = { Text("v2.2.1") },
+                                                supportingContent = { Text("v2.4.1") },
                                                 leadingContent = { Icon(Icons.Default.Info, null) }
                                         )
                                 }
