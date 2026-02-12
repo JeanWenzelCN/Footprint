@@ -29,7 +29,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private var _totalDistanceTraveled = MutableStateFlow(0.0f)
     private var _lastLocation: AMapLocation? = null
     private var _sessionStartTime: Long = 0
-    
+    private var _notificationUpdateJob: Job? = null
+
     companion object {
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "location_tracking_channel"
@@ -53,17 +54,20 @@ class LocationTrackingService : Service(), AMapLocationListener {
         }
 
         fun startTracking(context: Context) {
-            val intent = Intent(context, LocationTrackingService::class.java).apply {
-                action = ACTION_START_TRACKING
-            }
-            // Always start as a regular service first. The service will promote itself to foreground.
+            val intent =
+                    Intent(context, LocationTrackingService::class.java).apply {
+                        action = ACTION_START_TRACKING
+                    }
+            // Always start as a regular service first. The service will promote itself to
+            // foreground.
             context.startService(intent)
         }
 
         fun stopTracking(context: Context) {
-            val intent = Intent(context, LocationTrackingService::class.java).apply {
-                action = ACTION_STOP_TRACKING
-            }
+            val intent =
+                    Intent(context, LocationTrackingService::class.java).apply {
+                        action = ACTION_STOP_TRACKING
+                    }
             context.startService(intent)
         }
     }
@@ -72,22 +76,27 @@ class LocationTrackingService : Service(), AMapLocationListener {
         super.onCreate()
         repository = (application as com.footprint.FootprintApplication).repository
         initLocationClient()
-        
+
         serviceScope.launch {
             val app = applicationContext as com.footprint.FootprintApplication
-            val startOfDay = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-            
+            val startOfDay =
+                    java.time.LocalDate.now()
+                            .atStartOfDay(java.time.ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli()
+
             app.repository.getTrackPoints(startOfDay, Long.MAX_VALUE).collect { points ->
-                val locations = points.map { entity ->
-                    AMapLocation("gps").apply {
-                        latitude = entity.latitude
-                        longitude = entity.longitude
-                        speed = entity.speed
-                        accuracy = entity.accuracy
-                        altitude = entity.altitude
-                        time = entity.timestamp
-                    }
-                }
+                val locations =
+                        points.map { entity ->
+                            AMapLocation("gps").apply {
+                                latitude = entity.latitude
+                                longitude = entity.longitude
+                                speed = entity.speed
+                                accuracy = entity.accuracy
+                                altitude = entity.altitude
+                                time = entity.timestamp
+                            }
+                        }
                 _sharedTrackingPath.value = locations
             }
         }
@@ -97,20 +106,26 @@ class LocationTrackingService : Service(), AMapLocationListener {
         try {
             AMapLocationClient.updatePrivacyShow(applicationContext, true, true)
             AMapLocationClient.updatePrivacyAgree(applicationContext, true)
-            
+
             locationClient = AMapLocationClient(applicationContext)
             locationClient?.setLocationListener(this)
-            
-            val option = AMapLocationClientOption().apply {
-                locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                interval = 2000L // 2秒刷新一次，更灵敏
-                isNeedAddress = true
-                isMockEnable = false // 禁止模拟位置
-                isLocationCacheEnable = false // 禁用缓存，强制获取最新位置
-                isOnceLocation = false
-                isSensorEnable = true // 开启传感器辅助
-                isGpsFirst = true // 优先使用GPS
-            }
+
+            val option =
+                    AMapLocationClientOption().apply {
+                        locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                        interval = 5000L // 初始间隔 5秒
+                        isNeedAddress = true
+                        isMockEnable = false
+                        isLocationCacheEnable = false
+                        isOnceLocation = false
+                        isSensorEnable = true
+                        isGpsFirst = true
+                        // 开启高德 SDK 自带的后台定位能力
+                        locationClient?.enableBackgroundLocation(
+                                NOTIFICATION_ID,
+                                buildNotification(0, 0f, "")
+                        )
+                    }
             locationClient?.setLocationOption(option)
         } catch (e: Exception) {
             Log.e("FootprintLoc", "SDK初始化失败: ${e.message}")
@@ -123,31 +138,36 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 _totalDistanceTraveled.value = 0.0f
                 _lastLocation = null
                 _sessionStartTime = System.currentTimeMillis()
-                
+
                 // Acquire WakeLock
                 val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Footprint:TrackingWakeLock").apply {
-                    acquire()
-                }
+                wakeLock =
+                        powerManager.newWakeLock(
+                                        PowerManager.PARTIAL_WAKE_LOCK,
+                                        "Footprint:TrackingWakeLock"
+                                )
+                                .apply { acquire() }
 
-                startForeground(NOTIFICATION_ID, buildNotification(0))
+                startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
                 locationClient?.startLocation()
                 _sharedIsTracking.value = true
+                startNotificationUpdates()
                 Log.d("FootprintLoc", "定位服务已启动, Session start: $_sessionStartTime")
             }
             ACTION_STOP_TRACKING -> {
                 locationClient?.stopLocation()
                 _sharedIsTracking.value = false
-                
+                _notificationUpdateJob?.cancel()
+
                 // Release WakeLock
                 if (wakeLock?.isHeld == true) {
                     wakeLock?.release()
                 }
                 wakeLock = null
 
-                serviceScope.launch {
-                    saveTrackingSessionAsFootprint()
-                }
+                serviceScope.launch { saveTrackingSessionAsFootprint() }
+                locationClient?.disableBackgroundLocation(true)
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
@@ -166,16 +186,21 @@ class LocationTrackingService : Service(), AMapLocationListener {
                         // Calculate distance and filter points
                         _lastLocation?.let { lastLoc ->
                             val distance = location.distanceTo(lastLoc)
-                            
+
                             // 距离太小（静止或漂移）或者速度异常大的点予以过滤
                             if (distance > 5) {
                                 _totalDistanceTraveled.value += distance
-                                Log.d("FootprintLoc", "Distance added: $distance, Total: ${_totalDistanceTraveled.value}")
-                                
+                                Log.d(
+                                        "FootprintLoc",
+                                        "Distance added: $distance, Total: ${_totalDistanceTraveled.value}"
+                                )
+
                                 // 持久化存储 (DB)
                                 serviceScope.launch {
                                     try {
-                                        val app = applicationContext as com.footprint.FootprintApplication
+                                        val app =
+                                                applicationContext as
+                                                        com.footprint.FootprintApplication
                                         app.repository.saveTrackPoint(location)
                                     } catch (e: Exception) {
                                         Log.e("FootprintLoc", "Failed to save point: ${e.message}")
@@ -183,109 +208,246 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 }
                                 _lastLocation = location // 仅在点被保存时更新 lastLocation
                             }
-                        } ?: run {
-                            // 第一个有效点
-                            _lastLocation = location
-                            serviceScope.launch {
-                                val app = applicationContext as com.footprint.FootprintApplication
-                                app.repository.saveTrackPoint(location)
-                            }
                         }
+                                ?: run {
+                                    // 第一个有效点
+                                    _lastLocation = location
+                                    serviceScope.launch {
+                                        val app =
+                                                applicationContext as
+                                                        com.footprint.FootprintApplication
+                                        app.repository.saveTrackPoint(location)
+                                    }
+                                }
 
-                        // Update notification with distance
-                        startForeground(NOTIFICATION_ID, buildNotification(_totalDistanceTraveled.value.toInt()))
+                        // Adaptive Interval: Adjust frequency based on speed (m/s)
+                        updateAdaptiveInterval(location.speed)
+
+                        // Update notification with all stats
+                        val notification =
+                                buildNotification(
+                                        _totalDistanceTraveled.value.toInt(),
+                                        location.speed,
+                                        location.address ?: ""
+                                )
+                        val manager = getSystemService(NotificationManager::class.java)
+                        manager.notify(NOTIFICATION_ID, notification)
                     }
-                    Log.d("FootprintLoc", "坐标获取成功: ${location.latitude}, ${location.longitude}, accuracy: ${location.accuracy}")
+                    Log.d(
+                            "FootprintLoc",
+                            "坐标获取成功: ${location.latitude}, ${location.longitude}, accuracy: ${location.accuracy}"
+                    )
                 }
             } else {
                 val errText = "定位错误: ${location.errorCode} - ${location.errorInfo}"
                 Log.e("FootprintLoc", errText)
-                
+
                 // 仅针对需要用户干预的关键错误弹 Toast (7=Key鉴权失败, 12=缺权限)
                 // 忽略错误 10 (网络/GPS不稳定)，避免在弱网环境下频繁弹窗打扰用户
                 if (location.errorCode == 7 || location.errorCode == 12) {
-                    val userMsg = when (location.errorCode) {
-                        7 -> "Key鉴权失败：请检查高德后台包名是否为 com.footprint"
-                        12 -> "缺少定位权限：请在设置中授予权限"
-                        else -> "未知定位错误: ${location.errorCode}"
-                    }
+                    val userMsg =
+                            when (location.errorCode) {
+                                7 -> "Key鉴权失败：请检查高德后台包名是否为 com.footprint"
+                                12 -> "缺少定位权限：请在设置中授予权限"
+                                else -> "未知定位错误: ${location.errorCode}"
+                            }
                     _locationError.value = userMsg
                 }
             }
         }
     }
 
-    private fun buildNotification(distanceKm: Int): Notification {
+    private fun buildNotification(
+            distanceMeters: Int,
+            speedMs: Float,
+            address: String
+    ): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "足迹记录", NotificationManager.IMPORTANCE_LOW)
+            val channel =
+                    NotificationChannel(CHANNEL_ID, "足迹记录", NotificationManager.IMPORTANCE_DEFAULT)
+                            .apply {
+                                description = "实时显示步数、距离和位置"
+                                setShowBadge(false)
+                            }
             manager.createNotificationChannel(channel)
         }
 
-        val text = if (distanceKm > 0) "已记录 ${"%.2f".format(distanceKm / 1000.0)} 公里" else "正在后台记录你的轨迹..."
+        val remoteViews =
+                android.widget.RemoteViews(
+                        packageName,
+                        com.footprint.R.layout.notification_tracking
+                )
+
+        // Update stats
+        val distanceKm = distanceMeters / 1000.0
+        val speedKmh = speedMs * 3.6f
+        val elapsedMs = System.currentTimeMillis() - _sessionStartTime
+        val duration = formatDuration(elapsedMs)
+
+        remoteViews.setTextViewText(
+                com.footprint.R.id.notification_distance,
+                "%.2f km".format(distanceKm)
+        )
+        remoteViews.setTextViewText(
+                com.footprint.R.id.notification_speed,
+                "%.1f km/h".format(speedKmh)
+        )
+        remoteViews.setTextViewText(com.footprint.R.id.notification_time, duration)
+        remoteViews.setTextViewText(
+                com.footprint.R.id.notification_address,
+                address.ifEmpty { "正在记录轨迹..." }
+        )
+
+        val stopIntent =
+                Intent(this, LocationTrackingService::class.java).apply {
+                    action = ACTION_STOP_TRACKING
+                }
+        val stopPendingIntent =
+                PendingIntent.getService(
+                        this,
+                        0,
+                        stopIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+        val mainIntent = Intent(this, com.footprint.MainActivity::class.java)
+        val mainPendingIntent =
+                PendingIntent.getActivity(
+                        this,
+                        0,
+                        mainIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("正在探索世界")
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setOngoing(true)
-            .build()
+                .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                .setCustomContentView(remoteViews)
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setContentIntent(mainPendingIntent)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止记录", stopPendingIntent)
+                .build()
+    }
+
+    private fun formatDuration(ms: Long): String {
+        val seconds = (ms / 1000) % 60
+        val minutes = (ms / (1000 * 60)) % 60
+        val hours = (ms / (1000 * 60 * 60))
+        return "%02d:%02d:%02d".format(hours, minutes, seconds)
+    }
+
+    private fun updateAdaptiveInterval(speedMs: Float) {
+        val speedKmh = speedMs * 3.6f
+        val newInterval =
+                when {
+                    speedKmh > 30 -> 2000L // 快速移动 (开车/公交): 2s
+                    speedKmh > 5 -> 5000L // 正常跑步/骑行: 5s
+                    speedKmh > 0.5 -> 10000L // 走路: 10s
+                    else -> 30000L // 静止: 30s
+                }
+
+        locationClient?.locationOption?.let { currentOption ->
+            if (currentOption.interval != newInterval) {
+                currentOption.interval = newInterval
+                locationClient?.setLocationOption(currentOption)
+                Log.d(
+                        "FootprintLoc",
+                        "Adaptive interval updated to: $newInterval ms (Speed: $speedKmh km/h)"
+                )
+            }
+        }
+    }
+
+    private fun startNotificationUpdates() {
+        _notificationUpdateJob?.cancel()
+        _notificationUpdateJob =
+                serviceScope.launch {
+                    while (isActive && _sharedIsTracking.value) {
+                        delay(1000) // 每秒更新一次时间
+                        val notification =
+                                buildNotification(
+                                        _totalDistanceTraveled.value.toInt(),
+                                        _sharedCurrentLocation.value?.speed ?: 0f,
+                                        _sharedCurrentLocation.value?.address ?: ""
+                                )
+                        val manager = getSystemService(NotificationManager::class.java)
+                        manager.notify(NOTIFICATION_ID, notification)
+                    }
+                }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        // 当应用被从最近任务栏划掉时，如果是正在记录，可以发送一个广播或通知，或者尝试自启动
+        // 对于 START_STICKY 服务，系统会自动重启，但我们可以通过 startForeground 增加优先级
+        Log.d("FootprintLoc", "Service onTaskRemoved")
     }
 
     private suspend fun saveTrackingSessionAsFootprint() {
         val endTime = System.currentTimeMillis()
         val points = repository.getTrackPointsOnce(_sessionStartTime, endTime)
-        
+
         if (points.size >= 2) {
             val totalDistance = calculateTotalDistance(points)
             val lastLocation = _sharedCurrentLocation.value
             val today = java.time.LocalDate.now()
 
-            val entry = com.footprint.data.model.FootprintEntry(
-                title = "自动追踪",
-                location = lastLocation?.toAddressString() ?: "未知地点",
-                detail = "通过自动追踪记录：共 ${points.size} 个点，耗时 ${ (endTime - _sessionStartTime) / 60000 } 分钟",
-                mood = Mood.RELAXED,
-                tags = listOf("自动追踪"),
-                distanceKm = totalDistance / 1000.0,
-                photos = emptyList(),
-                energyLevel = 5,
-                happenedOn = today,
-                latitude = lastLocation?.latitude,
-                longitude = lastLocation?.longitude,
-                altitude = lastLocation?.altitude,
-                weather = null,
-                temperature = null,
-                transportType = com.footprint.data.model.TransportType.WALK,
-                carbonSavedKg = 0.0,
-                icon = "RunCircle"
-            )
+            val entry =
+                    com.footprint.data.model.FootprintEntry(
+                            title = "自动追踪",
+                            location = lastLocation?.toAddressString() ?: "未知地点",
+                            detail =
+                                    "通过自动追踪记录：共 ${points.size} 个点，耗时 ${ (endTime - _sessionStartTime) / 60000 } 分钟",
+                            mood = Mood.RELAXED,
+                            tags = listOf("自动追踪"),
+                            distanceKm = totalDistance / 1000.0,
+                            photos = emptyList(),
+                            energyLevel = 5,
+                            happenedOn = today,
+                            latitude = lastLocation?.latitude,
+                            longitude = lastLocation?.longitude,
+                            altitude = lastLocation?.altitude,
+                            weather = null,
+                            temperature = null,
+                            transportType = com.footprint.data.model.TransportType.WALK,
+                            carbonSavedKg = 0.0,
+                            icon = "RunCircle"
+                    )
             repository.saveEntry(entry)
-            Log.d("FootprintLoc", "Tracking session saved: ${entry.distanceKm} km, points: ${points.size}")
+            Log.d(
+                    "FootprintLoc",
+                    "Tracking session saved: ${entry.distanceKm} km, points: ${points.size}"
+            )
             _totalDistanceTraveled.value = 0.0f // Reset after saving
         } else {
             Log.d("FootprintLoc", "Track too short, not saving (points: ${points.size})")
         }
     }
 
-    private fun calculateTotalDistance(points: List<com.footprint.data.local.TrackPointEntity>): Double {
+    private fun calculateTotalDistance(
+            points: List<com.footprint.data.local.TrackPointEntity>
+    ): Double {
         var distance = 0.0
         for (i in 0 until points.size - 1) {
             val start = points[i]
             val end = points[i + 1]
             val results = FloatArray(1)
             android.location.Location.distanceBetween(
-                start.latitude, start.longitude,
-                end.latitude, end.longitude,
-                results
+                    start.latitude,
+                    start.longitude,
+                    end.latitude,
+                    end.longitude,
+                    results
             )
             distance += results[0]
         }
         return distance
     }
-    
+
     override fun onBind(intent: Intent?): IBinder? = null
-    
+
     override fun onDestroy() {
         locationClient?.stopLocation()
         locationClient?.onDestroy()
