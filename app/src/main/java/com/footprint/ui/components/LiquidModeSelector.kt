@@ -62,70 +62,78 @@ fun LiquidModeSelector(
         selectedMode: MapMode,
         onModeSelected: (MapMode) -> Unit
 ) {
-    val modes =
-            listOf(
-                    MapMode.STANDARD to Icons.Outlined.Layers,
-                    MapMode.FOG to Icons.Outlined.Cloud,
-                    MapMode.HEATMAP to Icons.Outlined.Whatshot,
-                    MapMode.CAPSULE to Icons.Outlined.Inventory2
-            )
-    val selectedIndex = modes.indexOfFirst { it.first == selectedMode }.coerceAtLeast(0)
+        val modes =
+                listOf(
+                        MapMode.STANDARD to Icons.Outlined.Layers,
+                        MapMode.FOG to Icons.Outlined.Cloud,
+                        MapMode.HEATMAP to Icons.Outlined.Whatshot,
+                        MapMode.CAPSULE to Icons.Outlined.Inventory2
+                )
+        val selectedIndex = modes.indexOfFirst { it.first == selectedMode }.coerceAtLeast(0)
 
-    Box(modifier = modifier.width(280.dp).height(56.dp), contentAlignment = Alignment.Center) {
-        // Layer 1: Glass Background with Liquid Refraction
-        GlassCard(
-                modifier =
-                        Modifier.matchParentSize()
-                                .then(
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            Modifier.liquidSelectorRefraction(modes, selectedIndex)
-                                        } else {
-                                            Modifier
-                                        }
-                                ),
-                hazeState = hazeState,
-                shape = CircleShape,
-                backgroundColor = Color.White.copy(alpha = 0.05f),
-                noiseOpacity = 0.05f
-        ) {
-            // Legacy Fallback for Android 12 and below
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                Box(modifier = Modifier.fillMaxSize().liquidRenderEffect()) {
-                    LiquidSelectorLayout(modes.size, selectedIndex)
-                }
-                LiquidSelectorGloss(modes.size, selectedIndex)
-            }
-        }
-
-        // Layer 2: Icons
-        Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-        ) {
-            modes.forEachIndexed { index, (mode, icon) ->
-                val isSelected = index == selectedIndex
-                Box(
+        Box(modifier = modifier.width(210.dp).height(56.dp), contentAlignment = Alignment.Center) {
+                // Layer 1: Glass Background with Liquid Refraction
+                GlassCard(
                         modifier =
-                                Modifier.weight(1f)
-                                        .height(56.dp)
-                                        .clip(CircleShape)
-                                        .bouncyClick()
-                                        .clickable { onModeSelected(mode) },
-                        contentAlignment = Alignment.Center
+                                Modifier.matchParentSize()
+                                        .then(
+                                                if (Build.VERSION.SDK_INT >=
+                                                                Build.VERSION_CODES.TIRAMISU
+                                                ) {
+                                                        Modifier.liquidSelectorRefraction(
+                                                                modes,
+                                                                selectedIndex
+                                                        )
+                                                } else {
+                                                        Modifier
+                                                }
+                                        ),
+                        hazeState = hazeState,
+                        shape = CircleShape,
+                        backgroundColor = Color.White.copy(alpha = 0.05f),
+                        noiseOpacity = 0.05f
                 ) {
-                    Icon(
-                            imageVector = icon,
-                            contentDescription = mode.label,
-                            tint =
-                                    if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            modifier = Modifier.size(22.dp)
-                    )
+                        // Legacy Fallback for Android 12 and below
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                Box(modifier = Modifier.fillMaxSize().liquidRenderEffect()) {
+                                        LiquidSelectorLayout(modes.size, selectedIndex)
+                                }
+                                LiquidSelectorGloss(modes.size, selectedIndex)
+                        }
                 }
-            }
+
+                // Layer 2: Icons
+                Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                        modes.forEachIndexed { index, (mode, icon) ->
+                                val isSelected = index == selectedIndex
+                                Box(
+                                        modifier =
+                                                Modifier.weight(1f)
+                                                        .height(56.dp)
+                                                        .clip(CircleShape)
+                                                        .bouncyClick()
+                                                        .clickable { onModeSelected(mode) },
+                                        contentAlignment = Alignment.Center
+                                ) {
+                                        Icon(
+                                                imageVector = icon,
+                                                contentDescription = mode.label,
+                                                tint =
+                                                        if (isSelected)
+                                                                MaterialTheme.colorScheme.onPrimary
+                                                        else
+                                                                MaterialTheme.colorScheme.onSurface
+                                                                        .copy(alpha = 0.7f),
+                                                modifier = Modifier.size(22.dp)
+                                        )
+                                }
+                        }
+                }
         }
-    }
 }
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -134,146 +142,166 @@ private fun Modifier.liquidSelectorRefraction(
         modes: List<Pair<MapMode, ImageVector>>,
         selectedIndex: Int
 ): Modifier {
-    val density = LocalDensity.current
-    val animatedIndex = remember { Animatable(selectedIndex.toFloat()) }
-    val stretch = remember { Animatable(1f) }
-    val squash = remember { Animatable(1f) }
+        val density = LocalDensity.current
+        val animatedIndex = remember { Animatable(selectedIndex.toFloat()) }
+        val stretch = remember { Animatable(1f) }
+        val squash = remember { Animatable(1f) }
 
-    LaunchedEffect(selectedIndex) {
-        launch { stretch.snapTo(1f) }
-        launch { squash.snapTo(1f) }
-        launch {
-            animatedIndex.animateTo(
-                    targetValue = selectedIndex.toFloat(),
-                    animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
-            ) {
-                val stretchValue = (1f + abs(velocity) / 1000f).coerceIn(1f, 1.8f)
-                launch { stretch.snapTo(stretchValue) }
-            }
-            launch {
-                squash.animateTo(
-                        0.75f,
-                        spring(dampingRatio = 0.2f, stiffness = Spring.StiffnessMedium)
-                )
-                squash.animateTo(
-                        1f,
-                        spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)
-                )
-            }
+        LaunchedEffect(selectedIndex) {
+                launch { stretch.snapTo(1f) }
+                launch { squash.snapTo(1f) }
+                launch {
+                        animatedIndex.animateTo(
+                                targetValue = selectedIndex.toFloat(),
+                                animationSpec =
+                                        spring(
+                                                dampingRatio = 0.45f,
+                                                stiffness = Spring.StiffnessLow
+                                        )
+                        ) {
+                                val stretchValue = (1f + abs(velocity) / 1000f).coerceIn(1f, 1.8f)
+                                launch { stretch.snapTo(stretchValue) }
+                        }
+                        launch {
+                                squash.animateTo(
+                                        0.75f,
+                                        spring(
+                                                dampingRatio = 0.2f,
+                                                stiffness = Spring.StiffnessMedium
+                                        )
+                                )
+                                squash.animateTo(
+                                        1f,
+                                        spring(
+                                                dampingRatio = 0.4f,
+                                                stiffness = Spring.StiffnessMedium
+                                        )
+                                )
+                        }
+                }
         }
-    }
 
-    val shader = remember { RuntimeShader(LIQUID_SHADER) }
-    val infiniteTransition = rememberInfiniteTransition(label = "LiquidBreath")
-    val time by
-            infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 6.28f,
-                    animationSpec =
-                            infiniteRepeatable(
-                                    tween(4000, easing = LinearEasing),
-                                    RepeatMode.Restart
-                            ),
-                    label = "Time"
-            )
+        val shader = remember { RuntimeShader(LIQUID_SHADER) }
+        val infiniteTransition = rememberInfiniteTransition(label = "LiquidBreath")
+        val time by
+                infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 6.28f,
+                        animationSpec =
+                                infiniteRepeatable(
+                                        tween(4000, easing = LinearEasing),
+                                        RepeatMode.Restart
+                                ),
+                        label = "Time"
+                )
 
-    return this.graphicsLayer {
-        val w = size.width
-        val h = size.height
-        if (modes.isNotEmpty() && w > 0 && h > 0) {
-            val slotWidth = w / modes.size
-            val activeBlobSize = with(density) { 48.dp.toPx() } / 2f
-            val anchorSize = with(density) { 20.dp.toPx() } / 2f
+        return this.graphicsLayer {
+                val w = size.width
+                val h = size.height
+                if (modes.isNotEmpty() && w > 0 && h > 0) {
+                        val slotWidth = w / modes.size
+                        val activeBlobSize = with(density) { 48.dp.toPx() } / 2f
+                        val anchorSize = with(density) { 20.dp.toPx() } / 2f
 
-            shader.setFloatUniform("uResolution", w, h)
-            shader.setFloatUniform("uTime", time)
-            shader.setFloatUniform("uColor", 1f, 1f, 1f, 0.25f)
-            shader.setFloatUniform("uSmoothness", 55f)
-            shader.setFloatUniform("uScaleX", stretch.value * squash.value)
-            shader.setFloatUniform("uScaleY", (1f / stretch.value) * squash.value)
+                        shader.setFloatUniform("uResolution", w, h)
+                        shader.setFloatUniform("uTime", time)
+                        shader.setFloatUniform("uColor", 1f, 1f, 1f, 0.25f)
+                        shader.setFloatUniform("uSmoothness", 55f)
+                        shader.setFloatUniform("uScaleX", stretch.value * squash.value)
+                        shader.setFloatUniform("uScaleY", (1f / stretch.value) * squash.value)
 
-            val blobCoords = FloatArray(12)
-            val blobRadii = FloatArray(6)
+                        val blobCoords = FloatArray(12)
+                        val blobRadii = FloatArray(6)
 
-            for (i in 0 until modes.size.coerceAtMost(5)) {
-                val cx = (slotWidth * i) + (slotWidth / 2)
-                blobCoords[i * 2] = cx
-                blobCoords[i * 2 + 1] = h / 2
-                blobRadii[i] = anchorSize
-            }
+                        for (i in 0 until modes.size.coerceAtMost(5)) {
+                                val cx = (slotWidth * i) + (slotWidth / 2)
+                                blobCoords[i * 2] = cx
+                                blobCoords[i * 2 + 1] = h / 2
+                                blobRadii[i] = anchorSize
+                        }
 
-            val targetX = (slotWidth * animatedIndex.value) + (slotWidth / 2)
-            blobCoords[10] = targetX
-            blobCoords[11] = h / 2
-            blobRadii[5] = activeBlobSize
+                        val targetX = (slotWidth * animatedIndex.value) + (slotWidth / 2)
+                        blobCoords[10] = targetX
+                        blobCoords[11] = h / 2
+                        blobRadii[5] = activeBlobSize
 
-            shader.setFloatUniform("uBlobCoords", blobCoords)
-            shader.setFloatUniform("uRadii", blobRadii)
+                        shader.setFloatUniform("uBlobCoords", blobCoords)
+                        shader.setFloatUniform("uRadii", blobRadii)
 
-            renderEffect =
-                    RenderEffect.createRuntimeShaderEffect(shader, "composable")
-                            .asComposeRenderEffect()
+                        renderEffect =
+                                RenderEffect.createRuntimeShaderEffect(shader, "composable")
+                                        .asComposeRenderEffect()
+                }
         }
-    }
 }
 
 @Composable
 private fun LiquidSelectorLayout(itemCount: Int, selectedIndex: Int) {
-    val animatedIndex by
-            animateFloatAsState(
-                    targetValue = selectedIndex.toFloat(),
-                    animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
-                    label = "LiquidMove"
-            )
+        val animatedIndex by
+                animateFloatAsState(
+                        targetValue = selectedIndex.toFloat(),
+                        animationSpec =
+                                spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+                        label = "LiquidMove"
+                )
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val slotWidth = size.width / itemCount
-        val staticBlobRadius = 20.dp.toPx() / 2
-        val movingBlobRadius = 48.dp.toPx() / 2
-        val cy = size.height / 2
+        Canvas(modifier = Modifier.fillMaxSize()) {
+                val slotWidth = size.width / itemCount
+                val staticBlobRadius = 20.dp.toPx() / 2
+                val movingBlobRadius = 48.dp.toPx() / 2
+                val cy = size.height / 2
 
-        for (i in 0 until itemCount) {
-            val cx = (slotWidth * i) + (slotWidth / 2)
-            drawCircle(
-                    Color.White.copy(alpha = 0.01f),
-                    radius = staticBlobRadius,
-                    center = Offset(cx, cy)
-            )
+                for (i in 0 until itemCount) {
+                        val cx = (slotWidth * i) + (slotWidth / 2)
+                        drawCircle(
+                                Color.White.copy(alpha = 0.01f),
+                                radius = staticBlobRadius,
+                                center = Offset(cx, cy)
+                        )
+                }
+
+                val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
+                drawCircle(
+                        Color.White.copy(alpha = 0.01f),
+                        radius = movingBlobRadius,
+                        center = Offset(targetX, cy)
+                )
         }
-
-        val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
-        drawCircle(
-                Color.White.copy(alpha = 0.01f),
-                radius = movingBlobRadius,
-                center = Offset(targetX, cy)
-        )
-    }
 }
 
 @Composable
 private fun LiquidSelectorGloss(itemCount: Int, selectedIndex: Int) {
-    val animatedIndex by
-            animateFloatAsState(
-                    targetValue = selectedIndex.toFloat(),
-                    animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
-                    label = "LiquidMove"
-            )
+        val animatedIndex by
+                animateFloatAsState(
+                        targetValue = selectedIndex.toFloat(),
+                        animationSpec =
+                                spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+                        label = "LiquidMove"
+                )
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val slotWidth = size.width / itemCount
-        val blobSize = 48.dp.toPx()
-        val cy = size.height / 2
-        val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+                val slotWidth = size.width / itemCount
+                val blobSize = 48.dp.toPx()
+                val cy = size.height / 2
+                val targetX = (slotWidth * animatedIndex) + (slotWidth / 2)
 
-        drawCircle(
-                brush =
-                        Brush.radialGradient(
-                                colors = listOf(Color.White.copy(alpha = 0.8f), Color.Transparent),
-                                center = Offset(targetX - blobSize * 0.15f, cy - blobSize * 0.15f),
-                                radius = blobSize * 0.25f
-                        ),
-                radius = blobSize * 0.25f,
-                center = Offset(targetX - blobSize * 0.15f, cy - blobSize * 0.15f)
-        )
-    }
+                drawCircle(
+                        brush =
+                                Brush.radialGradient(
+                                        colors =
+                                                listOf(
+                                                        Color.White.copy(alpha = 0.8f),
+                                                        Color.Transparent
+                                                ),
+                                        center =
+                                                Offset(
+                                                        targetX - blobSize * 0.15f,
+                                                        cy - blobSize * 0.15f
+                                                ),
+                                        radius = blobSize * 0.25f
+                                ),
+                        radius = blobSize * 0.25f,
+                        center = Offset(targetX - blobSize * 0.15f, cy - blobSize * 0.15f)
+                )
+        }
 }

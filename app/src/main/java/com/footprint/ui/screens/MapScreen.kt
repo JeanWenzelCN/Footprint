@@ -160,6 +160,8 @@ fun MapScreen(
         // ... (Existing state)
         var mapMode by remember { mutableStateOf(MapMode.STANDARD) }
         var showBuryCapsuleDialog by remember { mutableStateOf(false) }
+        var showApiKeyDialog by remember { mutableStateOf(false) }
+        val amapKey by viewModel.amapKey.collectAsStateWithLifecycle()
 
         // Time Capsule State
         val unlockedCapsules by
@@ -221,307 +223,414 @@ fun MapScreen(
         val hazeState = remember { HazeState() }
         var amapInstance by remember { mutableStateOf<AMap?>(null) }
 
-        Box(
-                modifier =
-                        Modifier.fillMaxSize()
-                                .background(MaterialTheme.colorScheme.background)
-                                .haze(hazeState)
-        ) {
-                if (hasPermission) {
-                        AndroidView(
-                                factory = { _ ->
-                                        mapView.apply {
-                                                amapInstance = map
-                                                map.apply {
-                                                        uiSettings.isMyLocationButtonEnabled = false
-                                                        isMyLocationEnabled = true
+        CompositionLocalProvider(LocalHazeState provides hazeState) {
+                Box(
+                        modifier =
+                                Modifier.fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                        // 1. Background Source Layer (What gets blurred)
+                        Box(modifier = Modifier.fillMaxSize().haze(hazeState)) {
+                                if (hasPermission) {
+                                        AndroidView(
+                                                factory = { _ ->
+                                                        mapView.apply {
+                                                                amapInstance = map
+                                                                map.apply {
+                                                                        uiSettings
+                                                                                .isMyLocationButtonEnabled =
+                                                                                false
+                                                                        isMyLocationEnabled = true
 
-                                                        // ... (Existing setup)
+                                                                        // ... (Existing setup)
 
-                                                        setOnMarkerClickListener { marker ->
-                                                                val entryId =
-                                                                        marker.snippet
-                                                                                ?.toLongOrNull()
-                                                                if (entryId != null) {
-                                                                        // Check if it's a capsule
-                                                                        // or entry
-                                                                        if (marker.title ==
-                                                                                        "Time Capsule"
-                                                                        ) {
-                                                                                // Show capsule
-                                                                                // dialog
-                                                                        } else {
-                                                                                onNavigateToDetail(
-                                                                                        entryId
+                                                                        setOnMarkerClickListener {
+                                                                                marker ->
+                                                                                val entryId =
+                                                                                        marker.snippet
+                                                                                                ?.toLongOrNull()
+                                                                                if (entryId != null
+                                                                                ) {
+                                                                                        // Check if
+                                                                                        // it's a
+                                                                                        // capsule
+                                                                                        // or entry
+                                                                                        if (marker.title ==
+                                                                                                        "Time Capsule"
+                                                                                        ) {
+                                                                                                // Show
+                                                                                                // capsule
+                                                                                                // dialog
+                                                                                        } else {
+                                                                                                onNavigateToDetail(
+                                                                                                        entryId
+                                                                                                )
+                                                                                        }
+                                                                                }
+                                                                                true
+                                                                        }
+                                                                        // ...
+                                                                }
+                                                        }
+                                                },
+                                                modifier = Modifier.fillMaxSize()
+                                        ) { mv ->
+                                                mv.map.clear()
+
+                                                // Common: Draw Footprints (Standard Mode)
+                                                if (mapMode == MapMode.STANDARD) {
+                                                        if (trackingPath.isNotEmpty()) {
+                                                                val points =
+                                                                        trackingPath.map {
+                                                                                LatLng(
+                                                                                        it.latitude,
+                                                                                        it.longitude
                                                                                 )
                                                                         }
-                                                                }
-                                                                true
-                                                        }
-                                                        // ...
-                                                }
-                                        }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                        ) { mv ->
-                                mv.map.clear()
-
-                                // Common: Draw Footprints (Standard Mode)
-                                if (mapMode == MapMode.STANDARD) {
-                                        if (trackingPath.isNotEmpty()) {
-                                                val points =
-                                                        trackingPath.map {
-                                                                LatLng(it.latitude, it.longitude)
-                                                        }
-                                                mv.map.addPolyline(
-                                                        PolylineOptions()
-                                                                .addAll(points)
-                                                                .width(18f)
-                                                                .color(
-                                                                        android.graphics.Color
-                                                                                .parseColor(
-                                                                                        "#00FF9F"
+                                                                mv.map.addPolyline(
+                                                                        PolylineOptions()
+                                                                                .addAll(points)
+                                                                                .width(18f)
+                                                                                .color(
+                                                                                        android.graphics
+                                                                                                .Color
+                                                                                                .parseColor(
+                                                                                                        "#00FF9F"
+                                                                                                )
                                                                                 )
                                                                 )
-                                                )
-                                        }
-                                        entries.forEach { entry ->
-                                                if (entry.latitude != null &&
-                                                                entry.longitude != null
-                                                ) {
-                                                        mv.map.addMarker(
-                                                                MarkerOptions()
-                                                                        .position(
-                                                                                LatLng(
-                                                                                        entry.latitude,
-                                                                                        entry.longitude
-                                                                                )
-                                                                        )
-                                                                        .title(entry.title)
-                                                                        .snippet(
-                                                                                entry.id.toString()
-                                                                        )
-                                                                        .icon(
-                                                                                BitmapDescriptorFactory
-                                                                                        .defaultMarker(
+                                                        }
+                                                        entries.forEach { entry ->
+                                                                if (entry.latitude != null &&
+                                                                                entry.longitude !=
+                                                                                        null
+                                                                ) {
+                                                                        mv.map.addMarker(
+                                                                                MarkerOptions()
+                                                                                        .position(
+                                                                                                LatLng(
+                                                                                                        entry.latitude,
+                                                                                                        entry.longitude
+                                                                                                )
+                                                                                        )
+                                                                                        .title(
+                                                                                                entry.title
+                                                                                        )
+                                                                                        .snippet(
+                                                                                                entry.id
+                                                                                                        .toString()
+                                                                                        )
+                                                                                        .icon(
                                                                                                 BitmapDescriptorFactory
-                                                                                                        .HUE_AZURE
+                                                                                                        .defaultMarker(
+                                                                                                                BitmapDescriptorFactory
+                                                                                                                        .HUE_AZURE
+                                                                                                        )
                                                                                         )
                                                                         )
-                                                        )
+                                                                }
+                                                        }
+                                                }
+
+                                                // Capsule Mode
+                                                if (mapMode == MapMode.CAPSULE) {
+                                                        unlockedCapsules.forEach { capsule ->
+                                                                mv.map.addMarker(
+                                                                        MarkerOptions()
+                                                                                .position(
+                                                                                        LatLng(
+                                                                                                capsule.latitude,
+                                                                                                capsule.longitude
+                                                                                        )
+                                                                                )
+                                                                                .title(
+                                                                                        "Time Capsule"
+                                                                                )
+                                                                                .snippet(
+                                                                                        capsule.id
+                                                                                                .toString()
+                                                                                )
+                                                                                .icon(
+                                                                                        BitmapDescriptorFactory
+                                                                                                .defaultMarker(
+                                                                                                        BitmapDescriptorFactory
+                                                                                                                .HUE_YELLOW
+                                                                                                )
+                                                                                )
+                                                                )
+                                                        }
+                                                        lockedCapsules.forEach { capsule ->
+                                                                mv.map.addMarker(
+                                                                        MarkerOptions()
+                                                                                .position(
+                                                                                        LatLng(
+                                                                                                capsule.latitude,
+                                                                                                capsule.longitude
+                                                                                        )
+                                                                                )
+                                                                                .title(
+                                                                                        "Locked Capsule"
+                                                                                )
+                                                                                .snippet(
+                                                                                        capsule.id
+                                                                                                .toString()
+                                                                                )
+                                                                                .icon(
+                                                                                        BitmapDescriptorFactory
+                                                                                                .defaultMarker(
+                                                                                                        BitmapDescriptorFactory
+                                                                                                                .HUE_RED
+                                                                                                )
+                                                                                )
+                                                                )
+                                                        }
+                                                }
+
+                                                // 4. Cloud & Mist Overlay (Compose Side)
+                                                // We use a dummy overlay here to ensure the AMap
+                                                // polygon
+                                                // clears
+                                                // elements,
+                                                // but we will also draw the "Cloud" in Compose.
+                                                if (mapMode == MapMode.FOG) {
+                                                        // Still use AMap polygon to hide everything
+                                                        // underneath
+                                                        // efficiently
+                                                        val worldCoords =
+                                                                listOf(
+                                                                        LatLng(85.0, -179.9),
+                                                                        LatLng(85.0, 179.9),
+                                                                        LatLng(-85.0, 179.9),
+                                                                        LatLng(-85.0, -179.9)
+                                                                )
+                                                        val fogArea =
+                                                                com.amap.api.maps.model
+                                                                        .PolygonOptions()
+                                                                        .addAll(worldCoords)
+                                                                        .fillColor(
+                                                                                android.graphics
+                                                                                        .Color
+                                                                                        .parseColor(
+                                                                                                "#4D4F4F4F"
+                                                                                        )
+                                                                        ) // Much more transparent
+                                                                        // base
+                                                                        .strokeWidth(0f)
+                                                                        .zIndex(2f)
+
+                                                        val sampledHistorical =
+                                                                heatmapPoints
+                                                                        .filterIndexed { index, _ ->
+                                                                                index % 20 == 0
+                                                                        }
+                                                                        .map {
+                                                                                LatLng(
+                                                                                        it.latitude,
+                                                                                        it.longitude
+                                                                                )
+                                                                        }
+                                                        val sampledLive =
+                                                                trackingPath
+                                                                        .filterIndexed { index, _ ->
+                                                                                index % 10 == 0
+                                                                        }
+                                                                        .map {
+                                                                                LatLng(
+                                                                                        it.latitude,
+                                                                                        it.longitude
+                                                                                )
+                                                                        }
+                                                        (sampledHistorical + sampledLive).forEach {
+                                                                latLng ->
+                                                                fogArea.addHoles(
+                                                                        com.amap.api.maps.model
+                                                                                .CircleHoleOptions()
+                                                                                .center(latLng)
+                                                                                .radius(50.0)
+                                                                )
+                                                        }
+                                                        mv.map.addPolygon(fogArea)
+                                                }
+
+                                                // Heatmap Mode
+                                                if (mapMode == MapMode.HEATMAP) {
+                                                        // Optimized visualization: Larger radius,
+                                                        // lower
+                                                        // opacity for
+                                                        // blending
+                                                        heatmapPoints.forEach { pt ->
+                                                                mv.map.addCircle(
+                                                                        com.amap.api.maps.model
+                                                                                .CircleOptions()
+                                                                                .center(
+                                                                                        LatLng(
+                                                                                                pt.latitude,
+                                                                                                pt.longitude
+                                                                                        )
+                                                                                )
+                                                                                .radius(50.0)
+                                                                                .fillColor(
+                                                                                        android.graphics
+                                                                                                .Color
+                                                                                                .parseColor(
+                                                                                                        "#1A33FF00"
+                                                                                                )
+                                                                                )
+                                                                                .strokeWidth(0f)
+                                                                )
+                                                        }
                                                 }
                                         }
-                                }
-
-                                // Capsule Mode
-                                if (mapMode == MapMode.CAPSULE) {
-                                        unlockedCapsules.forEach { capsule ->
-                                                mv.map.addMarker(
-                                                        MarkerOptions()
-                                                                .position(
-                                                                        LatLng(
-                                                                                capsule.latitude,
-                                                                                capsule.longitude
-                                                                        )
-                                                                )
-                                                                .title("Time Capsule")
-                                                                .snippet(capsule.id.toString())
-                                                                .icon(
-                                                                        BitmapDescriptorFactory
-                                                                                .defaultMarker(
-                                                                                        BitmapDescriptorFactory
-                                                                                                .HUE_YELLOW
-                                                                                )
-                                                                )
-                                                )
-                                        }
-                                        lockedCapsules.forEach { capsule ->
-                                                mv.map.addMarker(
-                                                        MarkerOptions()
-                                                                .position(
-                                                                        LatLng(
-                                                                                capsule.latitude,
-                                                                                capsule.longitude
-                                                                        )
-                                                                )
-                                                                .title("Locked Capsule")
-                                                                .snippet(capsule.id.toString())
-                                                                .icon(
-                                                                        BitmapDescriptorFactory
-                                                                                .defaultMarker(
-                                                                                        BitmapDescriptorFactory
-                                                                                                .HUE_RED
-                                                                                )
-                                                                )
-                                                )
-                                        }
-                                }
-
-                                // 4. Cloud & Mist Overlay (Compose Side)
-                                // We use a dummy overlay here to ensure the AMap polygon clears
-                                // elements,
-                                // but we will also draw the "Cloud" in Compose.
-                                if (mapMode == MapMode.FOG) {
-                                        // Still use AMap polygon to hide everything underneath
-                                        // efficiently
-                                        val worldCoords =
-                                                listOf(
-                                                        LatLng(85.0, -179.9),
-                                                        LatLng(85.0, 179.9),
-                                                        LatLng(-85.0, 179.9),
-                                                        LatLng(-85.0, -179.9)
-                                                )
-                                        val fogArea =
-                                                com.amap.api.maps.model.PolygonOptions()
-                                                        .addAll(worldCoords)
-                                                        .fillColor(
-                                                                android.graphics.Color.parseColor(
-                                                                        "#4D4F4F4F"
-                                                                )
-                                                        ) // Much more transparent base
-                                                        .strokeWidth(0f)
-                                                        .zIndex(2f)
-
-                                        val sampledHistorical =
-                                                heatmapPoints
-                                                        .filterIndexed { index, _ ->
-                                                                index % 20 == 0
-                                                        }
-                                                        .map { LatLng(it.latitude, it.longitude) }
-                                        val sampledLive =
-                                                trackingPath
-                                                        .filterIndexed { index, _ ->
-                                                                index % 10 == 0
-                                                        }
-                                                        .map { LatLng(it.latitude, it.longitude) }
-                                        (sampledHistorical + sampledLive).forEach { latLng ->
-                                                fogArea.addHoles(
-                                                        com.amap.api.maps.model.CircleHoleOptions()
-                                                                .center(latLng)
-                                                                .radius(50.0)
-                                                )
-                                        }
-                                        mv.map.addPolygon(fogArea)
-                                }
-
-                                // Heatmap Mode
-                                if (mapMode == MapMode.HEATMAP) {
-                                        // Optimized visualization: Larger radius, lower opacity for
-                                        // blending
-                                        heatmapPoints.forEach { pt ->
-                                                mv.map.addCircle(
-                                                        com.amap.api.maps.model.CircleOptions()
-                                                                .center(
-                                                                        LatLng(
-                                                                                pt.latitude,
-                                                                                pt.longitude
-                                                                        )
-                                                                )
-                                                                .radius(50.0)
-                                                                .fillColor(
-                                                                        android.graphics.Color
-                                                                                .parseColor(
-                                                                                        "#1A33FF00"
-                                                                                )
-                                                                )
-                                                                .strokeWidth(0f)
-                                                )
+                                } else {
+                                        PermissionDenyOverlay {
+                                                launcher.launch(permissionsToRequest)
                                         }
                                 }
                         }
-                } else {
-                        PermissionDenyOverlay { launcher.launch(permissionsToRequest) }
-                }
 
-                //                        )
+                        // 2. Overlay Layers (hazeChild components)
+                        // Note: These are OUTSIDE the .haze() box above to avoid being blurred
+                        // themselves.
 
-                // High-Fidelity Cloud & Mist Layer (Android 12+)
-                if (mapMode == MapMode.FOG) {
-                        CloudMistFog(
-                                amap = amapInstance,
-                                heatmapPoints = heatmapPoints,
-                                trackingPath = trackingPath,
-                                pulseValue = pulseValue,
-                                hazeState = hazeState
-                        )
-                }
-
-                // Mode Selector (Top Center) with Liquid Glass & Water Drop effect
-                LiquidModeSelector(
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp),
-                        hazeState = LocalHazeState.current,
-                        selectedMode = mapMode,
-                        onModeSelected = { mode ->
-                                if (mapMode != mode) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        mapMode = mode
-                                }
-                        }
-                )
-
-                // FAB Group (Bottom End)
-                Column(
-                        modifier =
-                                Modifier.align(Alignment.BottomEnd)
-                                        .padding(bottom = bottomPadding + 24.dp, end = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                        // Location Centering FAB
-                        FloatingActionButton(
-                                onClick = {
-                                        currentLocation?.let { loc ->
-                                                mapView.map.animateCamera(
-                                                        CameraUpdateFactory.newLatLngZoom(
-                                                                LatLng(loc.latitude, loc.longitude),
-                                                                17f
-                                                        )
-                                                )
-                                        }
-                                },
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ) { Icon(Icons.Filled.MyLocation, "Center Location") }
-
-                        // Recording FAB
-                        FloatingActionButton(
-                                onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        if (isTracking) {
-                                                LocationTrackingService.stopTracking(context)
-                                        } else {
-                                                LocationTrackingService.startTracking(context)
-                                        }
-                                },
-                                containerColor =
-                                        if (isTracking) Color.Red
-                                        else MaterialTheme.colorScheme.tertiary,
-                                contentColor = Color.White
-                        ) {
-                                Icon(
-                                        if (isTracking) Icons.Filled.Stop
-                                        else Icons.Filled.PlayArrow,
-                                        if (isTracking) "Stop Recording" else "Start Recording"
+                        // High-Fidelity Cloud & Mist Layer (Android 12+)
+                        if (mapMode == MapMode.FOG) {
+                                CloudMistFog(
+                                        amap = amapInstance,
+                                        heatmapPoints = heatmapPoints,
+                                        trackingPath = trackingPath,
+                                        pulseValue = pulseValue,
+                                        hazeState = hazeState
                                 )
                         }
 
-                        // Bury Capsule Button (Only in Capsule Mode)
-                        AnimatedVisibility(
-                                visible = mapMode == MapMode.CAPSULE,
-                                enter = scaleIn() + fadeIn(),
-                                exit = scaleOut() + fadeOut()
+                        // Mode Selector (Top Center) with Liquid Glass & Water Drop effect
+                        LiquidModeSelector(
+                                modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp),
+                                hazeState = hazeState,
+                                selectedMode = mapMode,
+                                onModeSelected = { mode ->
+                                        if (mapMode != mode) {
+                                                haptic.performHapticFeedback(
+                                                        HapticFeedbackType.LongPress
+                                                )
+                                                mapMode = mode
+                                        }
+                                }
+                        )
+
+                        // Settings Button (Top End)
+                        LiquidGlassCard(
+                                modifier =
+                                        Modifier.align(Alignment.TopEnd)
+                                                .padding(top = 48.dp, end = 16.dp)
+                                                .size(56.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                blurRadius = 12.dp
                         ) {
+                                IconButton(
+                                        onClick = { showApiKeyDialog = true },
+                                        modifier = Modifier.fillMaxSize()
+                                ) {
+                                        Icon(
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = "Settings",
+                                                tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                }
+                        }
+
+                        // FAB Group (Bottom End)
+                        Column(
+                                modifier =
+                                        Modifier.align(Alignment.BottomEnd)
+                                                .padding(
+                                                        bottom = bottomPadding + 24.dp,
+                                                        end = 24.dp
+                                                ),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                                // Location Centering FAB
                                 FloatingActionButton(
-                                        onClick = { showBuryCapsuleDialog = true },
-                                        containerColor = MaterialTheme.colorScheme.secondary,
-                                        contentColor = MaterialTheme.colorScheme.onSecondary
-                                ) { Icon(Icons.Filled.Timer, "Bury Capsule") }
+                                        onClick = {
+                                                currentLocation?.let { loc ->
+                                                        mapView.map.animateCamera(
+                                                                CameraUpdateFactory.newLatLngZoom(
+                                                                        LatLng(
+                                                                                loc.latitude,
+                                                                                loc.longitude
+                                                                        ),
+                                                                        17f
+                                                                )
+                                                        )
+                                                }
+                                        },
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ) { Icon(Icons.Filled.MyLocation, "Center Location") }
+
+                                // Recording FAB
+                                FloatingActionButton(
+                                        onClick = {
+                                                haptic.performHapticFeedback(
+                                                        HapticFeedbackType.LongPress
+                                                )
+                                                if (isTracking) {
+                                                        LocationTrackingService.stopTracking(
+                                                                context
+                                                        )
+                                                } else {
+                                                        LocationTrackingService.startTracking(
+                                                                context
+                                                        )
+                                                }
+                                        },
+                                        containerColor =
+                                                if (isTracking) Color.Red
+                                                else MaterialTheme.colorScheme.tertiary,
+                                        contentColor = Color.White
+                                ) {
+                                        Icon(
+                                                if (isTracking) Icons.Filled.Stop
+                                                else Icons.Filled.PlayArrow,
+                                                if (isTracking) "Stop Recording"
+                                                else "Start Recording"
+                                        )
+                                }
+
+                                // Bury Capsule Button (Only in Capsule Mode)
+                                AnimatedVisibility(
+                                        visible = mapMode == MapMode.CAPSULE,
+                                        enter = scaleIn() + fadeIn(),
+                                        exit = scaleOut() + fadeOut()
+                                ) {
+                                        FloatingActionButton(
+                                                onClick = { showBuryCapsuleDialog = true },
+                                                containerColor =
+                                                        MaterialTheme.colorScheme.secondary,
+                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                        ) { Icon(Icons.Filled.Timer, "Bury Capsule") }
+                                }
                         }
                 }
-
-                // ...
         }
 
         // Dialogs
+        if (showApiKeyDialog) {
+                ApiKeyDialog(
+                        initialKey = amapKey,
+                        onDismiss = { showApiKeyDialog = false },
+                        onSave = { key ->
+                                viewModel.saveAmapKey(key)
+                                showApiKeyDialog = false
+                                android.widget.Toast.makeText(
+                                                context,
+                                                "API Key 已保存，请重启应用生效",
+                                                android.widget.Toast.LENGTH_LONG
+                                        )
+                                        .show()
+                        }
+                )
+        }
         if (showBuryCapsuleDialog) {
                 BuryCapsuleDialog(
                         currentLocation = currentLocation,

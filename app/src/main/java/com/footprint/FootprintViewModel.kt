@@ -15,6 +15,7 @@ import com.footprint.data.repository.FootprintRepository
 import com.footprint.ui.state.FilterState
 import com.footprint.ui.state.FootprintUiState
 import com.footprint.ui.theme.ThemeMode
+import com.footprint.utils.ApiKeyManager
 import com.footprint.utils.PreferenceManager
 import com.google.gson.Gson
 import java.io.InputStreamReader
@@ -43,6 +44,8 @@ class FootprintViewModel(
     private val avatarId = MutableStateFlow(preferenceManager.avatarId)
     private val blurStrength = MutableStateFlow(preferenceManager.blurStrength)
     private val hapticFeedback = MutableStateFlow(preferenceManager.hapticFeedbackEnabled)
+    private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
+    val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val yearlyTrackPointCount: Flow<Int> =
@@ -306,6 +309,11 @@ class FootprintViewModel(
 
     fun updateFootprint(entry: com.footprint.data.model.FootprintEntry) {
         viewModelScope.launch { repository.saveEntry(entry) }
+    }
+
+    fun saveAmapKey(key: String) {
+        _amapKey.value = key
+        ApiKeyManager.setApiKey(getApplication(), key)
     }
 
     fun deleteFootprint(entry: com.footprint.data.model.FootprintEntry) {
