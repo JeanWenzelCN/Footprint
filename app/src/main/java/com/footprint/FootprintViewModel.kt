@@ -155,17 +155,7 @@ class FootprintViewModel(
 
                         val memoryQuote =
                                 if (randomMemory == null) {
-                                    val quotes =
-                                            listOf(
-                                                    "所有的昨日，都是为了迎接更好的明天。",
-                                                    "记忆是阵阵花香，我们说好永远不能忘。",
-                                                    "时光荏苒，唯有足迹证明我们曾热烈地活过。",
-                                                    "那些被翻阅过的日子，都成了生命里的光。",
-                                                    "生活不在于走了多少路，而在于留下了多少回忆。",
-                                                    "去发现，去记录，去成为更好的自己。",
-                                                    "每一个今天，都是未来最想回到的昨天。"
-                                            )
-                                    quotes[(today.toEpochDay() % quotes.size).toInt()]
+                                    com.footprint.utils.DailyQuoteManager.getDailyQuote()
                                 } else null
 
                         FootprintUiState(

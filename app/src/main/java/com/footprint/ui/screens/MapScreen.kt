@@ -22,11 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.AnnotatedString
@@ -923,10 +923,8 @@ fun CloudMistFog(
         pulseValue: Float,
         hazeState: HazeState
 ) {
-        if (amap == null) return
-
-        val density = LocalDensity.current
-        val holeSize = with(density) { 60.dp.toPx() } // Size of discovery hole
+        val a = amap ?: return
+        val zoom = a.cameraPosition.zoom
 
         // Sample and map to LatLng for unified processing
         val sampledPoints =
@@ -937,39 +935,196 @@ fun CloudMistFog(
                                 LatLng(it.latitude, it.longitude)
                         })
 
+        // Calculate dynamic hole size in pixels
+        val targetRadiusMeters = 50.0
+
+        // Separate points for clearer path construction
+        val heatmapLines = heatmapPoints.filterIndexed { i, _ -> i % 10 == 0 }
+        val trackingLines = trackingPath.filterIndexed { i, _ -> i % 3 == 0 }
+
         Box(
                 modifier =
                         Modifier.fillMaxSize()
                                 .hazeChild(
                                         state = hazeState,
                                         shape = RectangleShape,
-                                        style = HazeStyle(blurRadius = 30.dp)
+                                        style = HazeStyle(blurRadius = 40.dp)
                                 )
                                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                                 .drawWithContent {
-                                        // 1. Draw Mist Tint
+                                        // 1. Draw Base "Cloud/Smoke" Atmospheric Texture
+                                        // Layer 1: Deep Base
                                         drawRect(
                                                 Brush.verticalGradient(
                                                         colors =
                                                                 listOf(
-                                                                        Color(0xFFBACBDD)
-                                                                                .copy(alpha = 0.5f),
-                                                                        Color(0xFFE3E8EE)
-                                                                                .copy(alpha = 0.7f)
+                                                                        Color(0xFF1B2631)
+                                                                                .copy(
+                                                                                        alpha =
+                                                                                                0.96f
+                                                                                ),
+                                                                        Color(0xFF2E4053)
+                                                                                .copy(alpha = 0.98f)
                                                                 )
                                                 )
                                         )
 
-                                        // 2. Breathing mist
-                                        drawRect(Color.White.copy(alpha = 0.1f * pulseValue))
+                                        // Layer 2: Cloud Splotches (Noise-like gradients)
+                                        drawRect(
+                                                Brush.radialGradient(
+                                                        colors =
+                                                                listOf(
+                                                                        Color.White.copy(
+                                                                                alpha = 0.05f
+                                                                        ),
+                                                                        Color.Transparent
+                                                                ),
+                                                        center =
+                                                                Offset(
+                                                                        size.width * 0.3f,
+                                                                        size.height * 0.2f
+                                                                ),
+                                                        radius = size.width * 0.8f
+                                                )
+                                        )
+                                        drawRect(
+                                                Brush.radialGradient(
+                                                        colors =
+                                                                listOf(
+                                                                        Color.White.copy(
+                                                                                alpha = 0.03f
+                                                                        ),
+                                                                        Color.Transparent
+                                                                ),
+                                                        center =
+                                                                Offset(
+                                                                        size.width * 0.7f,
+                                                                        size.height * 0.8f
+                                                                ),
+                                                        radius = size.width * 0.6f
+                                                )
+                                        )
 
-                                        // 3. Project LatLng to Screenspace and punch holes
-                                        val projection = amap.projection
-                                        sampledPoints.forEach { latLng ->
+                                        // 2. Breathing mist effect
+                                        drawRect(Color.White.copy(alpha = 0.05f * pulseValue))
+
+                                        // 3. Punch Holes (Explored Areas)
+                                        val projection = a.projection
+
+                                        // A. CONNECTED PATH for tracking trace
+                                        if (trackingLines.size > 1) {
+                                                val path = Path()
+                                                val firstPoint = trackingLines[0]
+                                                val firstPos =
+                                                        projection.toScreenLocation(
+                                                                LatLng(
+                                                                        firstPoint.latitude,
+                                                                        firstPoint.longitude
+                                                                )
+                                                        )
+                                                path.moveTo(
+                                                        firstPos.x.toFloat(),
+                                                        firstPos.y.toFloat()
+                                                )
+
+                                                trackingLines.drop(1).forEach { loc ->
+                                                        val pos =
+                                                                projection.toScreenLocation(
+                                                                        LatLng(
+                                                                                loc.latitude,
+                                                                                loc.longitude
+                                                                        )
+                                                                )
+                                                        path.lineTo(
+                                                                pos.x.toFloat(),
+                                                                pos.y.toFloat()
+                                                        )
+                                                }
+
+                                                // Calculate pixels for ~60m width
+                                                val centerLat =
+                                                        trackingLines[trackingLines.size / 2]
+                                                                .latitude
+                                                val metersPerPixel =
+                                                        (156543.03392 *
+                                                                        Math.cos(
+                                                                                centerLat *
+                                                                                        Math.PI /
+                                                                                        180.0
+                                                                        ) /
+                                                                        Math.pow(
+                                                                                2.0,
+                                                                                zoom.toDouble()
+                                                                        ))
+                                                                .toFloat()
+                                                val pixelRadius =
+                                                        (targetRadiusMeters / metersPerPixel)
+                                                                .toFloat()
+
+                                                drawPath(
+                                                        path = path,
+                                                        color = Color.Black,
+                                                        style =
+                                                                Stroke(
+                                                                        width =
+                                                                                pixelRadius *
+                                                                                        2.2f, // Slightly wider corridor
+                                                                        cap = StrokeCap.Round,
+                                                                        join = StrokeJoin.Round
+                                                                ),
+                                                        blendMode = BlendMode.DstOut
+                                                )
+
+                                                // Add a softer outer glow/blur to the path
+                                                drawPath(
+                                                        path = path,
+                                                        color = Color.Black.copy(alpha = 0.4f),
+                                                        style =
+                                                                Stroke(
+                                                                        width = pixelRadius * 3.5f,
+                                                                        cap = StrokeCap.Round,
+                                                                        join = StrokeJoin.Round
+                                                                ),
+                                                        blendMode = BlendMode.DstOut
+                                                )
+                                        }
+
+                                        // B. BLOBS for individual heatmap points (also soft)
+                                        heatmapLines.forEach { pt ->
+                                                val latLng = LatLng(pt.latitude, pt.longitude)
                                                 val pos = projection.toScreenLocation(latLng)
+                                                val metersPerPixel =
+                                                        (156543.03392 *
+                                                                        Math.cos(
+                                                                                latLng.latitude *
+                                                                                        Math.PI /
+                                                                                        180.0
+                                                                        ) /
+                                                                        Math.pow(
+                                                                                2.0,
+                                                                                zoom.toDouble()
+                                                                        ))
+                                                                .toFloat()
+                                                val pixelRadius =
+                                                        (targetRadiusMeters / metersPerPixel)
+                                                                .toFloat()
+
+                                                // Soft inner core
                                                 drawCircle(
                                                         color = Color.Black,
-                                                        radius = holeSize,
+                                                        radius = pixelRadius,
+                                                        center =
+                                                                Offset(
+                                                                        pos.x.toFloat(),
+                                                                        pos.y.toFloat()
+                                                                ),
+                                                        blendMode = BlendMode.DstOut
+                                                )
+
+                                                // Soft outer glow
+                                                drawCircle(
+                                                        color = Color.Black.copy(alpha = 0.3f),
+                                                        radius = pixelRadius * 1.8f,
                                                         center =
                                                                 Offset(
                                                                         pos.x.toFloat(),
@@ -979,7 +1134,7 @@ fun CloudMistFog(
                                                 )
                                         }
                                 }
-                                .noiseTexture(0.1f)
+                                .noiseTexture(0.2f)
         )
 }
 

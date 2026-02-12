@@ -20,98 +20,103 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.footprint.data.model.FootprintSummary
 import com.footprint.data.model.TravelGoal
 import com.footprint.ui.components.AppBackground
 import com.footprint.ui.components.LiquidGlassCard // Added import statement
-
-import java.time.format.DateTimeFormatter
-
 import com.footprint.ui.components.SwipeableItem
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun GoalPlannerScreen(
-    modifier: Modifier = Modifier,
-    goals: List<TravelGoal>,
-    summary: FootprintSummary,
-    hapticFeedbackEnabled: Boolean,
-    onToggleGoal: (TravelGoal) -> Unit,
-    onAddGoal: () -> Unit,
-    onEditGoal: (TravelGoal) -> Unit,
-    onDeleteGoal: (TravelGoal) -> Unit
+        modifier: Modifier = Modifier,
+        goals: List<TravelGoal>,
+        summary: FootprintSummary,
+        hapticFeedbackEnabled: Boolean,
+        onToggleGoal: (TravelGoal) -> Unit,
+        onAddGoal: () -> Unit,
+        onEditGoal: (TravelGoal) -> Unit,
+        onDeleteGoal: (TravelGoal) -> Unit
 ) {
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    
+
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val performHaptic = {
         if (hapticFeedbackEnabled) {
-            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            haptic.performHapticFeedback(
+                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+            )
         }
     }
-    
+
     AppBackground(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 仿 Telegram 沉浸式顶部
             Surface(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                modifier = Modifier.fillMaxWidth()
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                    modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.statusBarsPadding().padding(16.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
                         Text(
-                            text = "计划与目标",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
+                                text = "计划与目标",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "完成进度: ${goals.count { it.isCompleted }}/${goals.size}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+                                text = "完成进度: ${goals.count { it.isCompleted }}/${goals.size}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    
+
                     LiquidGlassCard(
-                        shape = CircleShape,
-                        modifier = Modifier.clickable {
-                            performHaptic()
-                            onAddGoal()
-                        }
+                            shape = CircleShape,
+                            modifier =
+                                    Modifier.clickable {
+                                        performHaptic()
+                                        onAddGoal()
+                                    }
                     ) {
                         Icon(
-                            Icons.Default.Add, 
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(12.dp)
+                                Icons.Default.Add,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(12.dp)
                         )
                     }
                 }
             }
 
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp, bottom = 100.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp, bottom = 100.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // 概览摘要卡片
                 item {
                     LiquidGlassCard(
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(20.dp),
-                            horizontalArrangement = Arrangement.SpaceAround
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                horizontalArrangement = Arrangement.SpaceAround
                         ) {
-                            PlannerStatItem("年度记录", "${summary.yearly.totalEntries}", Icons.Default.QueryStats)
-                            PlannerStatItem("活跃天数", "${summary.daysActiveThisYear}", Icons.Default.Flag)
+                            PlannerStatItem(
+                                    "年度记录",
+                                    "${summary.yearly.totalEntries}",
+                                    Icons.Default.QueryStats
+                            )
+                            PlannerStatItem(
+                                    "活跃天数",
+                                    "${summary.daysActiveThisYear}",
+                                    Icons.Default.Flag
+                            )
                             PlannerStatItem("连续天数", "${summary.streakDays}", Icons.Default.Check)
                         }
                     }
@@ -119,32 +124,32 @@ fun GoalPlannerScreen(
 
                 item {
                     Text(
-                        "进行中",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                            "进行中",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
                     )
                 }
 
                 items(goals) { goal ->
                     SwipeableItem(
-                        onEdit = { 
-                            performHaptic()
-                            onEditGoal(goal) 
-                        },
-                        onDelete = { onDeleteGoal(goal) }
+                            onEdit = {
+                                performHaptic()
+                                onEditGoal(goal)
+                            },
+                            onDelete = { onDeleteGoal(goal) }
                     ) {
                         TelegramGoalItem(
-                            goal = goal,
-                            formatter = formatter,
-                            onToggle = { 
-                                performHaptic()
-                                onToggleGoal(goal) 
-                            },
-                            onEdit = { 
-                                performHaptic()
-                                onEditGoal(goal) 
-                            }
+                                goal = goal,
+                                formatter = formatter,
+                                onToggle = {
+                                    performHaptic()
+                                    onToggleGoal(goal)
+                                },
+                                onEdit = {
+                                    performHaptic()
+                                    onEditGoal(goal)
+                                }
                         )
                     }
                 }
@@ -154,87 +159,100 @@ fun GoalPlannerScreen(
 }
 
 @Composable
-private fun PlannerStatItem(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private fun PlannerStatItem(
+        label: String,
+        value: String,
+        icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
 private fun TelegramGoalItem(
-    goal: TravelGoal,
-    formatter: DateTimeFormatter,
-    onToggle: () -> Unit,
-    onEdit: () -> Unit
+        goal: TravelGoal,
+        formatter: DateTimeFormatter,
+        onToggle: () -> Unit,
+        onEdit: () -> Unit
 ) {
     LiquidGlassCard(
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onEdit() }
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().clickable { onEdit() }
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.Top
-        ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             // 自定义 Checkbox 效果
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                if (goal.isCompleted) Icons.Default.Check else com.footprint.ui.components.IconUtils.getIconByName(goal.icon),
-                null,
-                tint = if (goal.isCompleted) Color.White else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-            
+            Box(
+                    modifier =
+                            Modifier.size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                            if (goal.isCompleted) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.primaryContainer
+                                    ),
+                    contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                        if (goal.isCompleted) Icons.Default.Check
+                        else com.footprint.ui.components.IconUtils.getIconByName(goal.icon),
+                        null,
+                        tint =
+                                if (goal.isCompleted) Color.White
+                                else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = goal.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (goal.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                        text = goal.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color =
+                                if (goal.isCompleted)
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                alpha = 0.6f
+                                        )
+                                else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "目的地: ${goal.targetLocation}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                        text = "目的地: ${goal.targetLocation}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "预计: ${goal.targetDate.format(formatter)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "预计: ${goal.targetDate.format(formatter)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 if (goal.notes.isNotBlank()) {
                     Text(
-                        text = goal.notes,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp),
-                        maxLines = 2,
-                        color = MaterialTheme.colorScheme.outline
+                            text = goal.notes,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                            maxLines = 2,
+                            color = MaterialTheme.colorScheme.outline
                     )
                 }
 
                 // 进度条
                 Spacer(modifier = Modifier.height(12.dp))
                 LinearProgressIndicator(
-                    progress = { goal.progress / 100f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(CircleShape),
-                    color = if (goal.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        progress = { goal.progress / 100f },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                        color =
+                                if (goal.isCompleted) MaterialTheme.colorScheme.outline
+                                else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             }
         }

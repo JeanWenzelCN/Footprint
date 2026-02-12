@@ -114,6 +114,7 @@ fun FootprintApp() {
                     bottomBar = {
                         val hideBottomBar =
                                 currentDestination == "settings" ||
+                                        currentDestination == "generative_art" ||
                                         currentDestination?.startsWith("export_trace") == true
                         if (!hideBottomBar) {
                             val items = remember {

@@ -180,7 +180,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
             if (location.errorCode == 0) {
                 // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
                 // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
-                if (location.latitude > 1.0 && location.longitude > 1.0 && location.accuracy < 80) {
+                if (location.latitude > 1.0 && location.longitude > 1.0 && location.accuracy < 200
+                ) {
                     _sharedCurrentLocation.value = location
                     _locationError.value = null // Clear previous errors
                     if (_sharedIsTracking.value) {
@@ -189,7 +190,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             val distance = location.distanceTo(lastLoc)
 
                             // 距离太小（静止或漂移）或者速度异常大的点予以过滤
-                            if (distance > 5) {
+                            // 室内优化：放宽至 2 米以捕捉小范围移动
+                            if (distance > 2) {
                                 _totalDistanceTraveled.value += distance
                                 Log.d(
                                         "FootprintLoc",
