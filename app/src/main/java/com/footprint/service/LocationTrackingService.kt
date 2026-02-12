@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class LocationTrackingService : Service(), AMapLocationListener {
 
     private var locationClient: AMapLocationClient? = null
+    private var locationOption: AMapLocationClientOption? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var repository: com.footprint.data.repository.FootprintRepository
     private var wakeLock: PowerManager.WakeLock? = null
@@ -110,7 +111,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
             locationClient = AMapLocationClient(applicationContext)
             locationClient?.setLocationListener(this)
 
-            val option =
+            locationOption =
                     AMapLocationClientOption().apply {
                         locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
                         interval = 5000L // 初始间隔 5秒
@@ -126,7 +127,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 buildNotification(0, 0f, "")
                         )
                     }
-            locationClient?.setLocationOption(option)
+            locationClient?.setLocationOption(locationOption)
         } catch (e: Exception) {
             Log.e("FootprintLoc", "SDK初始化失败: ${e.message}")
         }
@@ -348,7 +349,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     else -> 30000L // 静止: 30s
                 }
 
-        locationClient?.locationOption?.let { currentOption ->
+        locationOption?.let { currentOption ->
             if (currentOption.interval != newInterval) {
                 currentOption.interval = newInterval
                 locationClient?.setLocationOption(currentOption)
