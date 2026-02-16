@@ -350,7 +350,7 @@ fun SettingsScreen(
                                         LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
                                             ListItem(
                                                     headlineContent = { Text("软件版本") },
-                                                    supportingContent = { Text("v2.4.1") },
+                                                    supportingContent = { Text("v2.6.0") },
                                                     leadingContent = { Icon(Icons.Default.Info, null) },
                                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                             )
