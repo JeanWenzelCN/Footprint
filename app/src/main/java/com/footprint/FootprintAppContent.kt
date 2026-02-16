@@ -115,6 +115,7 @@ fun FootprintApp() {
                         val hideBottomBar =
                                 currentDestination == "settings" ||
                                         currentDestination == "generative_art" ||
+                                        currentDestination == "art_studio" ||
                                         currentDestination?.startsWith("export_trace") == true
                         if (!hideBottomBar) {
                             val items = remember {
@@ -293,7 +294,7 @@ fun FootprintApp() {
                                             }
                                     )
                                 },
-                                onGenerativeArt = { navController.navigate("generative_art") },
+                                onGenerativeArt = { navController.navigate("art_studio") },
                                 onBack = { navController.popBackStack() }
                         )
                     }
@@ -309,6 +310,12 @@ fun FootprintApp() {
                                 viewModel = viewModel,
                                 initialYear = year,
                                 onBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable("art_studio") {
+                        com.footprint.ui.screens.art.FootprintArtStudioScreen(
+                            viewModel = viewModel,
+                            onBack = { navController.popBackStack() }
                         )
                     }
                     composable("generative_art") {

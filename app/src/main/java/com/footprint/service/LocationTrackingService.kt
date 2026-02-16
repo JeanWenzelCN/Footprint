@@ -12,6 +12,9 @@ import com.amap.api.location.AMapLocation
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
 import com.amap.api.location.AMapLocationListener
+import android.content.pm.ServiceInfo
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
 import com.footprint.data.model.Mood
 import com.footprint.data.model.TransportType
 import kotlinx.coroutines.*
@@ -149,7 +152,23 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 )
                                 .apply { acquire() }
 
-                startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
+                // Android 14+ requires runtime permission check before calling startForeground with location type
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    Log.e("FootprintLoc", "Cannot start foreground service: Location permission missing")
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID, 
+                        buildNotification(0, 0f, ""),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
+                }
                 locationClient?.startLocation()
                 _sharedIsTracking.value = true
                 startNotificationUpdates()
