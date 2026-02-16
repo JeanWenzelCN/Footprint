@@ -281,6 +281,7 @@ fun SettingsScreen(
                                                                 title = "生成足迹艺术",
                                                                 subtitle = "将您的轨迹转化为独一无二的流体画",
                                                                 icon = Icons.Default.Brush,
+                                                                containerColor = Color.Transparent,
                                                                 onClick = onGenerativeArt
                                                         )
                                                 }
@@ -302,6 +303,7 @@ fun SettingsScreen(
                                                                 title = "导出足迹备份",
                                                                 subtitle = "将所有数据保存为 JSON 文件",
                                                                 icon = Icons.Default.CloudUpload,
+                                                                containerColor = Color.Transparent,
                                                                 onClick = {
                                                                         exportLauncher.launch(
                                                                                 "footprint_backup_${System.currentTimeMillis()}.json"
@@ -322,6 +324,7 @@ fun SettingsScreen(
                                                                 title = "导入历史记录",
                                                                 subtitle = "从备份文件恢复足迹和目标",
                                                                 icon = Icons.Default.CloudDownload,
+                                                                containerColor = Color.Transparent,
                                                                 onClick = {
                                                                         importLauncher.launch(
                                                                                 arrayOf(
@@ -344,11 +347,14 @@ fun SettingsScreen(
                                 // 关于
                                 item { SettingsSectionTitle("关于应用") }
                                 item {
-                                        ListItem(
-                                                headlineContent = { Text("软件版本") },
-                                                supportingContent = { Text("v2.4.1") },
-                                                leadingContent = { Icon(Icons.Default.Info, null) }
-                                        )
+                                        LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
+                                            ListItem(
+                                                    headlineContent = { Text("软件版本") },
+                                                    supportingContent = { Text("v2.4.1") },
+                                                    leadingContent = { Icon(Icons.Default.Info, null) },
+                                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                            )
+                                        }
                                 }
                         }
                 }
@@ -366,7 +372,13 @@ fun SettingsSectionTitle(title: String) {
 }
 
 @Composable
-fun SettingsActionItem(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+fun SettingsActionItem(
+    title: String, 
+    subtitle: String, 
+    icon: ImageVector, 
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    onClick: () -> Unit
+) {
         ListItem(
                 headlineContent = { Text(title) },
                 supportingContent = { Text(subtitle) },
@@ -378,6 +390,7 @@ fun SettingsActionItem(title: String, subtitle: String, icon: ImageVector, onCli
                                 tint = MaterialTheme.colorScheme.outline
                         )
                 },
+                colors = ListItemDefaults.colors(containerColor = containerColor),
                 modifier = Modifier.clickable(onClick = onClick)
         )
 }

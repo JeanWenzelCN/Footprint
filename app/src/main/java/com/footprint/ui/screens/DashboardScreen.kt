@@ -150,15 +150,21 @@ fun DashboardScreen(
                     )
                 }
 
-                // Memory Lane (Personalized)
+                // Combined Section: Memory Lane & Goals
                 item {
-                    MemoryLaneSection(
+                    CombinedDashboardSection(
                             memory = state.randomMemory,
                             quote = state.memoryQuote,
-                            onClick = {
+                            goals = state.goals.filter { it.targetDate.year == state.filterState.year },
+                            onMemoryClick = {
                                 performHaptic()
                                 onMemoryLaneClick()
-                            }
+                            },
+                            onEditGoal = {
+                                performHaptic()
+                                onEditGoal(it)
+                            },
+                            onDeleteGoal = onDeleteGoal
                     )
                 }
 
@@ -190,24 +196,6 @@ fun DashboardScreen(
                             onEditEntry(it)
                         },
                         onDeleteEntry = onDeleteEntry
-                )
-
-                item {
-                    HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                }
-
-                // Sections (Goals)
-                goalsListSection(
-                        goals = state.goals.filter { it.targetDate.year == state.filterState.year },
-                        onEditGoal = {
-                            performHaptic()
-                            onEditGoal(it)
-                        },
-                        onDeleteGoal = onDeleteGoal
                 )
             }
 
@@ -591,85 +579,7 @@ fun StatisticsSection(state: FootprintUiState, onStatClick: (StatType) -> Unit, 
     }
 }
 
-@Composable
-fun MemoryLaneSection(memory: FootprintEntry?, quote: String?, onClick: () -> Unit) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-                "那年今日 / 时光碎片",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-        )
-        LiquidGlassCard(
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth().clickable { onClick() }
-        ) {
-            if (memory != null) {
-                Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Box(
-                            modifier =
-                                    Modifier.size(56.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(memory.mood.color.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                                IconUtils.getIconByName(memory.icon),
-                                contentDescription = null,
-                                tint = memory.mood.color,
-                                modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                text = memory.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                        )
-                        val yearsAgo = LocalDate.now().year - memory.happenedOn.year
-                        Text(
-                                text = "${yearsAgo}年前的今天 · ${memory.location}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Icon(
-                            Icons.AutoMirrored.Filled.MenuBook,
-                            null,
-                            tint = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            } else {
-                Row(
-                        modifier = Modifier.padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Icon(
-                            Icons.Default.AutoAwesome,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                    )
-                    Text(
-                            text = quote ?: "记录当下的每一步，让未来有迹可循。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-    }
-}
+
 
 @Composable
 fun StatItem(
@@ -1082,124 +992,247 @@ private fun ExpandableMonthHeader(
     }
 }
 
-private fun LazyListScope.goalsListSection(
-        goals: List<com.footprint.data.model.TravelGoal>,
-        onEditGoal: (com.footprint.data.model.TravelGoal) -> Unit,
-        onDeleteGoal: (com.footprint.data.model.TravelGoal) -> Unit
+@Composable
+fun CombinedDashboardSection(
+    memory: FootprintEntry?,
+    quote: String?,
+    goals: List<com.footprint.data.model.TravelGoal>,
+    onMemoryClick: () -> Unit,
+    onEditGoal: (com.footprint.data.model.TravelGoal) -> Unit,
+    onDeleteGoal: (com.footprint.data.model.TravelGoal) -> Unit
 ) {
-    val grouped = goals.groupBy { it.targetDate.monthValue }
-    val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-
-    item {
-        Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        LiquidGlassCard(
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(
-                    Icons.Default.Flag,
-                    null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(18.dp)
-            )
-            Text(
-                    text = "年度旅行目标",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-            )
-        }
-    }
-
-    if (goals.isEmpty()) return
-
-    grouped.forEach { (month, monthGoals) ->
-        item {
-            var isExpanded by remember { mutableStateOf(true) }
-            Column(modifier = Modifier.animateContentSize()) {
-                ExpandableMonthHeader(
-                        month = month,
-                        isExpanded = isExpanded,
-                        color = MaterialTheme.colorScheme.secondary,
-                        onToggle = { isExpanded = !isExpanded }
-                )
-                AnimatedVisibility(
-                        visible = isExpanded,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                ) {
-                    Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
+            Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                // --- Memory Lane Section ---
+                Column(modifier = Modifier.clickable { onMemoryClick() }.padding(horizontal = 16.dp)) {
+                     Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 12.dp)
                     ) {
-                        monthGoals.forEach { goal ->
-                            SwipeableItem(
-                                    onEdit = { onEditGoal(goal) },
-                                    onDelete = { onDeleteGoal(goal) }
+                        Icon(
+                                Icons.Default.AutoAwesome, // Or a specific icon
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                                "那年今日 / 时光碎片",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (memory != null) {
+                        Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(
+                                    modifier =
+                                            Modifier.size(56.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(memory.mood.color.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
                             ) {
-                                LiquidGlassCard(
-                                        shape = RoundedCornerShape(22.dp),
+                                Icon(
+                                        IconUtils.getIconByName(memory.icon),
+                                        contentDescription = null,
+                                        tint = memory.mood.color,
+                                        modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                        text = memory.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                )
+                                val yearsAgo = LocalDate.now().year - memory.happenedOn.year
+                                Text(
+                                        text = "${yearsAgo}年前的今天 · ${memory.location}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                    Icons.AutoMirrored.Filled.MenuBook,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    } else {
+                        Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Icon(
+                                    Icons.Default.AutoAwesome,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp)
+                            )
+                            Text(
+                                    text = quote ?: "记录当下的每一步，让未来有迹可循。",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+
+                // --- Goals Section ---
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
+                        Icon(
+                                Icons.Default.Flag,
+                                null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                                text = "年度旅行目标",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+
+                    if (goals.isNotEmpty()) {
+                        val grouped = goals.groupBy { it.targetDate.monthValue }
+                        val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+
+                        grouped.forEach { (month, monthGoals) ->
+                            var isExpanded by remember { mutableStateOf(true) }
+                             Column(modifier = Modifier.animateContentSize()) {
+                                 // Simplified Header for inner section
+                                 Row(
                                         modifier =
                                                 Modifier.fillMaxWidth()
-                                                        .padding(horizontal = 16.dp)
-                                                        .clickable { onEditGoal(goal) }
+                                                        .clickable { isExpanded = !isExpanded }
+                                                        .padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                            modifier = Modifier.padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                    Text(
+                                            text = "${month}月",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f)
+                                    )
+                                    Icon(
+                                            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                        visible = isExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.padding(bottom = 8.dp)
                                     ) {
-                                        Box(
-                                                modifier =
-                                                        Modifier.size(40.dp)
-                                                                .clip(CircleShape)
-                                                                .background(
-                                                                        if (goal.isCompleted)
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .secondary
+                                        monthGoals.forEach { goal ->
+                                            SwipeableItem(
+                                                    onEdit = { onEditGoal(goal) },
+                                                    onDelete = { onDeleteGoal(goal) }
+                                            ) {
+                                                // Simplified Goal Item (No inner LiquidGlassCard)
+                                                Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
+                                                            .clickable { onEditGoal(goal) }
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Box(
+                                                            modifier =
+                                                                    Modifier.size(36.dp)
+                                                                            .clip(CircleShape)
+                                                                            .background(
+                                                                                    if (goal.isCompleted)
+                                                                                            MaterialTheme
+                                                                                                    .colorScheme
+                                                                                                    .secondary
+                                                                                    else
+                                                                                            MaterialTheme
+                                                                                                    .colorScheme
+                                                                                                    .secondaryContainer
+                                                                                                    .copy(
+                                                                                                            alpha =
+                                                                                                                    0.4f
+                                                                                                    )
+                                                                            ),
+                                                            contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                                if (goal.isCompleted) Icons.Default.Check
+                                                                else IconUtils.getIconByName(goal.icon),
+                                                                null,
+                                                                tint =
+                                                                        if (goal.isCompleted) Color.White
                                                                         else
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .secondaryContainer
-                                                                                        .copy(
-                                                                                                alpha =
-                                                                                                        0.4f
-                                                                                        )
-                                                                ),
-                                                contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                    if (goal.isCompleted) Icons.Default.Check
-                                                    else IconUtils.getIconByName(goal.icon),
-                                                    null,
-                                                    tint =
-                                                            if (goal.isCompleted) Color.White
-                                                            else
-                                                                    MaterialTheme.colorScheme
-                                                                            .secondary,
-                                                    modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column {
-                                            Text(
-                                                    goal.title,
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                    "${goal.targetLocation} · ${goal.targetDate.format(formatter)}",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color =
-                                                            MaterialTheme.colorScheme
-                                                                    .onSurfaceVariant
-                                            )
+                                                                                MaterialTheme.colorScheme
+                                                                                        .secondary,
+                                                                modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.width(12.dp))
+                                                    Column {
+                                                        Text(
+                                                                goal.title,
+                                                                style = MaterialTheme.typography.titleSmall,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                                "${goal.targetLocation} · ${goal.targetDate.format(formatter)}",
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color =
+                                                                        MaterialTheme.colorScheme
+                                                                                .onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                    } else {
+                         Text(
+                            "暂无年度计划，去添加一个吧！",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
                     }
                 }
             }
