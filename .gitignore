@@ -39,4 +39,7 @@ build/
 # Kotlin
 /bin/
 /gen/
-/out/
+
+# Build logs
+build_output.txt
+build_log.txt
