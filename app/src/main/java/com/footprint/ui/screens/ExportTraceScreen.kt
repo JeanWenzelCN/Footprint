@@ -68,10 +68,28 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     }
 
     // Map lifecycle
-    DisposableEffect(mapView) {
-        mapView.onCreate(null)
-        mapView.onResume()
-        onDispose { mapView.onDestroy() }
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, mapView) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_CREATE -> mapView.onCreate(null)
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        
+        // Handle initial state if verified (e.g. if already RESUMED)
+        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            mapView.onResume()
+        }
+
+        onDispose {
+            lifecycle.removeObserver(observer)
+            mapView.onDestroy()
+        }
     }
 
     LaunchedEffect(isDark) {
@@ -80,8 +98,10 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 
     LaunchedEffect(points) {
         mapView.map.clear()
-        if (points.isNotEmpty()) {
-            val latLngs = points.map { LatLng(it.latitude, it.longitude) }
+        val validPoints = points.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+        
+        if (validPoints.isNotEmpty()) {
+            val latLngs = validPoints.map { LatLng(it.latitude, it.longitude) }
             mapView.map.addPolyline(
                     PolylineOptions()
                             .addAll(latLngs)
@@ -93,11 +113,11 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             val builder = LatLngBounds.builder()
             latLngs.forEach { builder.include(it) }
             try {
-                mapView.map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100))
+                mapView.map.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100))
             } catch (e: Exception) {
                 // Bounds might be invalid if points are too close
                 if (latLngs.isNotEmpty()) {
-                    mapView.map.animateCamera(CameraUpdateFactory.newLatLngZoom(latLngs[0], 15f))
+                    mapView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngs[0], 15f))
                 }
             }
         }

@@ -5,6 +5,7 @@ import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
@@ -21,18 +22,19 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amap.api.maps.AMap
 import com.amap.api.maps.CameraUpdateFactory
-import com.amap.api.maps.MapView
+import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
 import com.footprint.FootprintViewModel
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -47,7 +49,7 @@ fun FootprintArtStudioScreen(
     val context = LocalContext.current
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     val mapView = remember { 
-        MapView(context).apply { 
+        TextureMapView(context).apply { 
             onCreate(null) 
         } 
     }
@@ -64,8 +66,6 @@ fun FootprintArtStudioScreen(
         }
         lifecycle.addObserver(observer)
         
-        // Handle initial state if verified (e.g. if already RESUMED)
-        // AMap requires onResume to be called to start rendering
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             mapView.onResume()
         }
@@ -115,9 +115,58 @@ fun FootprintArtStudioScreen(
         }
     }
 
-    // ... (Data Fetching code unchanged) ...
+    // Map Logic: Camera Update & Drawing
+    LaunchedEffect(mapView, tracePoints, mapStyle, lineWeight, selectedColor, glowRadius) {
+        val map = mapView.map ?: return@LaunchedEffect
+        
+        // 1. Update Map Style
+        map.mapType = when(mapStyle) {
+            ArtMapStyle.DARK, ArtMapStyle.VOID -> AMap.MAP_TYPE_NIGHT
+            ArtMapStyle.LIGHT -> AMap.MAP_TYPE_NORMAL
+            ArtMapStyle.SATELLITE -> AMap.MAP_TYPE_SATELLITE
+        }
+        
+        // Customizing for "Void"
+        map.showMapText(mapStyle != ArtMapStyle.VOID)
+        map.showBuildings(mapStyle != ArtMapStyle.VOID)
+        
+        map.uiSettings.isZoomControlsEnabled = false
+        map.uiSettings.isScaleControlsEnabled = false
 
-    // ... (Map Lifecycle & Style updates & Glow Effect unchanged) ...
+        // 2. Draw Track
+        map.clear()
+        
+        if (tracePoints.isNotEmpty()) {
+            val latLngs = tracePoints.map { LatLng(it.latitude, it.longitude) }
+            
+            // Draw "Glow"
+            map.addPolyline(
+                com.amap.api.maps.model.PolylineOptions()
+                    .addAll(latLngs)
+                    .width(lineWeight + glowRadius * 2f)
+                    .color(selectedColor.copy(alpha = 0.4f).toArgb())
+            )
+            
+            // Draw Core Line
+            map.addPolyline(
+                com.amap.api.maps.model.PolylineOptions()
+                    .addAll(latLngs)
+                    .width(lineWeight)
+                    .color(selectedColor.toArgb())
+            )
+
+            // 3. Move Camera
+            try {
+                val builder = LatLngBounds.builder()
+                latLngs.forEach { builder.include(it) }
+                map.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 150))
+            } catch (e: Exception) {
+                if (latLngs.isNotEmpty()) {
+                     map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngs[0], 14f))
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         // 1. Base Map Layer
@@ -126,11 +175,6 @@ fun FootprintArtStudioScreen(
             modifier = Modifier.fillMaxSize()
         )
         
-        // Void Mode Logic
-        // ...
-
-        // 2. Art Canvas Layer -> Removed
-
         // 3. Layout Overlay
         ArtLayoutOverlay(
             layout = selectedLayout,
@@ -190,19 +234,17 @@ fun FootprintArtStudioScreen(
                 ExtendedFloatingActionButton(
                     onClick = {
                         showControls = false
-                        // Use a handler to delay capture until UI updates
                         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                             val activity = context as? android.app.Activity ?: (context as? android.content.ContextWrapper)?.baseContext as? android.app.Activity
                             activity?.let { act ->
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                     com.footprint.utils.ExportUtils.captureWindow(act) { bitmap ->
-                                        // Save in background
                                         Thread {
                                             val path = com.footprint.utils.ExportUtils.saveBitmapToGallery(context, bitmap)
                                             activity.runOnUiThread {
                                                 showControls = true
                                                 if (path != null) {
-                    android.widget.Toast.makeText(context, "已保存到相册", android.widget.Toast.LENGTH_SHORT).show()
+                                                    android.widget.Toast.makeText(context, "已保存到相册", android.widget.Toast.LENGTH_SHORT).show()
                                                 } else {
                                                     android.widget.Toast.makeText(context, "保存失败", android.widget.Toast.LENGTH_SHORT).show()
                                                 }
@@ -229,8 +271,6 @@ fun FootprintArtStudioScreen(
     }
 }
 
-
-
 @Composable
 fun ArtLayoutOverlay(
     layout: ArtLayout,
@@ -245,13 +285,13 @@ fun ArtLayoutOverlay(
                     Text(
                         "漂泊的灵魂",
                         style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
+                        fontWeight = FontWeight.Black,
                         color = Color.White.copy(alpha = 0.9f),
                         letterSpacing = 4.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "深圳 • $dateRange • %.1f KM".format(distanceKm),
+                        "$dateRange • %.1f KM".format(distanceKm),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White.copy(alpha = 0.7f),
                         letterSpacing = 2.sp
@@ -261,57 +301,96 @@ fun ArtLayoutOverlay(
         }
         ArtLayout.POLAROID -> {
              Box(modifier = modifier.fillMaxSize()) {
-                 // White Frame
                  Canvas(modifier = Modifier.fillMaxSize()) {
-                     // Draw white border with hole
-                     val frameWidth = size.width * 0.8f
-                     val frameHeight = size.width * 0.8f // Square aspect for the image part
-                     val topOffset = size.height * 0.15f
-                     val leftOffset = (size.width - frameWidth) / 2
+                     // Polaroid Proportions: Roughly 3.5 width x 4.2 height
+                     // We want a large map area.
                      
-                     // Draw solid white background
-                     drawRect(Color.White)
+                     val cardMargin = size.width * 0.05f
+                     val cardWidth = size.width - (cardMargin * 2)
                      
-                     // Clear the hole (This is tricky in Compose Canvas without Layer)
-                     // Instead, draw 4 white rectangles around the hole.
+                     // Frame Color
+                     val paperColor = Color(0xFFFAFAFA) // Off-white photo paper
                      
-                     // Top rect
-                     drawRect(Color.White, topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(size.width, topOffset))
-                     // Bottom rect
-                     drawRect(Color.White, topLeft = Offset(0f, topOffset + frameHeight), size = androidx.compose.ui.geometry.Size(size.width, size.height - (topOffset + frameHeight)))
-                     // Left rect
-                     drawRect(Color.White, topLeft = Offset(0f, topOffset), size = androidx.compose.ui.geometry.Size(leftOffset, frameHeight))
-                     // Right rect
-                     drawRect(Color.White, topLeft = Offset(leftOffset + frameWidth, topOffset), size = androidx.compose.ui.geometry.Size(leftOffset, frameHeight))
+                     // Hole (Map Area)
+                     val mapAspect = 1f // Square map
+                     val mapWidth = cardWidth * 0.9f
+                     val mapHeight = mapWidth * mapAspect
+                     
+                     val mapLeft = (size.width - mapWidth) / 2
+                     val mapTop = size.height * 0.15f
+                     val mapRight = mapLeft + mapWidth
+                     val mapBottom = mapTop + mapHeight
+                     
+                     // Draw the Mask (The Frame) - 4 Rects
+                     // 1. Top Area (Above Map)
+                     drawRect(paperColor, topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(size.width, mapTop))
+                     // 2. Bottom Area (Below Map) - This is the "Chin" where text goes
+                     drawRect(paperColor, topLeft = Offset(0f, mapBottom), size = androidx.compose.ui.geometry.Size(size.width, size.height - mapBottom))
+                     // 3. Left Area (Left of Map)
+                     drawRect(paperColor, topLeft = Offset(0f, mapTop), size = androidx.compose.ui.geometry.Size(mapLeft, mapHeight))
+                     // 4. Right Area (Right of Map)
+                     drawRect(paperColor, topLeft = Offset(mapRight, mapTop), size = androidx.compose.ui.geometry.Size(size.width - mapRight, mapHeight))
+                     
+                     // Add subtle inner shadow/border for depth
+                     drawRect(
+                        color = Color.Black.copy(alpha = 0.1f),
+                        topLeft = Offset(mapLeft, mapTop),
+                        size = androidx.compose.ui.geometry.Size(mapWidth, mapHeight),
+                        style = Stroke(width = 2f)
+                     )
                  }
                  
-                 // Text at bottom
+                 // Polaroid Text
                  Column(
-                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 180.dp), // Adjust for controls
+                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp),
                      horizontalAlignment = Alignment.CenterHorizontally
                  ) {
                       Text(
-                        "我的足迹",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.Black,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive
+                        "My Journey",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Color.Black.copy(alpha = 0.8f),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "$dateRange | %.1f km".format(distanceKm),
-                        style = MaterialTheme.typography.bodyMedium,
+                        "$dateRange • %.1f km".format(distanceKm),
+                        style = MaterialTheme.typography.bodyLarge,
                         color = Color.Gray
                     )
                  }
-                 
-                 // Logo/Watermark
-                 // Icon(Icons.Default.Fingerprint, null, tint = Color.Black.copy(0.1f), modifier = Modifier.align(Alignment.BottomEnd).padding(32.dp).size(48.dp))
              }
         }
         ArtLayout.GEEK_STATS -> {
-             // Side panel implementation
+             Box(modifier = modifier.fillMaxSize().padding(16.dp)) {
+                 Column(
+                     modifier = Modifier.align(Alignment.TopEnd)
+                         .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                         .padding(16.dp)
+                 ) {
+                     Text("DATA VISUALIZATION", color = Color(0xFF00FF9F), style = MaterialTheme.typography.labelSmall, letterSpacing = 2.sp)
+                     Spacer(modifier = Modifier.height(8.dp))
+                     Text("DIST: %.2f KM".format(distanceKm), color = Color.White, style = MaterialTheme.typography.bodyMedium, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                     Text("DATE: $dateRange", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                     Text("MODE: TRACKING", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                 }
+                 
+                 // Decorative elements
+                 Canvas(modifier = Modifier.fillMaxSize()) {
+                     val color = Color(0xFF00FF9F).copy(alpha = 0.5f)
+                     // Corner brackets
+                     val length = 40.dp.toPx()
+                     val stroke = 2.dp.toPx()
+                     
+                     // Top Left
+                     drawLine(color, Offset(0f, 0f), Offset(length, 0f), stroke)
+                     drawLine(color, Offset(0f, 0f), Offset(0f, length), stroke)
+                     
+                     // Bottom Right
+                     drawLine(color, Offset(size.width, size.height), Offset(size.width - length, size.height), stroke)
+                     drawLine(color, Offset(size.width, size.height), Offset(size.width, size.height - length), stroke)
+                 }
+             }
         }
     }
 }
-
-
-

@@ -30,5 +30,7 @@ interface TrackPointDao {
     @Query("SELECT COUNT(*) FROM track_points WHERE timestamp BETWEEN :start AND :end")
     suspend fun getCountInRange(start: Long, end: Long): Int
 
-    @Insert suspend fun insertAll(points: List<TrackPointEntity>)
+
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun insertAll(points: List<TrackPointEntity>)
 }
