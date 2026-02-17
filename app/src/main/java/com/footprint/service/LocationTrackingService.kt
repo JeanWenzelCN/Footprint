@@ -3,20 +3,21 @@ package com.footprint.service
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.amap.api.location.AMapLocation
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
 import com.amap.api.location.AMapLocationListener
-import android.content.pm.ServiceInfo
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import com.footprint.data.model.Mood
 import com.footprint.data.model.TransportType
+import kotlin.math.abs
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
         const val CHANNEL_ID = "location_tracking_channel"
         const val ACTION_START_TRACKING = "com.footprint.START_TRACKING"
         const val ACTION_STOP_TRACKING = "com.footprint.STOP_TRACKING"
+
+        // Thresholds
+        private const val MAX_SPEED_THRESHOLD_MS =
+                50.0f // 50 m/s = 180 km/h (Limit for driving/train, rejects teleport)
+        private const val MIN_DISTANCE_THRESHOLD_M = 5.0f // Ignore drift < 5m
+        private const val MIN_VALID_LATLNG = 0.1 // Reject 0.0 or near 0.0
 
         private val _sharedIsTracking = MutableStateFlow(false)
         val isTracking: StateFlow<Boolean> = _sharedIsTracking.asStateFlow()
@@ -152,19 +159,30 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 )
                                 .apply { acquire() }
 
-                // Android 14+ requires runtime permission check before calling startForeground with location type
-                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                    ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    Log.e("FootprintLoc", "Cannot start foreground service: Location permission missing")
+                // Android 14+ requires runtime permission check before calling startForeground with
+                // location type
+                if (ActivityCompat.checkSelfPermission(
+                                this,
+                                android.Manifest.permission.ACCESS_FINE_LOCATION
+                        ) != PackageManager.PERMISSION_GRANTED &&
+                                ActivityCompat.checkSelfPermission(
+                                        this,
+                                        android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    Log.e(
+                            "FootprintLoc",
+                            "Cannot start foreground service: Location permission missing"
+                    )
                     stopSelf()
                     return START_NOT_STICKY
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     startForeground(
-                        NOTIFICATION_ID, 
-                        buildNotification(0, 0f, ""),
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                            NOTIFICATION_ID,
+                            buildNotification(0, 0f, ""),
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
                     )
                 } else {
                     startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
@@ -198,62 +216,91 @@ class LocationTrackingService : Service(), AMapLocationListener {
         if (location != null) {
             if (location.errorCode == 0) {
                 // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
-                // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
-                if (location.latitude > 1.0 && location.longitude > 1.0 && location.accuracy < 200
+                // update: using abs to allow valid negative coordinates, but reject near-zero
+                if (abs(location.latitude) > MIN_VALID_LATLNG &&
+                                abs(location.longitude) > MIN_VALID_LATLNG &&
+                                location.accuracy < 200
                 ) {
                     _sharedCurrentLocation.value = location
                     _locationError.value = null // Clear previous errors
                     if (_sharedIsTracking.value) {
-                        // Calculate distance and filter points
+
+                        var isValidPoint = false
+
                         _lastLocation?.let { lastLoc ->
                             val distance = location.distanceTo(lastLoc)
+                            val timeDeltaMs = location.time - lastLoc.time
+                            val timeDeltaSec = timeDeltaMs / 1000.0
 
-                            // 距离太小（静止或漂移）或者速度异常大的点予以过滤
-                            // 室内优化：放宽至 2 米以捕捉小范围移动
-                            if (distance > 2) {
+                            // Speed Sanity Check (Anti-Teleport)
+                            // If timeDelta is too small (e.g. same second), assume duplication or
+                            // glitch unless distance is 0
+                            var speed = 0.0
+                            if (timeDeltaSec > 0) {
+                                speed = distance / timeDeltaSec
+                            }
+
+                            if (distance > 0 && timeDeltaSec <= 0) {
+                                Log.w(
+                                        "FootprintLoc",
+                                        "Duplicate timestamp or negative time. Ignoring."
+                                )
+                                return // Ignore this point
+                            }
+
+                            // Filter:
+                            // 1. Teleport glitch: Speed > MAX (unless it's the very first points
+                            // initializing)
+                            // 2. Drift: Distance < MIN
+                            if (speed > MAX_SPEED_THRESHOLD_MS) {
+                                Log.w(
+                                        "FootprintLoc",
+                                        "Ignored glitch: $distance m in $timeDeltaSec s ($speed m/s)"
+                                )
+                            } else if (distance < MIN_DISTANCE_THRESHOLD_M) {
+                                // Too close, probably drift
+                                // Log.v("FootprintLoc", "Ignored drift: $distance m")
+                            } else {
+                                // Valid movement
+                                isValidPoint = true
                                 _totalDistanceTraveled.value += distance
                                 Log.d(
                                         "FootprintLoc",
                                         "Distance added: $distance, Total: ${_totalDistanceTraveled.value}"
                                 )
-
-                                // 持久化存储 (DB)
-                                serviceScope.launch {
-                                    try {
-                                        val app =
-                                                applicationContext as
-                                                        com.footprint.FootprintApplication
-                                        app.repository.saveTrackPoint(location)
-                                    } catch (e: Exception) {
-                                        Log.e("FootprintLoc", "Failed to save point: ${e.message}")
-                                    }
-                                }
-                                _lastLocation = location // 仅在点被保存时更新 lastLocation
                             }
                         }
                                 ?: run {
-                                    // 第一个有效点
-                                    _lastLocation = location
-                                    serviceScope.launch {
-                                        val app =
-                                                applicationContext as
-                                                        com.footprint.FootprintApplication
-                                        app.repository.saveTrackPoint(location)
-                                    }
+                                    // First point
+                                    isValidPoint = true
                                 }
 
-                        // Adaptive Interval: Adjust frequency based on speed (m/s)
-                        updateAdaptiveInterval(location.speed)
+                        if (isValidPoint) {
+                            // 持久化存储 (DB)
+                            serviceScope.launch {
+                                try {
+                                    val app =
+                                            applicationContext as com.footprint.FootprintApplication
+                                    app.repository.saveTrackPoint(location)
+                                } catch (e: Exception) {
+                                    Log.e("FootprintLoc", "Failed to save point: ${e.message}")
+                                }
+                            }
+                            _lastLocation = location // Update last location ONLY if valid
 
-                        // Update notification with all stats
-                        val notification =
-                                buildNotification(
-                                        _totalDistanceTraveled.value.toInt(),
-                                        location.speed,
-                                        location.address ?: ""
-                                )
-                        val manager = getSystemService(NotificationManager::class.java)
-                        manager.notify(NOTIFICATION_ID, notification)
+                            // Adaptive Interval: Adjust frequency based on speed (m/s)
+                            updateAdaptiveInterval(location.speed)
+
+                            // Update notification with all stats
+                            val notification =
+                                    buildNotification(
+                                            _totalDistanceTraveled.value.toInt(),
+                                            location.speed,
+                                            location.address ?: ""
+                                    )
+                            val manager = getSystemService(NotificationManager::class.java)
+                            manager.notify(NOTIFICATION_ID, notification)
+                        }
                     }
                     Log.d(
                             "FootprintLoc",
