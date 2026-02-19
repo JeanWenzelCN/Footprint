@@ -48,6 +48,7 @@ fun FootprintApp() {
 
     var showEntryDialog by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<com.footprint.data.model.FootprintEntry?>(null) }
+    var detailEntry by remember { mutableStateOf<com.footprint.data.model.FootprintEntry?>(null) }
     var showGoalDialog by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<com.footprint.data.model.TravelGoal?>(null) }
 
@@ -224,6 +225,7 @@ fun FootprintApp() {
                                 onSettings = { navController.navigate("settings") },
                                 onEditEntry = { editingEntry = it },
                                 onDeleteEntry = viewModel::deleteFootprint,
+                                onDetailClick = { detailEntry = it },
                                 onEditGoal = { editingGoal = it },
                                 onDeleteGoal = viewModel::deleteGoal,
                                 onMemoryLaneClick = {
@@ -314,8 +316,8 @@ fun FootprintApp() {
                     }
                     composable("art_studio") {
                         com.footprint.ui.screens.art.FootprintArtStudioScreen(
-                            viewModel = viewModel,
-                            onBack = { navController.popBackStack() }
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                         )
                     }
                     composable("generative_art") {
@@ -345,7 +347,8 @@ fun FootprintApp() {
                                 onMoodFilterChange = viewModel::toggleMoodFilter,
                                 onSearch = viewModel::updateSearch,
                                 onEditEntry = { editingEntry = it },
-                                onDeleteEntry = viewModel::deleteFootprint
+                                onDeleteEntry = viewModel::deleteFootprint,
+                                onDetailClick = { detailEntry = it }
                         )
                     }
                     composable("planner") {
@@ -441,6 +444,35 @@ fun FootprintApp() {
                         showGoalDialog = false
                         editingGoal = null
                     }
+            )
+        }
+
+        if (detailEntry != null) {
+            val trackPoints by
+                    if (detailEntry != null) {
+                        val start =
+                                detailEntry!!
+                                        .happenedOn
+                                        .atStartOfDay(java.time.ZoneOffset.UTC)
+                                        .toInstant()
+                                        .toEpochMilli()
+                        val end = start + 86400000L
+                        viewModel.getTrackPoints(start, end).collectAsState(initial = emptyList())
+                    } else {
+                        remember {
+                            mutableStateOf(emptyList<com.footprint.data.local.TrackPointEntity>())
+                        }
+                    }
+
+            FootprintDetailScreen(
+                    entry = detailEntry!!,
+                    trackPoints = trackPoints,
+                    onBack = { detailEntry = null },
+                    onEdit = {
+                        editingEntry = it
+                        detailEntry = null
+                    },
+                    onUpdateEntry = viewModel::updateFootprint
             )
         }
     }

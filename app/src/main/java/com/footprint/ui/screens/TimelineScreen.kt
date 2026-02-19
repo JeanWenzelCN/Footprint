@@ -12,42 +12,40 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.footprint.data.model.FootprintEntry
 import com.footprint.data.model.Mood
-import com.footprint.ui.state.FilterState
 import com.footprint.ui.components.AppBackground
-
-import java.time.format.DateTimeFormatter
-
 import com.footprint.ui.components.SwipeableItem
-import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
+import com.footprint.ui.state.FilterState
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TimelineScreen(
-    modifier: Modifier = Modifier,
-    entries: List<com.footprint.data.model.FootprintEntry>,
-    filterState: com.footprint.ui.state.FilterState,
-    hapticFeedbackEnabled: Boolean,
-    onMoodFilterChange: (Mood?) -> Unit,
-    onSearch: (String) -> Unit,
-    onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
-    onDeleteEntry: (com.footprint.data.model.FootprintEntry) -> Unit
+        modifier: Modifier = Modifier,
+        entries: List<com.footprint.data.model.FootprintEntry>,
+        filterState: com.footprint.ui.state.FilterState,
+        hapticFeedbackEnabled: Boolean,
+        onMoodFilterChange: (Mood?) -> Unit,
+        onSearch: (String) -> Unit,
+        onEditEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
+        onDeleteEntry: (com.footprint.data.model.FootprintEntry) -> Unit,
+        onDetailClick: (com.footprint.data.model.FootprintEntry) -> Unit
 ) {
-    val grouped = entries.groupBy { it.happenedOn.withDayOfMonth(1) }
-        .toSortedMap(compareByDescending { it })
+    val grouped =
+            entries
+                    .groupBy { it.happenedOn.withDayOfMonth(1) }
+                    .toSortedMap(compareByDescending { it })
     val formatter = DateTimeFormatter.ofPattern("M月d日")
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     val headerFormatter = DateTimeFormatter.ofPattern("yyyy年 MM月")
@@ -55,7 +53,9 @@ fun TimelineScreen(
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val performHaptic = {
         if (hapticFeedbackEnabled) {
-            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            haptic.performHapticFeedback(
+                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+            )
         }
     }
 
@@ -63,64 +63,66 @@ fun TimelineScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             // 仿 Telegram 沉浸式标题
             Surface(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                modifier = Modifier.fillMaxWidth()
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                    modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp).statusBarsPadding()) {
                     Text(
-                        text = "足迹流",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                            text = "足迹流",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${entries.size} 条记录已同步",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                            text = "${entries.size} 条记录已同步",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
 
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 100.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 100.dp)
             ) {
                 grouped.forEach { (month, items) ->
                     stickyHeader {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
                         ) {
                             Surface(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                                shape = CircleShape
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                    shape = CircleShape
                             ) {
                                 Text(
-                                    text = month.format(headerFormatter),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.onSurface
+                                        text = month.format(headerFormatter),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier =
+                                                Modifier.padding(
+                                                        horizontal = 12.dp,
+                                                        vertical = 4.dp
+                                                ),
+                                        color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
                     }
                     items(items) { entry ->
                         SwipeableItem(
-                            onEdit = { 
-                                performHaptic()
-                                onEditEntry(entry) 
-                            },
-                            onDelete = { onDeleteEntry(entry) }
+                                onEdit = {
+                                    performHaptic()
+                                    onEditEntry(entry)
+                                },
+                                onDelete = { onDeleteEntry(entry) }
                         ) {
                             TelegramEntryItem(
-                                entry = entry, 
-                                dateFormatter = formatter, 
-                                timeFormatter = timeFormatter,
-                                onClick = { 
-                                    performHaptic()
-                                    onEditEntry(entry) 
-                                }
+                                    entry = entry,
+                                    dateFormatter = formatter,
+                                    timeFormatter = timeFormatter,
+                                    onClick = {
+                                        performHaptic()
+                                        onDetailClick(entry)
+                                    }
                             )
                         }
                     }
@@ -132,87 +134,85 @@ fun TimelineScreen(
 
 @Composable
 private fun TelegramEntryItem(
-    entry: FootprintEntry, 
-    dateFormatter: DateTimeFormatter, 
-    timeFormatter: DateTimeFormatter,
-    onClick: () -> Unit
+        entry: FootprintEntry,
+        dateFormatter: DateTimeFormatter,
+        timeFormatter: DateTimeFormatter,
+        onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier =
+                    Modifier.fillMaxWidth()
+                            .clickable { onClick() }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 仿 Telegram 圆形头像/图标
         Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(entry.mood.color.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
+                modifier =
+                        Modifier.size(52.dp)
+                                .clip(CircleShape)
+                                .background(entry.mood.color.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
         ) {
             Icon(
-                com.footprint.ui.components.IconUtils.getIconByName(entry.icon),
-                contentDescription = null,
-                tint = entry.mood.color,
-                modifier = Modifier.size(28.dp)
+                    com.footprint.ui.components.IconUtils.getIconByName(entry.icon),
+                    contentDescription = null,
+                    tint = entry.mood.color,
+                    modifier = Modifier.size(28.dp)
             )
         }
 
         Column(modifier = Modifier.weight(1f)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = entry.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                        text = entry.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = entry.happenedOn.format(dateFormatter),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+                        text = entry.happenedOn.format(dateFormatter),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
                 )
             }
-            
+
             Text(
-                text = entry.location,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium
+                    text = entry.location,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
             )
 
             Spacer(modifier = Modifier.height(2.dp))
 
             Text(
-                text = entry.detail,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = entry.detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             // 图片预览
             val validPhotos = entry.photos.filter { it.isNotBlank() }
             if (validPhotos.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth().height(80.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth().height(80.dp)
                 ) {
                     items(validPhotos) { photoPath ->
                         AsyncImage(
-                            model = photoPath,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
+                                model = photoPath,
+                                contentDescription = null,
+                                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
                         )
                     }
                 }
@@ -220,27 +220,27 @@ private fun TelegramEntryItem(
 
             // 底部元数据
             Row(
-                modifier = Modifier.padding(top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(4.dp)
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = "${String.format("%.1f", entry.distanceKm)} km",
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                        style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp),
-                        color = MaterialTheme.colorScheme.secondary
+                            text = "${String.format("%.1f", entry.distanceKm)} km",
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.secondary
                     )
                 }
-                
+
                 if (entry.tags.isNotEmpty()) {
                     Text(
-                        text = entry.tags.joinToString(" ") { "#$it" },
-                        style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            text = entry.tags.joinToString(" ") { "#$it" },
+                            style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                     )
                 }
             }
