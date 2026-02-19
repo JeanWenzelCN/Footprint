@@ -376,7 +376,7 @@ fun FootprintApp() {
                     },
                     onSave = { payload ->
                         if (editingEntry != null) {
-                            viewModel.updateFootprint(
+                            val updatedEntry =
                                     editingEntry!!.copy(
                                             title = payload.title,
                                             location = payload.location,
@@ -391,7 +391,10 @@ fun FootprintApp() {
                                             icon = payload.icon,
                                             photos = payload.photos
                                     )
-                            )
+                            viewModel.updateFootprint(updatedEntry)
+                            if (detailEntry?.id == updatedEntry.id) {
+                                detailEntry = updatedEntry
+                            }
                         } else {
                             viewModel.addFootprint(
                                     title = payload.title,
@@ -468,10 +471,7 @@ fun FootprintApp() {
                     entry = detailEntry!!,
                     trackPoints = trackPoints,
                     onBack = { detailEntry = null },
-                    onEdit = {
-                        editingEntry = it
-                        detailEntry = null
-                    },
+                    onEdit = { editingEntry = it },
                     onUpdateEntry = viewModel::updateFootprint
             )
         }
