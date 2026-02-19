@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,6 +49,10 @@ fun SettingsScreen(
         onExportData: (Uri) -> Unit,
         onImportData: (Uri) -> Unit,
         onGenerativeArt: () -> Unit,
+        artAuthorName: String,
+        artFontName: String,
+        artColorStyle: String,
+        onArtUpdate: (String, String, String) -> Unit,
         onBack: () -> Unit
 ) {
         val context = LocalContext.current
@@ -272,20 +277,17 @@ fun SettingsScreen(
                                         )
                                 }
 
-                                // 数字资产
-                                item { SettingsSectionTitle("数字资产") }
+
+                                // 艺术定制
+                                item { SettingsSectionTitle("艺术定制") }
                                 item {
-                                        LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
-                                                Column {
-                                                        SettingsActionItem(
-                                                                title = "生成足迹艺术",
-                                                                subtitle = "将您的轨迹转化为独一无二的流体画",
-                                                                icon = Icons.Default.Brush,
-                                                                containerColor = Color.Transparent,
-                                                                onClick = onGenerativeArt
-                                                        )
-                                                }
-                                        }
+                                        ArtSettingsEditor(
+                                                name = artAuthorName,
+                                                font = artFontName,
+                                                color = artColorStyle,
+                                                onUpdate = onArtUpdate,
+                                                onGenerativeArt = onGenerativeArt
+                                        )
                                 }
 
                                 item {
@@ -348,12 +350,18 @@ fun SettingsScreen(
                                 item { SettingsSectionTitle("关于应用") }
                                 item {
                                         LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
-                                            ListItem(
-                                                    headlineContent = { Text("软件版本") },
-                                                    supportingContent = { Text("v2.6.0") },
-                                                    leadingContent = { Icon(Icons.Default.Info, null) },
-                                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                            )
+                                                ListItem(
+                                                        headlineContent = { Text("软件版本") },
+                                                        supportingContent = { Text("v2.7.0") },
+                                                        leadingContent = {
+                                                                Icon(Icons.Default.Info, null)
+                                                        },
+                                                        colors =
+                                                                ListItemDefaults.colors(
+                                                                        containerColor =
+                                                                                Color.Transparent
+                                                                )
+                                                )
                                         }
                                 }
                         }
@@ -373,11 +381,11 @@ fun SettingsSectionTitle(title: String) {
 
 @Composable
 fun SettingsActionItem(
-    title: String, 
-    subtitle: String, 
-    icon: ImageVector, 
-    containerColor: Color = MaterialTheme.colorScheme.surface,
-    onClick: () -> Unit
+        title: String,
+        subtitle: String,
+        icon: ImageVector,
+        containerColor: Color = MaterialTheme.colorScheme.surface,
+        onClick: () -> Unit
 ) {
         ListItem(
                 headlineContent = { Text(title) },
@@ -658,6 +666,126 @@ fun ProfileEditor(
                                                                         MaterialTheme.colorScheme
                                                                                 .onSurfaceVariant
                                                 )
+                                        }
+                                }
+                        }
+                }
+        }
+}
+
+@Composable
+fun ArtSettingsEditor(
+        name: String,
+        font: String,
+        color: String,
+        onUpdate: (String, String, String) -> Unit,
+        onGenerativeArt: () -> Unit
+) {
+        var artName by remember { mutableStateOf(name) }
+
+        LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                        SettingsActionItem(
+                                title = "生成足迹艺术",
+                                subtitle = "将您的轨迹转化为独一无二的流体画",
+                                icon = Icons.Default.Brush,
+                                containerColor = Color.Transparent,
+                                onClick = onGenerativeArt
+                        )
+
+                        HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 16.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant
+                        )
+
+                        OutlinedTextField(
+                                value = artName,
+                                onValueChange = {
+                                        artName = it
+                                        onUpdate(it, font, color)
+                                },
+                                label = { Text("艺术作品标题 (默认: 漂泊的灵魂)") },
+                                placeholder = { Text("漂泊的灵魂") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                                "书法字体",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(7) { index ->
+                                        val fonts =
+                                                listOf(
+                                                        "Default",
+                                                        "MaShanZheng",
+                                                        "ZhiMangXing",
+                                                        "LongCang",
+                                                        "Serif",
+                                                        "Monospace",
+                                                        "Cursive"
+                                                )
+                                        val f = fonts[index]
+                                        FilterChip(
+                                                selected = font == f,
+                                                onClick = { onUpdate(artName, f, color) },
+                                                label = { Text(f) }
+                                        )
+                                }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                                "核心色调",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val colors =
+                                listOf(
+                                        "Deep Blue" to Color(0xFF007AFF),
+                                        "Cyber Pink" to Color(0xFFFF2D55),
+                                        "Neon Green" to Color(0xFF00FF9F),
+                                        "Gold" to Color(0xFFFFCC00)
+                                )
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                colors.forEach { (cName, cValue) ->
+                                        val selected = color == cName
+                                        Box(
+                                                modifier =
+                                                        Modifier.size(40.dp)
+                                                                .clip(CircleShape)
+                                                                .background(cValue)
+                                                                .clickable {
+                                                                        onUpdate(
+                                                                                artName,
+                                                                                font,
+                                                                                cName
+                                                                        )
+                                                                }
+                                                                .padding(2.dp)
+                                        ) {
+                                                if (selected) {
+                                                        Icon(
+                                                                Icons.Default.Check,
+                                                                null,
+                                                                tint =
+                                                                        if (cName == "Gold")
+                                                                                Color.Black
+                                                                        else Color.White,
+                                                                modifier =
+                                                                        Modifier.align(
+                                                                                Alignment.Center
+                                                                        )
+                                                        )
+                                                }
                                         }
                                 }
                         }

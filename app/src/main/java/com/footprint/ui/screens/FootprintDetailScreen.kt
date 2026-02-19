@@ -1,5 +1,6 @@
 package com.footprint.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -50,6 +51,14 @@ fun FootprintDetailScreen(
     val context = LocalContext.current
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy年MM月dd日") }
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+
+    BackHandler {
+        if (selectedPhotoIndex != null) {
+            selectedPhotoIndex = null
+        } else {
+            onBack()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(

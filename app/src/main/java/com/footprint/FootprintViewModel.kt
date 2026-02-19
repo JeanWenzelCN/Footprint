@@ -17,9 +17,7 @@ import com.footprint.ui.state.FootprintUiState
 import com.footprint.ui.theme.ThemeMode
 import com.footprint.utils.ApiKeyManager
 import com.footprint.utils.PreferenceManager
-import com.google.gson.Gson
 import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -33,14 +31,21 @@ class FootprintViewModel(
 ) : AndroidViewModel(application) {
 
     private val preferenceManager = PreferenceManager(application)
-    private val gson = com.google.gson.GsonBuilder()
-        .registerTypeAdapter(LocalDate::class.java, com.google.gson.JsonSerializer<LocalDate> { src, _, _ ->
-            com.google.gson.JsonPrimitive(src.toString())
-        })
-        .registerTypeAdapter(LocalDate::class.java, com.google.gson.JsonDeserializer { json, _, _ ->
-            LocalDate.parse(json.asString)
-        })
-        .create()
+    private val gson =
+            com.google.gson.GsonBuilder()
+                    .registerTypeAdapter(
+                            LocalDate::class.java,
+                            com.google.gson.JsonSerializer<LocalDate> { src, _, _ ->
+                                com.google.gson.JsonPrimitive(src.toString())
+                            }
+                    )
+                    .registerTypeAdapter(
+                            LocalDate::class.java,
+                            com.google.gson.JsonDeserializer { json, _, _ ->
+                                LocalDate.parse(json.asString)
+                            }
+                    )
+                    .create()
 
     private val moodFilter = MutableStateFlow<Mood?>(null)
     private val searchQuery = MutableStateFlow("")
@@ -51,6 +56,9 @@ class FootprintViewModel(
     private val avatarId = MutableStateFlow(preferenceManager.avatarId)
     private val blurStrength = MutableStateFlow(preferenceManager.blurStrength)
     private val hapticFeedback = MutableStateFlow(preferenceManager.hapticFeedbackEnabled)
+    private val artAuthorName = MutableStateFlow(preferenceManager.artAuthorName)
+    private val artFontName = MutableStateFlow(preferenceManager.artFontName)
+    private val artColorStyle = MutableStateFlow(preferenceManager.artColorStyle)
     private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
     val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
@@ -80,7 +88,10 @@ class FootprintViewModel(
             val nk: String,
             val av: String,
             val blur: Float,
-            val haptic: Boolean
+            val haptic: Boolean,
+            val artName: String,
+            val artFont: String,
+            val artColor: String
     )
 
     // 强类型合并流
@@ -105,15 +116,23 @@ class FootprintViewModel(
     private val userFlow =
             combine(nickname, avatarId, hapticFeedback) { nk, av, haptic -> Triple(nk, av, haptic) }
 
+    private val artFlow =
+            combine(artAuthorName, artFontName, artColorStyle) { name, font, color ->
+                Triple(name, font, color)
+            }
+
     private val prefsFlow: Flow<PrefsGroup> =
-            combine(appearanceFlow, userFlow) { appearance, user ->
+            combine(appearanceFlow, userFlow, artFlow) { appearance, user, art ->
                 PrefsGroup(
                         theme = appearance.first,
                         style = appearance.second,
                         blur = appearance.third,
                         nk = user.first,
                         av = user.second,
-                        haptic = user.third
+                        haptic = user.third,
+                        artName = art.first,
+                        artFont = art.second,
+                        artColor = art.third
                 )
             }
 
@@ -187,6 +206,9 @@ class FootprintViewModel(
                                 userAvatarId = prefs.av,
                                 blurStrength = prefs.blur,
                                 hapticFeedbackEnabled = prefs.haptic,
+                                artAuthorName = prefs.artName,
+                                artFontName = prefs.artFont,
+                                artColorStyle = prefs.artColor,
                                 randomMemory = randomMemory,
                                 memoryQuote = memoryQuote,
                                 isLoading = false
@@ -198,7 +220,10 @@ class FootprintViewModel(
                             initialValue =
                                     FootprintUiState(
                                             themeMode = preferenceManager.themeMode,
-                                            themeStyle = preferenceManager.themeStyle
+                                            themeStyle = preferenceManager.themeStyle,
+                                            artAuthorName = preferenceManager.artAuthorName,
+                                            artFontName = preferenceManager.artFontName,
+                                            artColorStyle = preferenceManager.artColorStyle
                                     )
                     )
 
@@ -223,6 +248,15 @@ class FootprintViewModel(
         preferenceManager.hapticFeedbackEnabled = enabled
     }
 
+    fun updateArtSettings(name: String, font: String, color: String) {
+        artAuthorName.value = name
+        artFontName.value = font
+        artColorStyle.value = color
+        preferenceManager.artAuthorName = name
+        preferenceManager.artFontName = font
+        preferenceManager.artColorStyle = color
+    }
+
     fun updateAvatar(uri: Uri) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -245,9 +279,13 @@ class FootprintViewModel(
                     val context = getApplication<Application>()
                     // 1. Prepare Backup Data
                     val backup = repository.prepareBackup()
-                    
+
                     // 2. Create Temporary Directory
-                    val tempDir = java.io.File(context.cacheDir, "backup_temp_${System.currentTimeMillis()}")
+                    val tempDir =
+                            java.io.File(
+                                    context.cacheDir,
+                                    "backup_temp_${System.currentTimeMillis()}"
+                            )
                     if (tempDir.exists()) com.footprint.utils.FileUtils.deleteRecursively(tempDir)
                     tempDir.mkdirs()
 
@@ -255,25 +293,35 @@ class FootprintViewModel(
                     imagesDir.mkdirs()
 
                     // 3. Process Images & Copy to Temp
-                    val processedFootprints = backup.footprints.map { footprint ->
-                        val newPhotos = footprint.photos.mapNotNull { photoPath ->
-                            try {
-                                val originalFile = java.io.File(photoPath)
-                                if (originalFile.exists()) {
-                                    val destFile = java.io.File(imagesDir, originalFile.name)
-                                    com.footprint.utils.FileUtils.copyFile(originalFile, destFile)
-                                    "images/${originalFile.name}" // Relative path in backup
-                                } else {
-                                    null // Skip missing files
-                                }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                null
+                    val processedFootprints =
+                            backup.footprints.map { footprint ->
+                                val newPhotos =
+                                        footprint.photos.mapNotNull { photoPath ->
+                                            try {
+                                                val originalFile = java.io.File(photoPath)
+                                                if (originalFile.exists()) {
+                                                    val destFile =
+                                                            java.io.File(
+                                                                    imagesDir,
+                                                                    originalFile.name
+                                                            )
+                                                    com.footprint.utils.FileUtils.copyFile(
+                                                            originalFile,
+                                                            destFile
+                                                    )
+                                                    "images/${originalFile.name}" // Relative path
+                                                    // in backup
+                                                } else {
+                                                    null // Skip missing files
+                                                }
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                                null
+                                            }
+                                        }
+                                footprint.copy(photos = newPhotos)
                             }
-                        }
-                        footprint.copy(photos = newPhotos)
-                    }
-                    
+
                     val processedBackup = backup.copy(footprints = processedFootprints)
                     val json = gson.toJson(processedBackup)
 
@@ -303,7 +351,11 @@ class FootprintViewModel(
                 withContext(Dispatchers.IO) {
                     val context = getApplication<Application>()
                     // 1. Create Temp Work Dir
-                    val tempDir = java.io.File(context.cacheDir, "import_temp_${System.currentTimeMillis()}")
+                    val tempDir =
+                            java.io.File(
+                                    context.cacheDir,
+                                    "import_temp_${System.currentTimeMillis()}"
+                            )
                     if (tempDir.exists()) com.footprint.utils.FileUtils.deleteRecursively(tempDir)
                     tempDir.mkdirs()
 
@@ -311,17 +363,18 @@ class FootprintViewModel(
                     try {
                         // 2. Try Unzip
                         context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                           // Peek first few bytes to check for PK signature? 
-                           // For now, rely on try-catch but ensure we reset stream or re-open for JSON
-                           try {
+                            // Peek first few bytes to check for PK signature?
+                            // For now, rely on try-catch but ensure we reset stream or re-open for
+                            // JSON
+                            try {
                                 com.footprint.utils.FileUtils.unzip(inputStream, tempDir)
                                 if (tempDir.listFiles()?.isNotEmpty() == true) {
                                     isZip = true
                                 }
-                           } catch (e: Exception) {
-                               // Not a zip or unzip failed -> treat as JSON
-                               isZip = false
-                           }
+                            } catch (e: Exception) {
+                                // Not a zip or unzip failed -> treat as JSON
+                                isZip = false
+                            }
                         }
                     } catch (e: Exception) {
                         isZip = false
@@ -330,77 +383,116 @@ class FootprintViewModel(
                     val backup: com.footprint.data.model.BackupData
 
                     if (isZip) {
-                         // 3a. Read JSON from Zip
+                        // 3a. Read JSON from Zip
                         val jsonFile = java.io.File(tempDir, "backup_data.json")
                         if (jsonFile.exists()) {
                             val json = java.io.FileReader(jsonFile).use { it.readText() }
-                            backup = gson.fromJson(json, com.footprint.data.model.BackupData::class.java)
+                            backup =
+                                    gson.fromJson(
+                                            json,
+                                            com.footprint.data.model.BackupData::class.java
+                                    )
                         } else {
-                            // Valid zip but missing metadata - unlikely, but falback to direct read just in case
+                            // Valid zip but missing metadata - unlikely, but falback to direct read
+                            // just in case
                             // or verify if there is a json file directly in root?
-                            // For now, if no backup_data.json in zip, assume user error or fallthrough
-                           isZip = false 
-                           // Fallthrough to direct read below won't work easily if we consumed stream.
-                           // Actually, we need to re-open stream for direct read.
-                           val json = context.contentResolver.openInputStream(uri)?.use { 
-                                InputStreamReader(it).use { reader -> reader.readText() } 
-                           } ?: throw Exception("无法读取文件")
-                           backup = gson.fromJson(json, com.footprint.data.model.BackupData::class.java)
+                            // For now, if no backup_data.json in zip, assume user error or
+                            // fallthrough
+                            isZip = false
+                            // Fallthrough to direct read below won't work easily if we consumed
+                            // stream.
+                            // Actually, we need to re-open stream for direct read.
+                            val json =
+                                    context.contentResolver.openInputStream(uri)?.use {
+                                        InputStreamReader(it).use { reader -> reader.readText() }
+                                    }
+                                            ?: throw Exception("无法读取文件")
+                            backup =
+                                    gson.fromJson(
+                                            json,
+                                            com.footprint.data.model.BackupData::class.java
+                                    )
                         }
                     } else {
                         // 3b. Legacy JSON Import (Direct read)
-                        val json = context.contentResolver.openInputStream(uri)?.use { 
-                            InputStreamReader(it).use { reader -> reader.readText() } 
-                        } ?: throw Exception("无法读取文件")
-                        backup = gson.fromJson(json, com.footprint.data.model.BackupData::class.java)
+                        val json =
+                                context.contentResolver.openInputStream(uri)?.use {
+                                    InputStreamReader(it).use { reader -> reader.readText() }
+                                }
+                                        ?: throw Exception("无法读取文件")
+                        backup =
+                                gson.fromJson(json, com.footprint.data.model.BackupData::class.java)
                     }
 
                     // 4. Restore Images (Only if Zip)
-                     val restoredFootprints = if (isZip) {
-                        val appImagesDir = java.io.File(context.filesDir, "footprint_images")
-                        if (!appImagesDir.exists()) appImagesDir.mkdirs()
+                    val restoredFootprints =
+                            if (isZip) {
+                                val appImagesDir =
+                                        java.io.File(context.filesDir, "footprint_images")
+                                if (!appImagesDir.exists()) appImagesDir.mkdirs()
 
-                        backup.footprints.map { footprint ->
-                            val restoredPhotos = footprint.photos.map { relativePath ->
-                                if (relativePath.startsWith("images/")) {
-                                    val imageName = relativePath.substringAfter("images/")
-                                    val sourceFile = java.io.File(tempDir, relativePath)
-                                    if (sourceFile.exists()) {
-                                        val destFile = java.io.File(appImagesDir, imageName)
-                                        com.footprint.utils.FileUtils.copyFile(sourceFile, destFile)
-                                        destFile.absolutePath
-                                    } else {
-                                        relativePath
-                                    }
-                                } else relativePath
+                                backup.footprints.map { footprint ->
+                                    val restoredPhotos =
+                                            footprint.photos.map { relativePath ->
+                                                if (relativePath.startsWith("images/")) {
+                                                    val imageName =
+                                                            relativePath.substringAfter("images/")
+                                                    val sourceFile =
+                                                            java.io.File(tempDir, relativePath)
+                                                    if (sourceFile.exists()) {
+                                                        val destFile =
+                                                                java.io.File(
+                                                                        appImagesDir,
+                                                                        imageName
+                                                                )
+                                                        com.footprint.utils.FileUtils.copyFile(
+                                                                sourceFile,
+                                                                destFile
+                                                        )
+                                                        destFile.absolutePath
+                                                    } else {
+                                                        relativePath
+                                                    }
+                                                } else relativePath
+                                            }
+                                    footprint.copy(photos = restoredPhotos)
+                                }
+                            } else {
+                                backup.footprints // Legacy: keep paths as-is
                             }
-                            footprint.copy(photos = restoredPhotos)
-                        }
-                    } else {
-                        backup.footprints // Legacy: keep paths as-is
-                    }
-                    
-                    // 5. Restore Data to DB
-                    // If track points are missing (legacy backup), generate them from footprint entries
-                    val finalTrackPoints = if (backup.trackPoints.isEmpty()) {
-                        restoredFootprints.filter { it.latitude != null && it.longitude != null }.map { fp ->
-                            com.footprint.data.local.TrackPointEntity(
-                                    latitude = fp.latitude!!,
-                                    longitude = fp.longitude!!,
-                                    timestamp = fp.happenedOn.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(),
-                                    speed = 0f,
-                                    accuracy = 0f,
-                                    altitude = fp.altitude ?: 0.0
-                            )
-                        }
-                    } else {
-                        backup.trackPoints
-                    }
 
-                    val finalBackup = backup.copy(
-                        footprints = restoredFootprints, 
-                        trackPoints = finalTrackPoints
-                    )
+                    // 5. Restore Data to DB
+                    // If track points are missing (legacy backup), generate them from footprint
+                    // entries
+                    val finalTrackPoints =
+                            if (backup.trackPoints.isEmpty()) {
+                                restoredFootprints
+                                        .filter { it.latitude != null && it.longitude != null }
+                                        .map { fp ->
+                                            com.footprint.data.local.TrackPointEntity(
+                                                    latitude = fp.latitude!!,
+                                                    longitude = fp.longitude!!,
+                                                    timestamp =
+                                                            fp.happenedOn
+                                                                    .atStartOfDay(
+                                                                            java.time.ZoneOffset.UTC
+                                                                    )
+                                                                    .toInstant()
+                                                                    .toEpochMilli(),
+                                                    speed = 0f,
+                                                    accuracy = 0f,
+                                                    altitude = fp.altitude ?: 0.0
+                                            )
+                                        }
+                            } else {
+                                backup.trackPoints
+                            }
+
+                    val finalBackup =
+                            backup.copy(
+                                    footprints = restoredFootprints,
+                                    trackPoints = finalTrackPoints
+                            )
                     repository.restoreFromBackup(finalBackup)
 
                     // 6. Cleanup
@@ -410,13 +502,14 @@ class FootprintViewModel(
                 onSuccess()
             } catch (e: Exception) {
                 e.printStackTrace()
-                val errorMsg = if (e is java.io.FileNotFoundException) {
-                   "文件未找到或无法访问: ${e.message}"
-                } else if (e is com.google.gson.JsonSyntaxException) {
-                   "JSON 格式错误: ${e.message?.take(50)}..."
-                } else {
-                   "导入失败 (${e.javaClass.simpleName}): ${e.message}"
-                }
+                val errorMsg =
+                        if (e is java.io.FileNotFoundException) {
+                            "文件未找到或无法访问: ${e.message}"
+                        } else if (e is com.google.gson.JsonSyntaxException) {
+                            "JSON 格式错误: ${e.message?.take(50)}..."
+                        } else {
+                            "导入失败 (${e.javaClass.simpleName}): ${e.message}"
+                        }
                 onError(errorMsg)
             }
         }

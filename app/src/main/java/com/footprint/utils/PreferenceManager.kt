@@ -5,7 +5,8 @@ import android.content.SharedPreferences
 import com.footprint.ui.theme.ThemeMode
 
 class PreferenceManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("footprint_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+            context.getSharedPreferences("footprint_prefs", Context.MODE_PRIVATE)
 
     var themeMode: ThemeMode
         get() {
@@ -34,9 +35,15 @@ class PreferenceManager(context: Context) {
 
     var themeStyle: com.footprint.ui.theme.AppThemeStyle
         get() {
-            val name = prefs.getString("theme_style", com.footprint.ui.theme.AppThemeStyle.CLASSIC.name)
+            val name =
+                    prefs.getString(
+                            "theme_style",
+                            com.footprint.ui.theme.AppThemeStyle.CLASSIC.name
+                    )
             return try {
-                com.footprint.ui.theme.AppThemeStyle.valueOf(name ?: com.footprint.ui.theme.AppThemeStyle.CLASSIC.name)
+                com.footprint.ui.theme.AppThemeStyle.valueOf(
+                        name ?: com.footprint.ui.theme.AppThemeStyle.CLASSIC.name
+                )
             } catch (e: Exception) {
                 com.footprint.ui.theme.AppThemeStyle.CLASSIC
             }
@@ -56,4 +63,16 @@ class PreferenceManager(context: Context) {
     var hapticFeedbackEnabled: Boolean
         get() = prefs.getBoolean("haptic_feedback", true)
         set(value) = prefs.edit().putBoolean("haptic_feedback", value).apply()
+
+    var artAuthorName: String
+        get() = prefs.getString("art_author_name", "漂泊的灵魂") ?: "漂泊的灵魂"
+        set(value) = prefs.edit().putString("art_author_name", value).apply()
+
+    var artFontName: String
+        get() = prefs.getString("art_font_name", "Default") ?: "Default"
+        set(value) = prefs.edit().putString("art_font_name", value).apply()
+
+    var artColorStyle: String
+        get() = prefs.getString("art_color_style", "Neon Green") ?: "Neon Green"
+        set(value) = prefs.edit().putString("art_color_style", value).apply()
 }

@@ -296,6 +296,10 @@ fun FootprintApp() {
                                             }
                                     )
                                 },
+                                artAuthorName = uiState.artAuthorName,
+                                artFontName = uiState.artFontName,
+                                artColorStyle = uiState.artColorStyle,
+                                onArtUpdate = viewModel::updateArtSettings,
                                 onGenerativeArt = { navController.navigate("art_studio") },
                                 onBack = { navController.popBackStack() }
                         )
