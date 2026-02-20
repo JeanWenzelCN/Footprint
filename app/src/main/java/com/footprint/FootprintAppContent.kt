@@ -299,6 +299,9 @@ fun FootprintApp() {
                                 artAuthorName = uiState.artAuthorName,
                                 artFontName = uiState.artFontName,
                                 artColorStyle = uiState.artColorStyle,
+                                artTextColor = uiState.artTextColor,
+                                artTextItalic = uiState.artTextItalic,
+                                artTextBorder = uiState.artTextBorder,
                                 onArtUpdate = viewModel::updateArtSettings,
                                 onGenerativeArt = { navController.navigate("art_studio") },
                                 onBack = { navController.popBackStack() }
@@ -393,6 +396,7 @@ fun FootprintApp() {
                                             latitude = payload.latitude,
                                             longitude = payload.longitude,
                                             icon = payload.icon,
+                                            weather = payload.weather,
                                             photos = payload.photos
                                     )
                             viewModel.updateFootprint(updatedEntry)
@@ -412,7 +416,8 @@ fun FootprintApp() {
                                     date = payload.date,
                                     latitude = payload.latitude,
                                     longitude = payload.longitude,
-                                    icon = payload.icon
+                                    icon = payload.icon,
+                                    weather = payload.weather
                             )
                         }
                         showEntryDialog = false

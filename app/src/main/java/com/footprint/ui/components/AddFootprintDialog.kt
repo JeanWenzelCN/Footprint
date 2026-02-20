@@ -1,13 +1,23 @@
-package com.footprint.ui.components
+﻿package com.footprint.ui.components
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.footprint.data.model.Mood
 import com.footprint.service.LocationTrackingService
+import com.footprint.ui.components.weather.HolographicWeatherIcon
+import com.footprint.ui.components.weather.WeatherType
+import com.footprint.ui.components.weather.WeatherCategory
 import com.footprint.utils.AIStoryGenerator
 import com.footprint.utils.ImageUtils
 import java.time.Instant
@@ -52,6 +65,7 @@ fun AddFootprintDialog(
         var distance by remember { mutableStateOf(initialEntry?.distanceKm?.toString() ?: "5") }
         var energy by remember { mutableStateOf(initialEntry?.energyLevel?.toFloat() ?: 6f) }
         var mood by remember { mutableStateOf(initialEntry?.mood ?: Mood.EXCITED) }
+        var selectedWeather by remember { mutableStateOf<String?>(initialEntry?.weather) }
         var selectedIcon by remember { mutableStateOf(initialEntry?.icon ?: "LocationOn") }
         var photoPaths by remember { mutableStateOf(initialEntry?.photos ?: emptyList<String>()) }
 
@@ -119,9 +133,21 @@ fun AddFootprintDialog(
                 }
                         ?: LocalDate.now()
 
+        val selectedWeatherType =
+                remember(selectedWeather) {
+                        WeatherType.values().find { it.name == selectedWeather }
+                }
+        val backgroundColorTint by
+                animateColorAsState(
+                        targetValue = selectedWeatherType?.color?.copy(alpha = 0.08f)
+                                        ?: MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+                        animationSpec = tween(1000)
+                )
+
         androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
                 LiquidGlassCard(
                         shape = RoundedCornerShape(28.dp),
+                        backgroundColor = backgroundColorTint,
                         modifier = Modifier.fillMaxWidth().padding(8.dp).heightIn(max = 600.dp)
                 ) {
                         Column(
@@ -206,6 +232,20 @@ fun AddFootprintDialog(
                                                         }
                                                 }
                                         }
+                                }
+
+                                // Weather Carousel
+                                Column {
+                                        Text(
+                                                "天气胶囊",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Spacer(Modifier.height(8.dp))
+                                        WeatherCarousel(
+                                                selectedWeather = selectedWeather,
+                                                onWeatherSelected = { selectedWeather = it.name }
+                                        )
                                 }
 
                                 // Photo Picker
@@ -363,6 +403,86 @@ fun AddFootprintDialog(
                                         }
                                 }
 
+                                // Stat Controls: Distance, Energy, Mood
+                                Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        // Distance
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            HolographicMileageIcon(
+                                                distanceKm = distance.toDoubleOrNull() ?: 0.0,
+                                                size = 48.dp
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = distance,
+                                                onValueChange = { distance = it },
+                                                label = { Text("里程 (KM)") },
+                                                modifier = Modifier.width(100.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                singleLine = true
+                                            )
+                                        }
+
+                                        // Energy
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            HolographicEnergyIcon(
+                                                energyLevel = energy.toInt(),
+                                                size = 48.dp
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(
+                                                "能量: ${energy.toInt()}",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            Slider(
+                                                value = energy,
+                                                onValueChange = { energy = it },
+                                                valueRange = 1f..10f,
+                                                steps = 8,
+                                                modifier = Modifier.width(100.dp)
+                                            )
+                                        }
+
+                                        // Mood
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            HolographicMoodIcon(
+                                                mood = mood,
+                                                size = 48.dp
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            var expandedMood by remember { mutableStateOf(false) }
+                                            ExposedDropdownMenuBox(
+                                                expanded = expandedMood,
+                                                onExpandedChange = { expandedMood = !expandedMood }
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = mood.label,
+                                                    onValueChange = {},
+                                                    readOnly = true,
+                                                    label = { Text("心情") },
+                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMood) },
+                                                    modifier = Modifier.menuAnchor().width(100.dp)
+                                                )
+                                                ExposedDropdownMenu(
+                                                    expanded = expandedMood,
+                                                    onDismissRequest = { expandedMood = false }
+                                                ) {
+                                                    Mood.values().forEach { m ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(m.label) },
+                                                            onClick = {
+                                                                mood = m
+                                                                expandedMood = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                }
+
                                 OutlinedTextField(
                                         value = location,
                                         onValueChange = { location = it },
@@ -423,6 +543,7 @@ fun AddFootprintDialog(
                                                                 date = selectedDate,
                                                                 energy = energy.toInt(),
                                                                 icon = selectedIcon,
+                                                                weather = selectedWeather,
                                                                 latitude = initialEntry?.latitude
                                                                                 ?: currentLocation
                                                                                         ?.latitude,
@@ -451,6 +572,202 @@ data class FootprintDraft(
         val date: LocalDate,
         val energy: Int,
         val icon: String,
+        val weather: String? = null,
         val latitude: Double? = null,
         val longitude: Double? = null
 )
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.ui.components.weather.WeatherType) -> Unit) {
+        val listState = rememberLazyListState()
+        val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+        val context = LocalContext.current
+        val vibrator = remember {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vibratorManager =
+                                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as
+                                        VibratorManager
+                        vibratorManager.defaultVibrator
+                } else {
+                        @Suppress("DEPRECATION")
+                        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                }
+        }
+
+        val allWeathers = remember { com.footprint.ui.components.weather.WeatherType.values() }
+        val categories = remember { com.footprint.ui.components.weather.WeatherCategory.values() }
+        
+        var selectedCategory by remember { 
+            mutableStateOf(
+                selectedWeather?.let { wName -> allWeathers.find { it.name == wName }?.category } 
+                ?: categories.first()
+            ) 
+        }
+
+        val weathersInCategory = remember(selectedCategory) {
+            allWeathers.filter { it.category == selectedCategory }
+        }
+
+        // Setup initial scroll position based on selection or middle
+        val initialIndex = remember(selectedCategory) {
+                selectedWeather
+                        ?.let { weatherName -> weathersInCategory.indexOfFirst { it.name == weatherName } }
+                        ?.takeIf { it >= 0 }
+                        ?: (Int.MAX_VALUE / 2) // Middle of infinitely scrolling list
+        }
+
+        LaunchedEffect(selectedCategory) {
+                if (selectedWeather == null || allWeathers.find { it.name == selectedWeather }?.category != selectedCategory) {
+                        // Pre-select first item in new category if the current weather doesn't match
+                        val first = weathersInCategory.firstOrNull()
+                        if (first != null) {
+                            onWeatherSelected(first)
+                        }
+                        listState.scrollToItem(Int.MAX_VALUE / 2)
+                } else {
+                        listState.scrollToItem(initialIndex)
+                }
+        }
+
+        // Determine the currently focused item and trigger haptics
+        LaunchedEffect(listState.isScrollInProgress, selectedCategory) {
+                if (!listState.isScrollInProgress) {
+                        // After settling from a scroll, find center item
+                        val layoutInfo = listState.layoutInfo
+                        val visibleItemsInfo = layoutInfo.visibleItemsInfo
+                        if (visibleItemsInfo.isNotEmpty() && weathersInCategory.isNotEmpty()) {
+                                val viewportCenter =
+                                        layoutInfo.viewportStartOffset +
+                                                (layoutInfo.viewportEndOffset -
+                                                        layoutInfo.viewportStartOffset) / 2
+                                val closestItem =
+                                        visibleItemsInfo.minByOrNull {
+                                                Math.abs(it.offset + (it.size / 2) - viewportCenter)
+                                        }
+                                closestItem?.let {
+                                        val actualIndex = it.index % weathersInCategory.size
+                                        val activatedWeather = weathersInCategory[actualIndex]
+                                        if (selectedWeather != activatedWeather.name) {
+                                                onWeatherSelected(activatedWeather)
+
+                                                // Haptic Sync custom vibrations
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                        when (activatedWeather.category) {
+                                                                com.footprint.ui.components.weather.WeatherCategory.EXTREME -> {
+                                                                        vibrator.vibrate(VibrationEffect.createOneShot(50, 255))
+                                                                }
+                                                                com.footprint.ui.components.weather.WeatherCategory.SNOW_ICE -> {
+                                                                        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 80, 0, 80), -1))
+                                                                }
+                                                                else -> {
+                                                                        vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+                                                                }
+                                                        }
+                                                } else {
+                                                        @Suppress("DEPRECATION")
+                                                        vibrator.vibrate(20)
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+                // Tier 1: Category Selector
+                ScrollableTabRow(
+                        selectedTabIndex = categories.indexOf(selectedCategory),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        containerColor = Color.Transparent,
+                        divider = {}, // Remove default divider
+                        edgePadding = 16.dp // Tidy padding
+                ) {
+                        categories.forEachIndexed { index, category ->
+                                Tab(
+                                        selected = selectedCategory == category,
+                                        onClick = { selectedCategory = category },
+                                        text = {
+                                                Text(
+                                                        text = category.title,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = if (selectedCategory == category) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                        }
+                                )
+                        }
+                }
+
+                // Tier 2: Weather Carousel
+                Box(
+                        modifier =
+                                Modifier.fillMaxWidth()
+                                        .height(100.dp)
+                                        .background(
+                                                Color.Black.copy(alpha = 0.05f),
+                                                RoundedCornerShape(16.dp)
+                                        ),
+                        contentAlignment = Alignment.Center
+                ) {
+                        // Focus indicator bracket
+                        Box(
+                                modifier =
+                                        Modifier.size(80.dp)
+                                                .border(
+                                                        1.dp,
+                                                        MaterialTheme.colorScheme.primary.copy(
+                                                                alpha = 0.5f
+                                                        ),
+                                                        RoundedCornerShape(20.dp)
+                                                )
+                        )
+
+                        LazyRow(
+                                state = listState,
+                                flingBehavior = flingBehavior,
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding =
+                                        PaddingValues(
+                                                horizontal = 140.dp
+                                        ), // Adjust based on exact screen size for perfect centering
+                                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                        ) {
+                                if (weathersInCategory.isNotEmpty()) {
+                                        items(count = Int.MAX_VALUE) { index ->
+                                                val actualIndex = index % weathersInCategory.size
+                                                val weather = weathersInCategory[actualIndex]
+                                                val isSelected = weather.name == selectedWeather
+        
+                                                Column(
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        modifier =
+                                                                Modifier.clickable {
+                                                                        onWeatherSelected(weather)
+                                                                }
+                                                ) {
+                                                        HolographicWeatherIcon(
+                                                                type = weather,
+                                                                isActive = isSelected,
+                                                                size = if (isSelected) 64.dp else 48.dp
+                                                        )
+                                                        Spacer(Modifier.height(8.dp))
+                                                        Text(
+                                                                weather.label,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color =
+                                                                        if (isSelected)
+                                                                                MaterialTheme.colorScheme.onSurface
+                                                                        else
+                                                                                MaterialTheme.colorScheme
+                                                                                        .onSurfaceVariant.copy(
+                                                                                        alpha = 0.5f
+                                                                                )
+                                                        )
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+}

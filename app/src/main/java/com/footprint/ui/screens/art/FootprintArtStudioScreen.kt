@@ -197,6 +197,9 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                         artName = uiState.artAuthorName,
                         artFont = uiState.artFontName,
                         artColor = selectedColor,
+                        textColor = uiState.artTextColor,
+                        isItalic = uiState.artTextItalic,
+                        hasBorder = uiState.artTextBorder,
                         modifier = Modifier.fillMaxSize()
                 )
 
@@ -253,6 +256,39 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                         },
                                         layout = selectedLayout,
                                         onLayoutChange = { selectedLayout = it },
+                                        textColor = uiState.artTextColor,
+                                        onTextColorChange = {
+                                                viewModel.updateArtSettings(
+                                                        uiState.artAuthorName,
+                                                        uiState.artFontName,
+                                                        uiState.artColorStyle,
+                                                        it,
+                                                        uiState.artTextItalic,
+                                                        uiState.artTextBorder
+                                                )
+                                        },
+                                        isItalic = uiState.artTextItalic,
+                                        onItalicChange = {
+                                                viewModel.updateArtSettings(
+                                                        uiState.artAuthorName,
+                                                        uiState.artFontName,
+                                                        uiState.artColorStyle,
+                                                        uiState.artTextColor,
+                                                        it,
+                                                        uiState.artTextBorder
+                                                )
+                                        },
+                                        hasBorder = uiState.artTextBorder,
+                                        onBorderChange = {
+                                                viewModel.updateArtSettings(
+                                                        uiState.artAuthorName,
+                                                        uiState.artFontName,
+                                                        uiState.artColorStyle,
+                                                        uiState.artTextColor,
+                                                        uiState.artTextItalic,
+                                                        it
+                                                )
+                                        },
                                         accentColor = selectedColor
                                 )
                         }
@@ -391,16 +427,77 @@ fun ArtLayoutOverlay(
         artName: String,
         artFont: String,
         artColor: Color,
+        textColor: String,
+        isItalic: Boolean,
+        hasBorder: Boolean,
         modifier: Modifier = Modifier
 ) {
+        val provider = remember {
+                androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
+                        providerAuthority = "com.google.android.gms.fonts",
+                        providerPackage = "com.google.android.gms",
+                        certificates = com.footprint.R.array.com_google_android_gms_fonts_certs
+                )
+        }
+
         val fontFamily =
-                when (artFont) {
-                        "Serif" -> androidx.compose.ui.text.font.FontFamily.Serif
-                        "Monospace" -> androidx.compose.ui.text.font.FontFamily.Monospace
-                        "MaShanZheng", "ZhiMangXing", "LongCang", "Cursive" ->
-                                androidx.compose.ui.text.font.FontFamily.Cursive
-                        else -> androidx.compose.ui.text.font.FontFamily.Default
+                remember(artFont) {
+                        when (artFont) {
+                                "Serif" -> androidx.compose.ui.text.font.FontFamily.Serif
+                                "Monospace" -> androidx.compose.ui.text.font.FontFamily.Monospace
+                                "Cursive" -> androidx.compose.ui.text.font.FontFamily.Cursive
+                                "MaShanZheng" ->
+                                        androidx.compose.ui.text.font.FontFamily(
+                                                androidx.compose.ui.text.googlefonts.Font(
+                                                        googleFont =
+                                                                androidx.compose.ui.text.googlefonts
+                                                                        .GoogleFont(
+                                                                                "Ma Shan Zheng"
+                                                                        ),
+                                                        fontProvider = provider,
+                                                        weight = FontWeight.Normal
+                                                )
+                                        )
+                                "ZhiMangXing" ->
+                                        androidx.compose.ui.text.font.FontFamily(
+                                                androidx.compose.ui.text.googlefonts.Font(
+                                                        googleFont =
+                                                                androidx.compose.ui.text.googlefonts
+                                                                        .GoogleFont(
+                                                                                "Zhi Mang Xing"
+                                                                        ),
+                                                        fontProvider = provider,
+                                                        weight = FontWeight.Normal
+                                                )
+                                        )
+                                "LongCang" ->
+                                        androidx.compose.ui.text.font.FontFamily(
+                                                androidx.compose.ui.text.googlefonts.Font(
+                                                        googleFont =
+                                                                androidx.compose.ui.text.googlefonts
+                                                                        .GoogleFont("Long Cang"),
+                                                        fontProvider = provider,
+                                                        weight = FontWeight.Normal
+                                                )
+                                        )
+                                else -> androidx.compose.ui.text.font.FontFamily.Default
+                        }
                 }
+
+        val actualTextColor =
+                when (textColor) {
+                        "Black" -> Color.Black
+                        "Gold" -> Color(0xFFFFCC00)
+                        "Deep Blue" -> Color(0xFF007AFF)
+                        "White" -> Color.White
+                        else -> Color.White
+                }
+
+        val fontStyle =
+                if (isItalic) androidx.compose.ui.text.font.FontStyle.Italic
+                else androidx.compose.ui.text.font.FontStyle.Normal
+
+        val isCalligraphy = artFont in listOf("MaShanZheng", "ZhiMangXing", "LongCang", "Cursive")
         when (layout) {
                 ArtLayout.FULLCREEN_A24 -> {
                         Box(
@@ -408,14 +505,55 @@ fun ArtLayoutOverlay(
                                 contentAlignment = Alignment.BottomCenter
                         ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                                artName.ifBlank { "漂泊的灵魂" },
-                                                style = MaterialTheme.typography.headlineLarge,
-                                                fontWeight = FontWeight.Black,
-                                                color = Color.White.copy(alpha = 0.9f),
-                                                letterSpacing = 4.sp,
-                                                fontFamily = fontFamily
-                                        )
+                                        val baseStyle =
+                                                MaterialTheme.typography.headlineLarge.copy(
+                                                        fontWeight =
+                                                                if (isCalligraphy) FontWeight.Normal
+                                                                else FontWeight.Black,
+                                                        letterSpacing = 4.sp
+                                                )
+                                        Box {
+                                                if (hasBorder) {
+                                                        Text(
+                                                                artName.ifBlank { "漂泊的灵魂" },
+                                                                style =
+                                                                        baseStyle.copy(
+                                                                                color =
+                                                                                        Color.Black
+                                                                                                .copy(
+                                                                                                        alpha =
+                                                                                                                0.8f
+                                                                                                ),
+                                                                                drawStyle =
+                                                                                        androidx.compose
+                                                                                                .ui
+                                                                                                .graphics
+                                                                                                .drawscope
+                                                                                                .Stroke(
+                                                                                                        width =
+                                                                                                                6f,
+                                                                                                        join =
+                                                                                                                androidx.compose
+                                                                                                                        .ui
+                                                                                                                        .graphics
+                                                                                                                        .StrokeJoin
+                                                                                                                        .Round
+                                                                                                )
+                                                                        ),
+                                                                fontFamily = fontFamily,
+                                                                fontStyle = fontStyle
+                                                        )
+                                                }
+                                                Text(
+                                                        artName.ifBlank { "漂泊的灵魂" },
+                                                        style =
+                                                                baseStyle.copy(
+                                                                        color = actualTextColor
+                                                                ),
+                                                        fontFamily = fontFamily,
+                                                        fontStyle = fontStyle
+                                                )
+                                        }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
                                                 "$dateRange • %.1f KM".format(distanceKm),
@@ -511,17 +649,54 @@ fun ArtLayoutOverlay(
                                                         .padding(bottom = 120.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                        Text(
-                                                artName.ifBlank { "My Journey" },
-                                                style = MaterialTheme.typography.headlineLarge,
-                                                color = artColor,
-                                                fontFamily =
-                                                        if (artFont == "Default")
-                                                                androidx.compose.ui.text.font
-                                                                        .FontFamily.Cursive
-                                                        else fontFamily,
-                                                fontWeight = FontWeight.Bold
-                                        )
+                                        val baseStyle =
+                                                MaterialTheme.typography.headlineLarge.copy(
+                                                        fontWeight =
+                                                                if (isCalligraphy) FontWeight.Normal
+                                                                else FontWeight.Bold
+                                                )
+                                        Box {
+                                                if (hasBorder) {
+                                                        Text(
+                                                                artName.ifBlank { "My Journey" },
+                                                                style =
+                                                                        baseStyle.copy(
+                                                                                color =
+                                                                                        Color.Black
+                                                                                                .copy(
+                                                                                                        alpha =
+                                                                                                                0.8f
+                                                                                                ),
+                                                                                drawStyle =
+                                                                                        androidx.compose
+                                                                                                .ui
+                                                                                                .graphics
+                                                                                                .drawscope
+                                                                                                .Stroke(
+                                                                                                        width =
+                                                                                                                6f,
+                                                                                                        join =
+                                                                                                                androidx.compose
+                                                                                                                        .ui
+                                                                                                                        .graphics
+                                                                                                                        .StrokeJoin
+                                                                                                                        .Round
+                                                                                                )
+                                                                        ),
+                                                                fontFamily = fontFamily,
+                                                                fontStyle = fontStyle
+                                                        )
+                                                }
+                                                Text(
+                                                        artName.ifBlank { "My Journey" },
+                                                        style =
+                                                                baseStyle.copy(
+                                                                        color = actualTextColor
+                                                                ),
+                                                        fontFamily = fontFamily,
+                                                        fontStyle = fontStyle
+                                                )
+                                        }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
                                                 "$dateRange • %.1f km".format(distanceKm),
@@ -542,15 +717,59 @@ fun ArtLayoutOverlay(
                                                         )
                                                         .padding(16.dp)
                                 ) {
-                                        Text(
-                                                artName.uppercase().ifBlank {
-                                                        "DATA VISUALIZATION"
-                                                },
-                                                color = artColor,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                letterSpacing = 2.sp,
-                                                fontFamily = fontFamily
-                                        )
+                                        val baseStyle =
+                                                MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight =
+                                                                if (isCalligraphy) FontWeight.Normal
+                                                                else FontWeight.Bold,
+                                                        letterSpacing = 2.sp
+                                                )
+                                        Box {
+                                                if (hasBorder) {
+                                                        Text(
+                                                                artName.uppercase().ifBlank {
+                                                                        "DATA VISUALIZATION"
+                                                                },
+                                                                style =
+                                                                        baseStyle.copy(
+                                                                                color =
+                                                                                        Color.Black
+                                                                                                .copy(
+                                                                                                        alpha =
+                                                                                                                0.8f
+                                                                                                ),
+                                                                                drawStyle =
+                                                                                        androidx.compose
+                                                                                                .ui
+                                                                                                .graphics
+                                                                                                .drawscope
+                                                                                                .Stroke(
+                                                                                                        width =
+                                                                                                                4f,
+                                                                                                        join =
+                                                                                                                androidx.compose
+                                                                                                                        .ui
+                                                                                                                        .graphics
+                                                                                                                        .StrokeJoin
+                                                                                                                        .Round
+                                                                                                )
+                                                                        ),
+                                                                fontFamily = fontFamily,
+                                                                fontStyle = fontStyle
+                                                        )
+                                                }
+                                                Text(
+                                                        artName.uppercase().ifBlank {
+                                                                "DATA VISUALIZATION"
+                                                        },
+                                                        style =
+                                                                baseStyle.copy(
+                                                                        color = actualTextColor
+                                                                ),
+                                                        fontFamily = fontFamily,
+                                                        fontStyle = fontStyle
+                                                )
+                                        }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
                                                 "DIST: %.2f KM".format(distanceKm),

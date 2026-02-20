@@ -52,7 +52,10 @@ fun SettingsScreen(
         artAuthorName: String,
         artFontName: String,
         artColorStyle: String,
-        onArtUpdate: (String, String, String) -> Unit,
+        artTextColor: String,
+        artTextItalic: Boolean,
+        artTextBorder: Boolean,
+        onArtUpdate: (String, String, String, String, Boolean, Boolean) -> Unit,
         onBack: () -> Unit
 ) {
         val context = LocalContext.current
@@ -277,7 +280,6 @@ fun SettingsScreen(
                                         )
                                 }
 
-
                                 // 艺术定制
                                 item { SettingsSectionTitle("艺术定制") }
                                 item {
@@ -285,6 +287,9 @@ fun SettingsScreen(
                                                 name = artAuthorName,
                                                 font = artFontName,
                                                 color = artColorStyle,
+                                                textColor = artTextColor,
+                                                isItalic = artTextItalic,
+                                                hasBorder = artTextBorder,
                                                 onUpdate = onArtUpdate,
                                                 onGenerativeArt = onGenerativeArt
                                         )
@@ -678,7 +683,10 @@ fun ArtSettingsEditor(
         name: String,
         font: String,
         color: String,
-        onUpdate: (String, String, String) -> Unit,
+        textColor: String,
+        isItalic: Boolean,
+        hasBorder: Boolean,
+        onUpdate: (String, String, String, String, Boolean, Boolean) -> Unit,
         onGenerativeArt: () -> Unit
 ) {
         var artName by remember { mutableStateOf(name) }
@@ -703,7 +711,7 @@ fun ArtSettingsEditor(
                                 value = artName,
                                 onValueChange = {
                                         artName = it
-                                        onUpdate(it, font, color)
+                                        onUpdate(it, font, color, textColor, isItalic, hasBorder)
                                 },
                                 label = { Text("艺术作品标题 (默认: 漂泊的灵魂)") },
                                 placeholder = { Text("漂泊的灵魂") },
@@ -719,6 +727,18 @@ fun ArtSettingsEditor(
                                 color = MaterialTheme.colorScheme.outline
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        val provider = remember {
+                                androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
+                                        providerAuthority = "com.google.android.gms.fonts",
+                                        providerPackage = "com.google.android.gms",
+                                        certificates =
+                                                com.footprint
+                                                        .R
+                                                        .array
+                                                        .com_google_android_gms_fonts_certs
+                                )
+                        }
+
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(7) { index ->
                                         val fonts =
@@ -732,10 +752,106 @@ fun ArtSettingsEditor(
                                                         "Cursive"
                                                 )
                                         val f = fonts[index]
+                                        val fontFamily =
+                                                remember(f) {
+                                                        when (f) {
+                                                                "Serif" ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily
+                                                                                .Serif
+                                                                "Monospace" ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily
+                                                                                .Monospace
+                                                                "Cursive" ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily
+                                                                                .Cursive
+                                                                "MaShanZheng" ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily(
+                                                                                androidx.compose.ui
+                                                                                        .text
+                                                                                        .googlefonts
+                                                                                        .Font(
+                                                                                                googleFont =
+                                                                                                        androidx.compose
+                                                                                                                .ui
+                                                                                                                .text
+                                                                                                                .googlefonts
+                                                                                                                .GoogleFont(
+                                                                                                                        "Ma Shan Zheng"
+                                                                                                                ),
+                                                                                                fontProvider =
+                                                                                                        provider,
+                                                                                                weight =
+                                                                                                        FontWeight
+                                                                                                                .Normal
+                                                                                        )
+                                                                        )
+                                                                "ZhiMangXing" ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily(
+                                                                                androidx.compose.ui
+                                                                                        .text
+                                                                                        .googlefonts
+                                                                                        .Font(
+                                                                                                googleFont =
+                                                                                                        androidx.compose
+                                                                                                                .ui
+                                                                                                                .text
+                                                                                                                .googlefonts
+                                                                                                                .GoogleFont(
+                                                                                                                        "Zhi Mang Xing"
+                                                                                                                ),
+                                                                                                fontProvider =
+                                                                                                        provider,
+                                                                                                weight =
+                                                                                                        FontWeight
+                                                                                                                .Normal
+                                                                                        )
+                                                                        )
+                                                                "LongCang" ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily(
+                                                                                androidx.compose.ui
+                                                                                        .text
+                                                                                        .googlefonts
+                                                                                        .Font(
+                                                                                                googleFont =
+                                                                                                        androidx.compose
+                                                                                                                .ui
+                                                                                                                .text
+                                                                                                                .googlefonts
+                                                                                                                .GoogleFont(
+                                                                                                                        "Long Cang"
+                                                                                                                ),
+                                                                                                fontProvider =
+                                                                                                        provider,
+                                                                                                weight =
+                                                                                                        FontWeight
+                                                                                                                .Normal
+                                                                                        )
+                                                                        )
+                                                                else ->
+                                                                        androidx.compose.ui.text
+                                                                                .font.FontFamily
+                                                                                .Default
+                                                        }
+                                                }
                                         FilterChip(
                                                 selected = font == f,
-                                                onClick = { onUpdate(artName, f, color) },
-                                                label = { Text(f) }
+                                                onClick = {
+                                                        onUpdate(
+                                                                artName,
+                                                                f,
+                                                                color,
+                                                                textColor,
+                                                                isItalic,
+                                                                hasBorder
+                                                        )
+                                                },
+                                                label = { Text(f, fontFamily = fontFamily) }
                                         )
                                 }
                         }
@@ -767,7 +883,10 @@ fun ArtSettingsEditor(
                                                                         onUpdate(
                                                                                 artName,
                                                                                 font,
-                                                                                cName
+                                                                                cName,
+                                                                                textColor,
+                                                                                isItalic,
+                                                                                hasBorder
                                                                         )
                                                                 }
                                                                 .padding(2.dp)
@@ -788,6 +907,113 @@ fun ArtSettingsEditor(
                                                 }
                                         }
                                 }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                                "文本颜色",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val textColors =
+                                listOf(
+                                        "White" to Color.White,
+                                        "Black" to Color.Black,
+                                        "Gold" to Color(0xFFFFCC00),
+                                        "Deep Blue" to Color(0xFF007AFF)
+                                )
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                textColors.forEach { (cName, cValue) ->
+                                        val selected = textColor == cName
+                                        val borderModifier =
+                                                if (cName == "White" || cName == "Black")
+                                                        Modifier.background(
+                                                                        Color.Gray.copy(
+                                                                                alpha = 0.3f
+                                                                        ),
+                                                                        CircleShape
+                                                                )
+                                                                .padding(2.dp)
+                                                else Modifier
+
+                                        Box(
+                                                modifier =
+                                                        Modifier.size(40.dp)
+                                                                .clip(CircleShape)
+                                                                .then(borderModifier)
+                                                                .background(cValue)
+                                                                .clickable {
+                                                                        onUpdate(
+                                                                                artName,
+                                                                                font,
+                                                                                color,
+                                                                                cName,
+                                                                                isItalic,
+                                                                                hasBorder
+                                                                        )
+                                                                }
+                                                                .padding(2.dp)
+                                        ) {
+                                                if (selected) {
+                                                        Icon(
+                                                                Icons.Default.Check,
+                                                                null,
+                                                                tint =
+                                                                        if (cName == "White" ||
+                                                                                        cName ==
+                                                                                                "Gold"
+                                                                        )
+                                                                                Color.Black
+                                                                        else Color.White,
+                                                                modifier =
+                                                                        Modifier.align(
+                                                                                Alignment.Center
+                                                                        )
+                                                        )
+                                                }
+                                        }
+                                }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                                "文本效果",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                FilterChip(
+                                        selected = isItalic,
+                                        onClick = {
+                                                onUpdate(
+                                                        artName,
+                                                        font,
+                                                        color,
+                                                        textColor,
+                                                        !isItalic,
+                                                        hasBorder
+                                                )
+                                        },
+                                        label = { Text("斜体 (Italic)") }
+                                )
+                                FilterChip(
+                                        selected = hasBorder,
+                                        onClick = {
+                                                onUpdate(
+                                                        artName,
+                                                        font,
+                                                        color,
+                                                        textColor,
+                                                        isItalic,
+                                                        !hasBorder
+                                                )
+                                        },
+                                        label = { Text("黑边 (Black Border)") }
+                                )
                         }
                 }
         }
