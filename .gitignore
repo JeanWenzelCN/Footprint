@@ -30,16 +30,14 @@ google-services.json
 secrets.xml
 
 # Log files
+*.txt
 *.log
 
 # Gradle
 .gradle/
 build/
+.tmp_gradle_home/
 
 # Kotlin
 /bin/
 /gen/
-
-# Build logs
-build_output.txt
-build_log.txt
