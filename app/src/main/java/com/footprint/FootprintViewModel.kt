@@ -59,6 +59,9 @@ class FootprintViewModel(
     private val artAuthorName = MutableStateFlow(preferenceManager.artAuthorName)
     private val artFontName = MutableStateFlow(preferenceManager.artFontName)
     private val artColorStyle = MutableStateFlow(preferenceManager.artColorStyle)
+    private val artTextColor = MutableStateFlow(preferenceManager.artTextColor)
+    private val artTextItalic = MutableStateFlow(preferenceManager.artTextItalic)
+    private val artTextBorder = MutableStateFlow(preferenceManager.artTextBorder)
     private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
     val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
@@ -91,7 +94,10 @@ class FootprintViewModel(
             val haptic: Boolean,
             val artName: String,
             val artFont: String,
-            val artColor: String
+            val artColor: String,
+            val artTextColor: String,
+            val artTextItalic: Boolean,
+            val artTextBorder: Boolean
     )
 
     // 强类型合并流
@@ -116,13 +122,22 @@ class FootprintViewModel(
     private val userFlow =
             combine(nickname, avatarId, hapticFeedback) { nk, av, haptic -> Triple(nk, av, haptic) }
 
-    private val artFlow =
+    private val artBaseFlow =
             combine(artAuthorName, artFontName, artColorStyle) { name, font, color ->
                 Triple(name, font, color)
             }
 
+    private val artTextFlow =
+            combine(artTextColor, artTextItalic, artTextBorder) { color, italic, border ->
+                Triple(color, italic, border)
+            }
+
     private val prefsFlow: Flow<PrefsGroup> =
-            combine(appearanceFlow, userFlow, artFlow) { appearance, user, art ->
+            combine(appearanceFlow, userFlow, artBaseFlow, artTextFlow) {
+                    appearance,
+                    user,
+                    artBase,
+                    artText ->
                 PrefsGroup(
                         theme = appearance.first,
                         style = appearance.second,
@@ -130,9 +145,12 @@ class FootprintViewModel(
                         nk = user.first,
                         av = user.second,
                         haptic = user.third,
-                        artName = art.first,
-                        artFont = art.second,
-                        artColor = art.third
+                        artName = artBase.first,
+                        artFont = artBase.second,
+                        artColor = artBase.third,
+                        artTextColor = artText.first,
+                        artTextItalic = artText.second,
+                        artTextBorder = artText.third
                 )
             }
 
@@ -209,6 +227,9 @@ class FootprintViewModel(
                                 artAuthorName = prefs.artName,
                                 artFontName = prefs.artFont,
                                 artColorStyle = prefs.artColor,
+                                artTextColor = prefs.artTextColor,
+                                artTextItalic = prefs.artTextItalic,
+                                artTextBorder = prefs.artTextBorder,
                                 randomMemory = randomMemory,
                                 memoryQuote = memoryQuote,
                                 isLoading = false
@@ -223,7 +244,10 @@ class FootprintViewModel(
                                             themeStyle = preferenceManager.themeStyle,
                                             artAuthorName = preferenceManager.artAuthorName,
                                             artFontName = preferenceManager.artFontName,
-                                            artColorStyle = preferenceManager.artColorStyle
+                                            artColorStyle = preferenceManager.artColorStyle,
+                                            artTextColor = preferenceManager.artTextColor,
+                                            artTextItalic = preferenceManager.artTextItalic,
+                                            artTextBorder = preferenceManager.artTextBorder
                                     )
                     )
 
@@ -248,13 +272,27 @@ class FootprintViewModel(
         preferenceManager.hapticFeedbackEnabled = enabled
     }
 
-    fun updateArtSettings(name: String, font: String, color: String) {
+    fun updateArtSettings(
+            name: String,
+            font: String,
+            color: String,
+            textColor: String,
+            italic: Boolean,
+            border: Boolean
+    ) {
         artAuthorName.value = name
         artFontName.value = font
         artColorStyle.value = color
+        artTextColor.value = textColor
+        artTextItalic.value = italic
+        artTextBorder.value = border
+
         preferenceManager.artAuthorName = name
         preferenceManager.artFontName = font
         preferenceManager.artColorStyle = color
+        preferenceManager.artTextColor = textColor
+        preferenceManager.artTextItalic = italic
+        preferenceManager.artTextBorder = border
     }
 
     fun updateAvatar(uri: Uri) {
@@ -563,7 +601,8 @@ class FootprintViewModel(
             date: LocalDate,
             latitude: Double? = null,
             longitude: Double? = null,
-            icon: String = "LocationOn"
+            icon: String = "LocationOn",
+            weather: String? = null
     ) {
         viewModelScope.launch {
             val entry =
@@ -579,7 +618,8 @@ class FootprintViewModel(
                             happenedOn = date,
                             latitude = latitude,
                             longitude = longitude,
-                            icon = icon
+                            icon = icon,
+                            weather = weather
                     )
             repository.saveEntry(entry)
         }

@@ -75,4 +75,16 @@ class PreferenceManager(context: Context) {
     var artColorStyle: String
         get() = prefs.getString("art_color_style", "Neon Green") ?: "Neon Green"
         set(value) = prefs.edit().putString("art_color_style", value).apply()
+
+    var artTextColor: String
+        get() = prefs.getString("art_text_color", "White") ?: "White"
+        set(value) = prefs.edit().putString("art_text_color", value).apply()
+
+    var artTextItalic: Boolean
+        get() = prefs.getBoolean("art_text_italic", false)
+        set(value) = prefs.edit().putBoolean("art_text_italic", value).apply()
+
+    var artTextBorder: Boolean
+        get() = prefs.getBoolean("art_text_border", false)
+        set(value) = prefs.edit().putBoolean("art_text_border", value).apply()
 }

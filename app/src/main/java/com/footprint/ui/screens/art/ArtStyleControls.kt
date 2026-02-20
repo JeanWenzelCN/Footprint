@@ -19,10 +19,16 @@ fun ArtStyleControls(
         startDate: java.time.LocalDate,
         endDate: java.time.LocalDate,
         onStartDateClick: () -> Unit,
-    onEndDateClick: () -> Unit,
-    layout: ArtLayout,
-    onLayoutChange: (ArtLayout) -> Unit,
-    accentColor: Color
+        onEndDateClick: () -> Unit,
+        layout: ArtLayout,
+        onLayoutChange: (ArtLayout) -> Unit,
+        textColor: String,
+        onTextColorChange: (String) -> Unit,
+        isItalic: Boolean,
+        onItalicChange: (Boolean) -> Unit,
+        hasBorder: Boolean,
+        onBorderChange: (Boolean) -> Unit,
+        accentColor: Color
 ) {
     com.footprint.ui.components.LiquidGlassCard(
             backgroundColor = Color.Black.copy(alpha = 0.6f),
@@ -108,6 +114,55 @@ fun ArtStyleControls(
                                         )
                         )
                     }
+                }
+            }
+
+            // Typography modifiers
+            Column {
+                Text("字体颜色", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val colors = listOf("White", "Black", "Gold", "Deep Blue")
+                    colors.forEach { cName ->
+                        FilterChip(
+                                selected = textColor == cName,
+                                onClick = { onTextColorChange(cName) },
+                                label = { Text(cName) },
+                                colors =
+                                        FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = accentColor,
+                                                labelColor = Color.White,
+                                                selectedLabelColor = Color.Black
+                                        )
+                        )
+                    }
+                }
+            }
+
+            Column {
+                Text("字体效果", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                            selected = isItalic,
+                            onClick = { onItalicChange(!isItalic) },
+                            label = { Text("斜体 (Italic)") },
+                            colors =
+                                    FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = accentColor,
+                                            labelColor = Color.White,
+                                            selectedLabelColor = Color.Black
+                                    )
+                    )
+                    FilterChip(
+                            selected = hasBorder,
+                            onClick = { onBorderChange(!hasBorder) },
+                            label = { Text("黑边 (Black Border)") },
+                            colors =
+                                    FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = accentColor,
+                                            labelColor = Color.White,
+                                            selectedLabelColor = Color.Black
+                                    )
+                    )
                 }
             }
 

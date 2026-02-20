@@ -31,6 +31,9 @@ data class FootprintUiState(
         val artAuthorName: String = "漂泊的灵魂",
         val artFontName: String = "Default",
         val artColorStyle: String = "Neon Green",
+        val artTextColor: String = "White",
+        val artTextItalic: Boolean = false,
+        val artTextBorder: Boolean = false,
         val randomMemory: FootprintEntry? = null,
         val memoryQuote: String? = null,
         val isLoading: Boolean = true
