@@ -277,56 +277,36 @@ fun MapScreen(
                                         ) { mv ->
                                                 mv.map.clear()
 
-                                                // Common: Draw Footprints (Standard Mode)
+                                                // 1. Real-time Tracking Path (Visible in all modes)
+                                                if (trackingPath.isNotEmpty()) {
+                                                        val points =
+                                                                trackingPath.map {
+                                                                        LatLng(
+                                                                                it.latitude,
+                                                                                it.longitude
+                                                                        )
+                                                                }
+                                                        mv.map.addPolyline(
+                                                                PolylineOptions()
+                                                                        .addAll(points)
+                                                                        .width(18f)
+                                                                        .color(android.graphics.Color.parseColor("#00FF9F"))
+                                                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                                                        .zIndex(10f)
+                                                        )
+                                                }
+
+                                                // 2. Standard Mode: Footprint Markers
                                                 if (mapMode == MapMode.STANDARD) {
-                                                        if (trackingPath.isNotEmpty()) {
-                                                                val points =
-                                                                        trackingPath.map {
-                                                                                LatLng(
-                                                                                        it.latitude,
-                                                                                        it.longitude
-                                                                                )
-                                                                        }
-                                                                mv.map.addPolyline(
-                                                                        PolylineOptions()
-                                                                                .addAll(points)
-                                                                                .width(18f)
-                                                                                .color(
-                                                                                        android.graphics
-                                                                                                .Color
-                                                                                                .parseColor(
-                                                                                                        "#00FF9F"
-                                                                                                )
-                                                                                )
-                                                                )
-                                                        }
                                                         entries.forEach { entry ->
-                                                                if (entry.latitude != null &&
-                                                                                entry.longitude !=
-                                                                                        null
-                                                                ) {
+                                                                if (entry.latitude != null && entry.longitude != null) {
                                                                         mv.map.addMarker(
                                                                                 MarkerOptions()
-                                                                                        .position(
-                                                                                                LatLng(
-                                                                                                        entry.latitude,
-                                                                                                        entry.longitude
-                                                                                                )
-                                                                                        )
-                                                                                        .title(
-                                                                                                entry.title
-                                                                                        )
-                                                                                        .snippet(
-                                                                                                entry.id
-                                                                                                        .toString()
-                                                                                        )
-                                                                                        .icon(
-                                                                                                BitmapDescriptorFactory
-                                                                                                        .defaultMarker(
-                                                                                                                BitmapDescriptorFactory
-                                                                                                                        .HUE_AZURE
-                                                                                                        )
-                                                                                        )
+                                                                                        .position(LatLng(entry.latitude, entry.longitude))
+                                                                                        .title(entry.title)
+                                                                                        .snippet(entry.id.toString())
+                                                                                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
                                                                         )
                                                                 }
                                                         }

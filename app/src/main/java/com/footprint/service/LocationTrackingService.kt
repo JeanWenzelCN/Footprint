@@ -45,7 +45,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         // Thresholds
         private const val MAX_SPEED_THRESHOLD_MS =
                 50.0f // 50 m/s = 180 km/h (Limit for driving/train, rejects teleport)
-        private const val MIN_DISTANCE_THRESHOLD_M = 5.0f // Ignore drift < 5m
+        private const val MIN_DISTANCE_THRESHOLD_M = 0.5f // Capture even very short movements
         private const val MIN_VALID_LATLNG = 0.1 // Reject 0.0 or near 0.0
 
         private val _sharedIsTracking = MutableStateFlow(false)
@@ -194,115 +194,77 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onLocationChanged(location: AMapLocation?) {
         if (location != null) {
             if (location.errorCode == 0) {
-                // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
+                // Filter 0,0 and Low Accuracy
                 if (abs(location.latitude) > MIN_VALID_LATLNG &&
-                                abs(location.longitude) > MIN_VALID_LATLNG &&
-                                location.accuracy < 200
+                    abs(location.longitude) > MIN_VALID_LATLNG &&
+                    location.accuracy < 500
                 ) {
                     val clonedLocation = location.clone()
                     _sharedCurrentLocation.value = clonedLocation
-                    _locationError.value = null // Clear previous errors
+                    _locationError.value = null
+
                     if (_sharedIsTracking.value) {
-
                         var isValidPoint = false
-
+                        
                         _lastLocation?.let { lastLoc ->
                             val distance = location.distanceTo(lastLoc)
                             val timeDeltaMs = location.time - lastLoc.time
                             val timeDeltaSec = timeDeltaMs / 1000.0
-
-                            // Speed Sanity Check (Anti-Teleport)
-                            // If timeDelta is too small (e.g. same second), assume duplication or
-                            // glitch unless distance is 0
-                            var speed = 0.0
+                            
                             if (timeDeltaSec > 0) {
-                                speed = distance / timeDeltaSec
-                            }
-
-                            if (distance > 0 && timeDeltaSec <= 0) {
-                                Log.w(
-                                        "FootprintLoc",
-                                        "Duplicate timestamp or negative time. Ignoring."
-                                )
-                                return // Ignore this point
-                            }
-
-                            // Filter:
-                            // 1. Teleport glitch: Speed > MAX (unless it's the very first points
-                            // initializing)
-                            // 2. Drift: Distance < MIN
-                            if (speed > MAX_SPEED_THRESHOLD_MS) {
-                                Log.w(
-                                        "FootprintLoc",
-                                        "Ignored glitch: $distance m in $timeDeltaSec s ($speed m/s)"
-                                )
-                            } else if (distance < MIN_DISTANCE_THRESHOLD_M) {
-                                // Too close, probably drift
-                                // Log.v("FootprintLoc", "Ignored drift: $distance m")
-                            } else {
-                                // Valid movement
-                                isValidPoint = true
-                                _totalDistanceTraveled.value += distance
-                                Log.d(
-                                        "FootprintLoc",
-                                        "Distance added: $distance, Total: ${_totalDistanceTraveled.value}"
-                                )
-                            }
-                        }
-                                ?: run {
-                                    // First point
+                                val speed = distance / timeDeltaSec
+                                if (speed > MAX_SPEED_THRESHOLD_MS) {
+                                    Log.w("FootprintLoc", "Ignored glitch: $distance m in $timeDeltaSec s ($speed m/s)")
+                                } else if (distance < MIN_DISTANCE_THRESHOLD_M) {
+                                    // Too close
+                                } else {
                                     isValidPoint = true
+                                    _totalDistanceTraveled.value += distance
                                 }
+                            }
+                        } ?: run {
+                            // First point
+                            isValidPoint = true
+                        }
 
                         if (isValidPoint) {
-                            // 持久化存储 (DB)
+                            // Persist to DB
                             serviceScope.launch {
                                 try {
-                                    val app =
-                                            applicationContext as com.footprint.FootprintApplication
+                                    val app = applicationContext as com.footprint.FootprintApplication
                                     app.repository.saveTrackPoint(clonedLocation)
                                 } catch (e: Exception) {
                                     Log.e("FootprintLoc", "Failed to save point: ${e.message}")
                                 }
                             }
-                            
-                            // 更新实时路径
-                            _sharedTrackingPath.value = _sharedTrackingPath.value + clonedLocation
-                            
-                            _lastLocation = clonedLocation // Update last location ONLY if valid
 
-                            // Adaptive Interval: Adjust frequency based on speed (m/s)
+                            // Update Real-time Path
+                            _sharedTrackingPath.value = _sharedTrackingPath.value + clonedLocation
+                            _lastLocation = clonedLocation
+
+                            // Adaptive Interval
                             updateAdaptiveInterval(location.speed)
 
-                            // Update notification with all stats
-                            val notification =
-                                    buildNotification(
-                                            _totalDistanceTraveled.value.toInt(),
-                                            location.speed,
-                                            location.address ?: ""
-                                    )
+                            // Update Notification
+                            val notification = buildNotification(
+                                _totalDistanceTraveled.value.toInt(),
+                                location.speed,
+                                location.address ?: ""
+                            )
                             val manager = getSystemService(NotificationManager::class.java)
                             manager.notify(NOTIFICATION_ID, notification)
                         }
                     }
-                    Log.d(
-                            "FootprintLoc",
-                            "坐标获取成功: ${location.latitude}, ${location.longitude}, accuracy: ${location.accuracy}"
-                    )
+                    Log.d("FootprintLoc", "Location update success: ${location.latitude}, ${location.longitude}, acc: ${location.accuracy}")
                 }
             } else {
-                val errText = "定位错误: ${location.errorCode} - ${location.errorInfo}"
-                Log.e("FootprintLoc", errText)
-
-                // 仅针对需要用户干预的关键错误弹 Toast (7=Key鉴权失败, 12=缺权限)
-                // 忽略错误 10 (网络/GPS不稳定)，避免在弱网环境下频繁弹窗打扰用户
+                Log.e("FootprintLoc", "Location Error: ${location.errorCode} - ${location.errorInfo}")
                 if (location.errorCode == 7 || location.errorCode == 12) {
-                    val userMsg =
-                            when (location.errorCode) {
-                                7 -> "Key鉴权失败：请检查高德后台包名是否为 com.footprint"
-                                12 -> "缺少定位权限：请在设置中授予权限"
-                                else -> "未知定位错误: ${location.errorCode}"
-                            }
+                    val userMsg = when (location.errorCode) {
+                        7 -> "Key鉴权失败：请检查高德后台包名"
+                        12 -> "缺少定位权限：请在设置中授予"
+                        else -> "未知定位错误: ${location.errorCode}"
+                    }
                     _locationError.value = userMsg
                 }
             }
