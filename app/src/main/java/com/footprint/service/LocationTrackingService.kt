@@ -88,29 +88,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         repository = (application as com.footprint.FootprintApplication).repository
         initLocationClient()
 
-        serviceScope.launch {
-            val app = applicationContext as com.footprint.FootprintApplication
-            val startOfDay =
-                    java.time.LocalDate.now()
-                            .atStartOfDay(java.time.ZoneId.systemDefault())
-                            .toInstant()
-                            .toEpochMilli()
-
-            app.repository.getTrackPoints(startOfDay, Long.MAX_VALUE).collect { points ->
-                val locations =
-                        points.map { entity ->
-                            AMapLocation("gps").apply {
-                                latitude = entity.latitude
-                                longitude = entity.longitude
-                                speed = entity.speed
-                                accuracy = entity.accuracy
-                                altitude = entity.altitude
-                                time = entity.timestamp
-                            }
-                        }
-                _sharedTrackingPath.value = locations
-            }
-        }
+        // points are now loaded per-session or on demand, not all-at-once in onCreate
     }
 
     private fun initLocationClient() {
@@ -149,6 +127,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 _totalDistanceTraveled.value = 0.0f
                 _lastLocation = null
                 _sessionStartTime = System.currentTimeMillis()
+                _sharedTrackingPath.value = emptyList() // Reset path for new session
 
                 // Acquire WakeLock
                 val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -216,12 +195,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
         if (location != null) {
             if (location.errorCode == 0) {
                 // 彻底解决非洲 0,0 坐标问题：只有在经纬度有效且精度合理时才更新
-                // update: using abs to allow valid negative coordinates, but reject near-zero
                 if (abs(location.latitude) > MIN_VALID_LATLNG &&
                                 abs(location.longitude) > MIN_VALID_LATLNG &&
                                 location.accuracy < 200
                 ) {
-                    _sharedCurrentLocation.value = location
+                    val clonedLocation = location.clone()
+                    _sharedCurrentLocation.value = clonedLocation
                     _locationError.value = null // Clear previous errors
                     if (_sharedIsTracking.value) {
 
@@ -281,12 +260,16 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 try {
                                     val app =
                                             applicationContext as com.footprint.FootprintApplication
-                                    app.repository.saveTrackPoint(location)
+                                    app.repository.saveTrackPoint(clonedLocation)
                                 } catch (e: Exception) {
                                     Log.e("FootprintLoc", "Failed to save point: ${e.message}")
                                 }
                             }
-                            _lastLocation = location // Update last location ONLY if valid
+                            
+                            // 更新实时路径
+                            _sharedTrackingPath.value = _sharedTrackingPath.value + clonedLocation
+                            
+                            _lastLocation = clonedLocation // Update last location ONLY if valid
 
                             // Adaptive Interval: Adjust frequency based on speed (m/s)
                             updateAdaptiveInterval(location.speed)

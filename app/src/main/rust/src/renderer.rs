@@ -99,7 +99,7 @@ pub async fn render_map(
 
         // Fill background based on theme
         let bg_color = match theme_lower.as_str() {
-            "dark" | "void" => tiny_skia::Color::from_rgba8(27, 27, 27, 255),
+            "dark" | "void" | "satellite" => tiny_skia::Color::from_rgba8(27, 27, 27, 255),
             _ => tiny_skia::Color::from_rgba8(242, 242, 242, 255),
         };
         pixmap.fill(bg_color);

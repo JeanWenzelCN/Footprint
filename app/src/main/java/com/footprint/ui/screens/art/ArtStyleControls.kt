@@ -92,12 +92,14 @@ fun ArtStyleControls(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
+                val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd")
                 TextButton(onClick = onStartDateClick) {
-                    Text(startDate.toString(), color = accentColor)
+                    Text(startDate.format(dateFormatter), color = accentColor)
                 }
                 Text("-", color = Color.Gray)
                 TextButton(onClick = onEndDateClick) {
-                    Text(endDate.toString(), color = accentColor)
+                    val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd")
+                    Text(endDate.format(dateFormatter), color = accentColor)
                 }
             }
         }

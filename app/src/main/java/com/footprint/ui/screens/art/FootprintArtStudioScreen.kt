@@ -89,14 +89,15 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
         var endDate by remember { mutableStateOf(LocalDate.now()) }
         val startTimestamp =
                 remember(startDate) {
-                        LocalDateTime.of(startDate, LocalTime.MIN)
-                                .toInstant(ZoneOffset.UTC)
+                        startDate.atStartOfDay(java.time.ZoneId.systemDefault())
+                                .toInstant()
                                 .toEpochMilli()
                 }
         val endTimestamp =
                 remember(endDate) {
-                        LocalDateTime.of(endDate, LocalTime.MAX)
-                                .toInstant(ZoneOffset.UTC)
+                        endDate.atTime(java.time.LocalTime.MAX)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toInstant()
                                 .toEpochMilli()
                 }
 
@@ -330,7 +331,7 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 layout = selectedLayout,
                                 distanceKm = totalDistanceKm,
                                 dateRange =
-                                        "${startDate.year}.${startDate.monthValue} - ${endDate.year}.${endDate.monthValue}",
+                                        "${startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"))} - ${endDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"))}",
                                 artName = uiState.artAuthorName,
                                 artFont = uiState.artFontName,
                                 artColor = selectedColor,
@@ -482,42 +483,14 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                                                     ArtMapStyle.VOID -> "void"
                                                                                 }
 
-                                                                                val cValue =
-                                                                                        when (uiState.artColorStyle
-                                                                                        ) {
-                                                                                                "White" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .WHITE
-                                                                                                "Black" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .BLACK
-                                                                                                "Gold" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#FFD700"
-                                                                                                                )
-                                                                                                "Deep Blue" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#00008B"
-                                                                                                                )
-                                                                                                else ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#FF453A"
-                                                                                                                )
-                                                                                        }
-                                                                                val traceColorHex =
-                                                                                        String.format(
-                                                                                                "#%06X",
-                                                                                                0xFFFFFF and
-                                                                                                        cValue
-                                                                                        )
+                                                                                 val traceColorInt = when (uiState.artColorStyle) {
+                                                                                     "Deep Blue" -> android.graphics.Color.parseColor("#007AFF")
+                                                                                     "Cyber Pink" -> android.graphics.Color.parseColor("#FF2D55")
+                                                                                     "Neon Green" -> android.graphics.Color.parseColor("#00FF9F")
+                                                                                     "Gold" -> android.graphics.Color.parseColor("#FFCC00")
+                                                                                     else -> android.graphics.Color.parseColor("#FF453A")
+                                                                                 }
+                                                                                 val traceColorHex = String.format("#%06X", 0xFFFFFF and traceColorInt)
 
                                                                                 Thread {
                                                                                                 val statusCode =
@@ -682,17 +655,41 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                                                                                         bitmap.height -
                                                                                                                                 (180f *
                                                                                                                                         scale.toFloat())
-                                                                                                                canvas.drawText(
-                                                                                                                        uiState.artAuthorName,
-                                                                                                                        x,
-                                                                                                                        y,
-                                                                                                                        textPaint
-                                                                                                                )
+                                                                                canvas.drawText(uiState.artAuthorName, x, y, textPaint)
 
-                                                                                                                com.footprint
-                                                                                                                        .utils
-                                                                                                                        .ExportUtils
-                                                                                                                        .saveBitmapToGallery(
+                                                                                // Render Subtitle: Date Range · Distance
+                                                                                val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd")
+                                                                                val dateRangeStr = "${startDate.format(dateFormatter)} - ${endDate.format(dateFormatter)}"
+                                                                                
+                                                                                var totalMeters = 0.0
+                                                                                val floatRes = FloatArray(1)
+                                                                                for (i in 0 until tracePoints.size - 1) {
+                                                                                    android.location.Location.distanceBetween(
+                                                                                        tracePoints[i].latitude, tracePoints[i].longitude,
+                                                                                        tracePoints[i+1].latitude, tracePoints[i+1].longitude,
+                                                                                        floatRes
+                                                                                    )
+                                                                                    totalMeters += floatRes[0]
+                                                                                }
+                                                                                val distanceKmVal = String.format("%.0f", totalMeters / 1000.0)
+                                                                                val subtitleStr = "$dateRangeStr · ${distanceKmVal}km"
+
+                                                                                 val subtitlePaint = android.graphics.Paint().apply {
+                                                                                     color = textCValue
+                                                                                     alpha = 180 
+                                                                                     textSize = 48f * scale.toFloat()
+                                                                                     isAntiAlias = true
+                                                                                     typeface = customTypeface
+                                                                                 }
+                                                                                val subWidth = subtitlePaint.measureText(subtitleStr)
+                                                                                canvas.drawText(
+                                                                                    subtitleStr,
+                                                                                    (bitmap.width - subWidth) / 2f,
+                                                                                    y + (100f * scale.toFloat()), 
+                                                                                    subtitlePaint
+                                                                                )
+
+                                                                                com.footprint.utils.ExportUtils.saveBitmapToGallery(
                                                                                                                                 context,
                                                                                                                                 bitmap
                                                                                                                         )
@@ -906,10 +903,11 @@ fun ArtLayoutOverlay(
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                                "$dateRange • %.1f KM".format(distanceKm),
-                                                style = MaterialTheme.typography.titleMedium,
+                                                "$dateRange • %.2f KM".format(distanceKm),
+                                                style = MaterialTheme.typography.labelSmall,
                                                 color = Color.White.copy(alpha = 0.7f),
-                                                letterSpacing = 2.sp
+                                                letterSpacing = 1.sp,
+                                                fontFamily = fontFamily
                                         )
                                 }
                         }
@@ -1049,9 +1047,10 @@ fun ArtLayoutOverlay(
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                                "$dateRange • %.1f km".format(distanceKm),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = Color.Gray
+                                                "$dateRange • %.2f KM".format(distanceKm),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.Gray,
+                                                fontFamily = fontFamily
                                         )
                                 }
                         }
@@ -1122,25 +1121,15 @@ fun ArtLayoutOverlay(
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                                "DIST: %.2f KM".format(distanceKm),
+                                                "DATE: $dateRange • %.2f KM".format(distanceKm),
                                                 color = Color.White,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontFamily =
-                                                        androidx.compose.ui.text.font.FontFamily
-                                                                .Monospace
-                                        )
-                                        Text(
-                                                "DATE: $dateRange",
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontFamily =
-                                                        androidx.compose.ui.text.font.FontFamily
-                                                                .Monospace
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontFamily = fontFamily
                                         )
                                         Text(
                                                 "MODE: TRACKING",
                                                 color = Color.White,
-                                                style = MaterialTheme.typography.bodyMedium,
+                                                style = MaterialTheme.typography.labelSmall,
                                                 fontFamily =
                                                         androidx.compose.ui.text.font.FontFamily
                                                                 .Monospace

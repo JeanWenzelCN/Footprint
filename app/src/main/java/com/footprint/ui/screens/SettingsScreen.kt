@@ -345,7 +345,19 @@ fun SettingsScreen(
                                         LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
                                                 ListItem(
                                                         headlineContent = { Text("软件版本") },
-                                                        supportingContent = { Text("v2.7.0") },
+                                                        supportingContent = {
+                                                                val versionName = remember {
+                                                                        try {
+                                                                                context.packageManager.getPackageInfo(
+                                                                                        context.packageName,
+                                                                                        0
+                                                                                ).versionName
+                                                                        } catch (e: Exception) {
+                                                                                "2.9.0"
+                                                                        }
+                                                                }
+                                                                Text("v$versionName")
+                                                        },
                                                         leadingContent = {
                                                                 Icon(Icons.Default.Info, null)
                                                         },
