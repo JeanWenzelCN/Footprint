@@ -184,34 +184,61 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                 }
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                // 1. Base Map Layer
-                AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-
-                // 3. Layout Overlay
-                ArtLayoutOverlay(
-                        layout = selectedLayout,
-                        distanceKm = totalDistanceKm,
-                        dateRange =
-                                "${startDate.year}.${startDate.monthValue} - ${endDate.year}.${endDate.monthValue}",
-                        artName = uiState.artAuthorName,
-                        artFont = uiState.artFontName,
-                        artColor = selectedColor,
-                        textColor = uiState.artTextColor,
-                        isItalic = uiState.artTextItalic,
-                        hasBorder = uiState.artTextBorder,
-                        modifier = Modifier.fillMaxSize()
+        val scaffoldState =
+                androidx.compose.material3.rememberBottomSheetScaffoldState(
+                        bottomSheetState =
+                                androidx.compose.material3.rememberStandardBottomSheetState(
+                                        initialValue =
+                                                androidx.compose.material3.SheetValue
+                                                        .PartiallyExpanded
+                                )
                 )
 
-                // 4. UI Controls Overlay
-                if (showControls) {
-                        Column(
-                                modifier =
-                                        Modifier.align(Alignment.BottomCenter)
-                                                .fillMaxWidth()
-                                                .padding(16.dp)
-                        ) {
+        androidx.compose.material3.BottomSheetScaffold(
+                scaffoldState = scaffoldState,
+                sheetPeekHeight = 240.dp,
+                sheetContainerColor = Color.Black.copy(alpha = 0.6f),
+                sheetDragHandle = {
+                        androidx.compose.material3.BottomSheetDefaults.DragHandle(
+                                color = Color.White
+                        )
+                },
+                sheetContent = {
+                        if (showControls) {
                                 ArtStyleControls(
+                                        artName = uiState.artAuthorName,
+                                        onArtNameChange = {
+                                                viewModel.updateArtSettings(
+                                                        it,
+                                                        uiState.artFontName,
+                                                        uiState.artColorStyle,
+                                                        uiState.artTextColor,
+                                                        uiState.artTextItalic,
+                                                        uiState.artTextBorder
+                                                )
+                                        },
+                                        fontName = uiState.artFontName,
+                                        onFontNameChange = {
+                                                viewModel.updateArtSettings(
+                                                        uiState.artAuthorName,
+                                                        it,
+                                                        uiState.artColorStyle,
+                                                        uiState.artTextColor,
+                                                        uiState.artTextItalic,
+                                                        uiState.artTextBorder
+                                                )
+                                        },
+                                        coreColorName = uiState.artColorStyle,
+                                        onCoreColorNameChange = {
+                                                viewModel.updateArtSettings(
+                                                        uiState.artAuthorName,
+                                                        uiState.artFontName,
+                                                        it,
+                                                        uiState.artTextColor,
+                                                        uiState.artTextItalic,
+                                                        uiState.artTextBorder
+                                                )
+                                        },
                                         lineWeight = lineWeight,
                                         onLineWeightChange = { lineWeight = it },
                                         glowRadius = glowRadius,
@@ -293,126 +320,447 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 )
                         }
                 }
+        ) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        // 1. Base Map Layer
+                        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-                // Top Bar & Export Button
-                if (showControls) {
-                        Box(
-                                modifier =
-                                        Modifier.fillMaxSize()
-                                                .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-                        ) {
-                                SmallFloatingActionButton(
-                                        onClick = onBack,
-                                        modifier = Modifier.align(Alignment.TopStart),
-                                        containerColor = Color.Black.copy(alpha = 0.5f)
-                                ) {
-                                        Icon(
-                                                Icons.AutoMirrored.Filled.ArrowBack,
-                                                "Back",
-                                                tint = Color.White
-                                        )
-                                }
+                        // 3. Layout Overlay
+                        ArtLayoutOverlay(
+                                layout = selectedLayout,
+                                distanceKm = totalDistanceKm,
+                                dateRange =
+                                        "${startDate.year}.${startDate.monthValue} - ${endDate.year}.${endDate.monthValue}",
+                                artName = uiState.artAuthorName,
+                                artFont = uiState.artFontName,
+                                artColor = selectedColor,
+                                textColor = uiState.artTextColor,
+                                isItalic = uiState.artTextItalic,
+                                hasBorder = uiState.artTextBorder,
+                                modifier = Modifier.fillMaxSize()
+                        )
 
-                                ExtendedFloatingActionButton(
-                                        onClick = {
-                                                showControls = false
-                                                android.os.Handler(
-                                                                android.os.Looper.getMainLooper()
+                        // Top Bar & Export Button
+                        if (showControls) {
+                                Box(
+                                        modifier =
+                                                Modifier.fillMaxSize()
+                                                        .padding(
+                                                                top = 48.dp,
+                                                                start = 16.dp,
+                                                                end = 16.dp
                                                         )
-                                                        .postDelayed(
-                                                                {
-                                                                        val activity =
-                                                                                context as?
-                                                                                        android.app.Activity
-                                                                                        ?: (context as?
-                                                                                                        android.content.ContextWrapper)
-                                                                                                ?.baseContext as?
-                                                                                                android.app.Activity
-                                                                        activity?.let { act ->
-                                                                                if (android.os.Build
-                                                                                                .VERSION
-                                                                                                .SDK_INT >=
-                                                                                                android.os
-                                                                                                        .Build
-                                                                                                        .VERSION_CODES
-                                                                                                        .O
-                                                                                ) {
-                                                                                        com.footprint
-                                                                                                .utils
-                                                                                                .ExportUtils
-                                                                                                .captureWindow(
-                                                                                                        act
-                                                                                                ) {
-                                                                                                        bitmap
-                                                                                                        ->
-                                                                                                        Thread {
-                                                                                                                        val path =
-                                                                                                                                com.footprint
-                                                                                                                                        .utils
-                                                                                                                                        .ExportUtils
-                                                                                                                                        .saveBitmapToGallery(
-                                                                                                                                                context,
-                                                                                                                                                bitmap
-                                                                                                                                        )
-                                                                                                                        activity
-                                                                                                                                .runOnUiThread {
-                                                                                                                                        showControls =
-                                                                                                                                                true
-                                                                                                                                        if (path !=
-                                                                                                                                                        null
-                                                                                                                                        ) {
-                                                                                                                                                android.widget
-                                                                                                                                                        .Toast
-                                                                                                                                                        .makeText(
-                                                                                                                                                                context,
-                                                                                                                                                                "已保存到相册",
-                                                                                                                                                                android.widget
-                                                                                                                                                                        .Toast
-                                                                                                                                                                        .LENGTH_SHORT
-                                                                                                                                                        )
-                                                                                                                                                        .show()
-                                                                                                                                        } else {
-                                                                                                                                                android.widget
-                                                                                                                                                        .Toast
-                                                                                                                                                        .makeText(
-                                                                                                                                                                context,
-                                                                                                                                                                "保存失败",
-                                                                                                                                                                android.widget
-                                                                                                                                                                        .Toast
-                                                                                                                                                                        .LENGTH_SHORT
-                                                                                                                                                        )
-                                                                                                                                                        .show()
-                                                                                                                                        }
-                                                                                                                                }
-                                                                                                                }
-                                                                                                                .start()
-                                                                                                }
-                                                                                } else {
-                                                                                        android.widget
-                                                                                                .Toast
-                                                                                                .makeText(
-                                                                                                        context,
-                                                                                                        "导出功能需要 Android 8.0 以上版本",
-                                                                                                        android.widget
-                                                                                                                .Toast
-                                                                                                                .LENGTH_SHORT
+                                ) {
+                                        SmallFloatingActionButton(
+                                                onClick = onBack,
+                                                modifier = Modifier.align(Alignment.TopStart),
+                                                containerColor = Color.Black.copy(alpha = 0.5f)
+                                        ) {
+                                                Icon(
+                                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                                        "Back",
+                                                        tint = Color.White
+                                                )
+                                        }
+
+                                        ExtendedFloatingActionButton(
+                                                onClick = {
+                                                        android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "正在渲染极清海报...",
+                                                                        android.widget.Toast
+                                                                                .LENGTH_LONG
+                                                                )
+                                                                .show()
+                                                        showControls = false
+                                                        android.os.Handler(
+                                                                        android.os.Looper
+                                                                                .getMainLooper()
+                                                                )
+                                                                .postDelayed(
+                                                                        {
+                                                                                val amap =
+                                                                                        mapView.map
+                                                                                val centerLat =
+                                                                                        amap?.cameraPosition
+                                                                                                ?.target
+                                                                                                ?.latitude
+                                                                                                ?: 39.9
+                                                                                val centerLng =
+                                                                                        amap?.cameraPosition
+                                                                                                ?.target
+                                                                                                ?.longitude
+                                                                                                ?: 116.3
+                                                                                val viewWidthStr =
+                                                                                        mapView.width
+                                                                                                .coerceAtLeast(
+                                                                                                        1080
                                                                                                 )
-                                                                                                .show()
-                                                                                        showControls =
-                                                                                                true
+                                                                                                .toDouble()
+                                                                                val viewHeightStr =
+                                                                                        mapView.height
+                                                                                                .coerceAtLeast(
+                                                                                                        1920
+                                                                                                )
+                                                                                                .toDouble()
+
+                                                                                val maxDim =
+                                                                                        viewWidthStr
+                                                                                                .coerceAtLeast(
+                                                                                                        viewHeightStr
+                                                                                                )
+                                                                                val targetDim =
+                                                                                        6000.0 // Target maximum resolution for the longest side (e.g., 6K resolution)
+                                                                                val scale =
+                                                                                        (targetDim /
+                                                                                                        maxDim)
+                                                                                                .coerceAtLeast(
+                                                                                                        1.0
+                                                                                                )
+                                                                                                .coerceAtMost(
+                                                                                                        8.0
+                                                                                                )
+
+                                                                                val exportWidth =
+                                                                                        (viewWidthStr *
+                                                                                                        scale)
+                                                                                                .toInt()
+                                                                                val exportHeight =
+                                                                                        (viewHeightStr *
+                                                                                                        scale)
+                                                                                                .toInt()
+                                                                                val currentZoom =
+                                                                                        amap?.cameraPosition
+                                                                                                ?.zoom
+                                                                                                ?.toDouble()
+                                                                                                ?: 14.0
+                                                                                val exportZoom =
+                                                                                        currentZoom +
+                                                                                                kotlin.math
+                                                                                                        .log2(
+                                                                                                                scale
+                                                                                                        )
+
+                                                                                val tJson =
+                                                                                        org.json
+                                                                                                .JSONArray()
+                                                                                tracePoints
+                                                                                        .forEach {
+                                                                                                pt
+                                                                                                ->
+                                                                                                val obj =
+                                                                                                        org.json
+                                                                                                                .JSONObject()
+                                                                                                obj.put(
+                                                                                                        "lat",
+                                                                                                        pt.latitude
+                                                                                                )
+                                                                                                obj.put(
+                                                                                                        "lng",
+                                                                                                        pt.longitude
+                                                                                                )
+                                                                                                tJson.put(
+                                                                                                        obj
+                                                                                                )
+                                                                                        }
+                                                                                val traceStr =
+                                                                                        tJson.toString()
+
+                                                                                val fileName =
+                                                                                        "footprint_art_${System.currentTimeMillis()}.png"
+                                                                                val outputFile =
+                                                                                        java.io
+                                                                                                .File(
+                                                                                                        context.cacheDir,
+                                                                                                        fileName
+                                                                                                )
+
+                                                                                val themeStr = when (mapStyle) {
+                                                                                    ArtMapStyle.LIGHT -> "light"
+                                                                                    ArtMapStyle.DARK -> "dark"
+                                                                                    ArtMapStyle.SATELLITE -> "satellite"
+                                                                                    ArtMapStyle.VOID -> "void"
                                                                                 }
-                                                                        }
-                                                                },
-                                                                200
-                                                        )
-                                        },
-                                        modifier = Modifier.align(Alignment.TopEnd),
-                                        containerColor = selectedColor,
-                                        contentColor = Color.Black
-                                ) {
-                                        Icon(Icons.Default.Download, "导出")
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("导出海报")
+
+                                                                                val cValue =
+                                                                                        when (uiState.artColorStyle
+                                                                                        ) {
+                                                                                                "White" ->
+                                                                                                        android.graphics
+                                                                                                                .Color
+                                                                                                                .WHITE
+                                                                                                "Black" ->
+                                                                                                        android.graphics
+                                                                                                                .Color
+                                                                                                                .BLACK
+                                                                                                "Gold" ->
+                                                                                                        android.graphics
+                                                                                                                .Color
+                                                                                                                .parseColor(
+                                                                                                                        "#FFD700"
+                                                                                                                )
+                                                                                                "Deep Blue" ->
+                                                                                                        android.graphics
+                                                                                                                .Color
+                                                                                                                .parseColor(
+                                                                                                                        "#00008B"
+                                                                                                                )
+                                                                                                else ->
+                                                                                                        android.graphics
+                                                                                                                .Color
+                                                                                                                .parseColor(
+                                                                                                                        "#FF453A"
+                                                                                                                )
+                                                                                        }
+                                                                                val traceColorHex =
+                                                                                        String.format(
+                                                                                                "#%06X",
+                                                                                                0xFFFFFF and
+                                                                                                        cValue
+                                                                                        )
+
+                                                                                Thread {
+                                                                                                val statusCode =
+                                                                                                        com.footprint
+                                                                                                                .utils
+                                                                                                                .NativeRenderer
+                                                                                                                .generateGigapixelMap(
+                                                                                                                        outputFile
+                                                                                                                                .absolutePath,
+                                                                                                                        traceStr,
+                                                                                                                        themeStr,
+                                                                                                                        traceColorHex,
+                                                                                                                        glowRadius,
+                                                                                                                        exportWidth,
+                                                                                                                        exportHeight,
+                                                                                                                        centerLat,
+                                                                                                                        centerLng,
+                                                                                                                        exportZoom
+                                                                                                                )
+
+                                                                                                val mainHandler =
+                                                                                                        android.os
+                                                                                                                .Handler(
+                                                                                                                        android.os
+                                                                                                                                .Looper
+                                                                                                                                .getMainLooper()
+                                                                                                                )
+                                                                                                if (statusCode ==
+                                                                                                                0 &&
+                                                                                                                outputFile
+                                                                                                                        .exists()
+                                                                                                ) {
+                                                                                                        val opt =
+                                                                                                                android.graphics
+                                                                                                                        .BitmapFactory
+                                                                                                                        .Options()
+                                                                                                        opt.inMutable =
+                                                                                                                true
+                                                                                                        val bitmap =
+                                                                                                                android.graphics
+                                                                                                                        .BitmapFactory
+                                                                                                                        .decodeFile(
+                                                                                                                                outputFile
+                                                                                                                                        .absolutePath,
+                                                                                                                                opt
+                                                                                                                        )
+                                                                                                        if (bitmap !=
+                                                                                                                        null
+                                                                                                        ) {
+                                                                                                                val canvas =
+                                                                                                                        android.graphics
+                                                                                                                                .Canvas(
+                                                                                                                                        bitmap
+                                                                                                                                )
+                                                                                                                val typefaceId =
+                                                                                                                        when (uiState.artFontName
+                                                                                                                        ) {
+                                                                                                                                "MaShanZheng" ->
+                                                                                                                                        com.footprint
+                                                                                                                                                .R
+                                                                                                                                                .font
+                                                                                                                                                .ma_shan_zheng
+                                                                                                                                "ZhiMangXing" ->
+                                                                                                                                        com.footprint
+                                                                                                                                                .R
+                                                                                                                                                .font
+                                                                                                                                                .zhi_mang_xing
+                                                                                                                                "LongCang" ->
+                                                                                                                                        com.footprint
+                                                                                                                                                .R
+                                                                                                                                                .font
+                                                                                                                                                .long_cang
+                                                                                                                                "LiuJianMaoCao" ->
+                                                                                                                                        com.footprint
+                                                                                                                                                .R
+                                                                                                                                                .font
+                                                                                                                                                .liu_jian_mao_cao
+                                                                                                                                "ZCOOLXiaoWei" ->
+                                                                                                                                        com.footprint
+                                                                                                                                                .R
+                                                                                                                                                .font
+                                                                                                                                                .zcool_xiao_wei
+                                                                                                                                else ->
+                                                                                                                                        null
+                                                                                                                        }
+                                                                                                                val customTypeface =
+                                                                                                                        typefaceId
+                                                                                                                                ?.let {
+                                                                                                                                        androidx.core
+                                                                                                                                                .content
+                                                                                                                                                .res
+                                                                                                                                                .ResourcesCompat
+                                                                                                                                                .getFont(
+                                                                                                                                                        context,
+                                                                                                                                                        it
+                                                                                                                                                )
+                                                                                                                                }
+                                                                                                                                ?: android.graphics
+                                                                                                                                        .Typeface
+                                                                                                                                        .DEFAULT
+
+                                                                                                                val textCValue =
+                                                                                                                        when (uiState.artTextColor
+                                                                                                                        ) {
+                                                                                                                                "Black" ->
+                                                                                                                                        android.graphics
+                                                                                                                                                .Color
+                                                                                                                                                .BLACK
+                                                                                                                                "Gold" ->
+                                                                                                                                        android.graphics
+                                                                                                                                                .Color
+                                                                                                                                                .parseColor(
+                                                                                                                                                        "#FFCC00"
+                                                                                                                                                )
+                                                                                                                                "Deep Blue" ->
+                                                                                                                                        android.graphics
+                                                                                                                                                .Color
+                                                                                                                                                .parseColor(
+                                                                                                                                                        "#007AFF"
+                                                                                                                                                )
+                                                                                                                                else ->
+                                                                                                                                        android.graphics
+                                                                                                                                                .Color
+                                                                                                                                                .WHITE
+                                                                                                                        }
+
+                                                                                                                val textPaint =
+                                                                                                                        android.graphics
+                                                                                                                                .Paint()
+                                                                                                                                .apply {
+                                                                                                                                        color =
+                                                                                                                                                textCValue
+                                                                                                                                        textSize =
+                                                                                                                                                240f *
+                                                                                                                                                        scale.toFloat()
+                                                                                                                                        isAntiAlias =
+                                                                                                                                                true
+                                                                                                                                        typeface =
+                                                                                                                                                customTypeface
+                                                                                                                                        setShadowLayer(
+                                                                                                                                                8f *
+                                                                                                                                                        scale.toFloat(),
+                                                                                                                                                0f,
+                                                                                                                                                6f *
+                                                                                                                                                        scale.toFloat(),
+                                                                                                                                                android.graphics
+                                                                                                                                                        .Color
+                                                                                                                                                        .BLACK
+                                                                                                                                        )
+                                                                                                                                }
+
+                                                                                                                val textWidth =
+                                                                                                                        textPaint
+                                                                                                                                .measureText(
+                                                                                                                                        uiState.artAuthorName
+                                                                                                                                )
+                                                                                                                val x =
+                                                                                                                        (bitmap.width -
+                                                                                                                                textWidth) /
+                                                                                                                                2f
+                                                                                                                val y =
+                                                                                                                        bitmap.height -
+                                                                                                                                (180f *
+                                                                                                                                        scale.toFloat())
+                                                                                                                canvas.drawText(
+                                                                                                                        uiState.artAuthorName,
+                                                                                                                        x,
+                                                                                                                        y,
+                                                                                                                        textPaint
+                                                                                                                )
+
+                                                                                                                com.footprint
+                                                                                                                        .utils
+                                                                                                                        .ExportUtils
+                                                                                                                        .saveBitmapToGallery(
+                                                                                                                                context,
+                                                                                                                                bitmap
+                                                                                                                        )
+                                                                                                        }
+                                                                                                        mainHandler
+                                                                                                                .post {
+                                                                                                                        android.widget
+                                                                                                                                .Toast
+                                                                                                                                .makeText(
+                                                                                                                                        context,
+                                                                                                                                        "超清海报已保存",
+                                                                                                                                        android.widget
+                                                                                                                                                .Toast
+                                                                                                                                                .LENGTH_SHORT
+                                                                                                                                )
+                                                                                                                                .show()
+                                                                                                                        showControls =
+                                                                                                                                true
+                                                                                                                }
+                                                                                                } else {
+                                                                                                        val errorMsg =
+                                                                                                                when (statusCode
+                                                                                                                ) {
+                                                                                                                        -1 ->
+                                                                                                                                "参数传递失败 (JNI Error)"
+                                                                                                                        1 ->
+                                                                                                                                "轨迹格式错误 (JSON Parse Error)"
+                                                                                                                        2 ->
+                                                                                                                                "无法创建输出文件 (File Create Error)"
+                                                                                                                        3 ->
+                                                                                                                                "图片写入失败 (PNG Header Error)"
+                                                                                                                        4 ->
+                                                                                                                                "内存分配失败 (Skia Allocation Error)"
+                                                                                                                        5 ->
+                                                                                                                                "图像块渲染失败 (Chunk Write Error)"
+                                                                                                                        else ->
+                                                                                                                                "海报渲染失败, 代码: $statusCode"
+                                                                                                                }
+                                                                                                        mainHandler
+                                                                                                                .post {
+                                                                                                                        android.widget
+                                                                                                                                .Toast
+                                                                                                                                .makeText(
+                                                                                                                                        context,
+                                                                                                                                        errorMsg,
+                                                                                                                                        android.widget
+                                                                                                                                                .Toast
+                                                                                                                                                .LENGTH_SHORT
+                                                                                                                                )
+                                                                                                                                .show()
+                                                                                                                        showControls =
+                                                                                                                                true
+                                                                                                                }
+                                                                                                }
+                                                                                        }
+                                                                                        .start()
+                                                                        },
+                                                                        200
+                                                                )
+                                                },
+                                                modifier = Modifier.align(Alignment.TopEnd),
+                                                containerColor = selectedColor,
+                                                contentColor = Color.Black
+                                        ) {
+                                                Icon(Icons.Default.Download, "导出")
+                                                Spacer(Modifier.width(8.dp))
+                                                Text("导出高清海报")
+                                        }
                                 }
                         }
                 }
@@ -432,14 +780,6 @@ fun ArtLayoutOverlay(
         hasBorder: Boolean,
         modifier: Modifier = Modifier
 ) {
-        val provider = remember {
-                androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
-                        providerAuthority = "com.google.android.gms.fonts",
-                        providerPackage = "com.google.android.gms",
-                        certificates = com.footprint.R.array.com_google_android_gms_fonts_certs
-                )
-        }
-
         val fontFamily =
                 remember(artFont) {
                         when (artFont) {
@@ -448,36 +788,37 @@ fun ArtLayoutOverlay(
                                 "Cursive" -> androidx.compose.ui.text.font.FontFamily.Cursive
                                 "MaShanZheng" ->
                                         androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.googlefonts.Font(
-                                                        googleFont =
-                                                                androidx.compose.ui.text.googlefonts
-                                                                        .GoogleFont(
-                                                                                "Ma Shan Zheng"
-                                                                        ),
-                                                        fontProvider = provider,
-                                                        weight = FontWeight.Normal
+                                                androidx.compose.ui.text.font.Font(
+                                                        com.footprint.R.font.ma_shan_zheng,
+                                                        FontWeight.Normal
                                                 )
                                         )
                                 "ZhiMangXing" ->
                                         androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.googlefonts.Font(
-                                                        googleFont =
-                                                                androidx.compose.ui.text.googlefonts
-                                                                        .GoogleFont(
-                                                                                "Zhi Mang Xing"
-                                                                        ),
-                                                        fontProvider = provider,
-                                                        weight = FontWeight.Normal
+                                                androidx.compose.ui.text.font.Font(
+                                                        com.footprint.R.font.zhi_mang_xing,
+                                                        FontWeight.Normal
                                                 )
                                         )
                                 "LongCang" ->
                                         androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.googlefonts.Font(
-                                                        googleFont =
-                                                                androidx.compose.ui.text.googlefonts
-                                                                        .GoogleFont("Long Cang"),
-                                                        fontProvider = provider,
-                                                        weight = FontWeight.Normal
+                                                androidx.compose.ui.text.font.Font(
+                                                        com.footprint.R.font.long_cang,
+                                                        FontWeight.Normal
+                                                )
+                                        )
+                                "LiuJianMaoCao" ->
+                                        androidx.compose.ui.text.font.FontFamily(
+                                                androidx.compose.ui.text.font.Font(
+                                                        com.footprint.R.font.liu_jian_mao_cao,
+                                                        FontWeight.Normal
+                                                )
+                                        )
+                                "ZCOOLXiaoWei" ->
+                                        androidx.compose.ui.text.font.FontFamily(
+                                                androidx.compose.ui.text.font.Font(
+                                                        com.footprint.R.font.zcool_xiao_wei,
+                                                        FontWeight.Normal
                                                 )
                                         )
                                 else -> androidx.compose.ui.text.font.FontFamily.Default
@@ -497,7 +838,16 @@ fun ArtLayoutOverlay(
                 if (isItalic) androidx.compose.ui.text.font.FontStyle.Italic
                 else androidx.compose.ui.text.font.FontStyle.Normal
 
-        val isCalligraphy = artFont in listOf("MaShanZheng", "ZhiMangXing", "LongCang", "Cursive")
+        val isCalligraphy =
+                artFont in
+                        listOf(
+                                "MaShanZheng",
+                                "ZhiMangXing",
+                                "LongCang",
+                                "Cursive",
+                                "LiuJianMaoCao",
+                                "ZCOOLXiaoWei"
+                        )
         when (layout) {
                 ArtLayout.FULLCREEN_A24 -> {
                         Box(

@@ -70,6 +70,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDir("src/main/jniLibs")
+        }
+    }
 }
 
 dependencies {
@@ -124,4 +130,21 @@ dependencies {
 
     // Haze (Glassmorphism)
     implementation("dev.chrisbanes.haze:haze-jetpack-compose:0.5.2")
+}
+
+val buildRustTask = tasks.register<Exec>("buildRust") {
+    workingDir = file("src/main/rust")
+    commandLine(
+        "cargo", "ndk",
+        "-t", "armeabi-v7a",
+        "-t", "arm64-v8a",
+        "-t", "x86",
+        "-t", "x86_64",
+        "-o", "../jniLibs",
+        "build", "--release"
+    )
+}
+
+tasks.named("preBuild") {
+    dependsOn(buildRustTask)
 }

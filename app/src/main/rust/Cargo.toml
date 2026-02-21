@@ -1,0 +1,17 @@
+[package]
+name = "footprint_renderer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21.1"
+tiny-skia = "0.11"
+png = "0.17.13"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "rustls-tls-webpki-roots"] }
+tokio = { version = "1.37", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "webp"] }

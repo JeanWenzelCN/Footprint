@@ -1,0 +1,1 @@
+E:\Code\IDE\AndroidStudio\Footprint\app\src\main\rust\target\armv7-linux-androideabi\release\libfootprint_renderer.so: E:\Code\IDE\AndroidStudio\Footprint\app\src\main\rust\src\lib.rs E:\Code\IDE\AndroidStudio\Footprint\app\src\main\rust\src\renderer.rs
