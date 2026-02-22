@@ -152,8 +152,8 @@ object HolographicExportUtils {
                 append(".pol-frame{position:absolute;top:0;left:0;right:0;bottom:0;border-style:solid;border-color:#FAFAFA;border-width:10vh 5vw 25vh 5vw;box-shadow:inset 0 0 10px rgba(0,0,0,0.1)}")
                 append(".ov.geek{justify-content:flex-start;align-items:flex-end;padding:24px}")
                 append(".geek-box{background:rgba(0,0,0,0.7);padding:16px;border-radius:8px;border-right:4px solid $traceColor;backdrop-filter:blur(4px);text-align:right}")
-                append(".ttl{font-size:38px;margin-bottom:4px;letter-spacing:2px;color:$textColorHex;font-family:$fontCss;font-style:$fontStyle;text-shadow:$shadow}")
-                append(".met{font-size:14px;opacity:0.8;letter-spacing:1px;color:#fff;font-family:$fontCss}")
+                append(".ttl{font-size:22px;margin-bottom:3px;letter-spacing:1.5px;color:$textColorHex;font-family:$fontCss;font-style:$fontStyle;text-shadow:$shadow}")
+                append(".met{font-size:11px;opacity:0.8;letter-spacing:0.5px;color:#fff;font-family:$fontCss}")
                 append(".maplibregl-ctrl-attrib{display:none!important}")
                 append(".corner{position:absolute;width:40px;height:40px;border:2px solid rgba(255,255,255,0.3);pointer-events:none}")
                 append(".tl{top:20px;left:20px;border-right:0;border-bottom:0}")
@@ -176,7 +176,7 @@ object HolographicExportUtils {
                     }
                     "GEEK_STATS" -> {
                         append("<div class=\"ov geek\">")
-                        append("<div class=\"geek-box\"><div class=\"ttl\" style=\"font-size:16px\">$safeTitle</div><div class=\"met\">$safeMeta</div><div class=\"met\">MODE: TRACKING</div></div>")
+                        append("<div class=\"geek-box\"><div class=\"ttl\" style=\"font-size:13px\">$safeTitle</div><div class=\"met\">$safeMeta</div><div class=\"met\">MODE: TRACKING</div></div>")
                         append("<div class=\"corner tl\"></div><div class=\"corner br\"></div>")
                         append("</div>")
                     }
