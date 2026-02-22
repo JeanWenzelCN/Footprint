@@ -133,51 +133,9 @@ fun MapScreen(
                 val today = java.time.LocalDate.now()
                 today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         }
-        val todayEnd = remember { System.currentTimeMillis() + 86400_000L } // end of today+
+        val todayEnd = remember { System.currentTimeMillis() + 86400_000L }
         val todayTrackPoints by viewModel.getTrackPoints(todayStart, todayEnd)
                 .collectAsStateWithLifecycle(initialValue = emptyList())
-
-        // Draw today's historical tracks as a polyline
-        var historyPolyline by remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
-        LaunchedEffect(todayTrackPoints) {
-                val map = mapView.map ?: return@LaunchedEffect
-                historyPolyline?.remove()
-                historyPolyline = null
-
-                if (todayTrackPoints.isNotEmpty()) {
-                        val points = todayTrackPoints.map { LatLng(it.latitude, it.longitude) }
-                        historyPolyline = map.addPolyline(
-                                PolylineOptions()
-                                        .addAll(points)
-                                        .width(14f)
-                                        .color(android.graphics.Color.parseColor("#8000FF9F")) // semi-transparent green
-                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                        .zIndex(50f)
-                        )
-                }
-        }
-
-        // Dedicated effect to redraw live tracking polyline when path changes
-        var trackPolyline by remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
-        LaunchedEffect(trackingPath) {
-                val map = mapView.map ?: return@LaunchedEffect
-                trackPolyline?.remove()
-                trackPolyline = null
-                
-                if (trackingPath.isNotEmpty()) {
-                        val points = trackingPath.map { LatLng(it.latitude, it.longitude) }
-                        trackPolyline = map.addPolyline(
-                                PolylineOptions()
-                                        .addAll(points)
-                                        .width(18f)
-                                        .color(android.graphics.Color.parseColor("#00FF9F"))
-                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                        .zIndex(100f)
-                        )
-                }
-        }
 
         // 扩展权限列表
         val permissionsToRequest =
@@ -328,7 +286,21 @@ fun MapScreen(
                                         ) { mv ->
                                                 mv.map.clear()
 
-                                                // 1. Real-time Tracking Path (Visible in all modes)
+                                                // 0. Today's Historical Track (from database)
+                                                if (todayTrackPoints.isNotEmpty()) {
+                                                        val histPts = todayTrackPoints.map { LatLng(it.latitude, it.longitude) }
+                                                        mv.map.addPolyline(
+                                                                PolylineOptions()
+                                                                        .addAll(histPts)
+                                                                        .width(14f)
+                                                                        .color(android.graphics.Color.parseColor("#8000FF9F"))
+                                                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                                                        .zIndex(8f)
+                                                        )
+                                                }
+
+                                                // 1. Real-time Tracking Path (bright, on top)
                                                 if (trackingPath.isNotEmpty()) {
                                                         val points =
                                                                 trackingPath.map {
