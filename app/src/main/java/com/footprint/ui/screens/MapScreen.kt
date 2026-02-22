@@ -128,12 +128,40 @@ fun MapScreen(
                 mapView.map.mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
         }
 
-        // Dedicated effect to redraw tracking polyline when path changes
-        // This is more reliable than relying on AndroidView's update block
+        // Load today's historical track points from the database
+        val todayStart = remember {
+                val today = java.time.LocalDate.now()
+                today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }
+        val todayEnd = remember { System.currentTimeMillis() + 86400_000L } // end of today+
+        val todayTrackPoints by viewModel.getTrackPoints(todayStart, todayEnd)
+                .collectAsStateWithLifecycle(initialValue = emptyList())
+
+        // Draw today's historical tracks as a polyline
+        var historyPolyline by remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
+        LaunchedEffect(todayTrackPoints) {
+                val map = mapView.map ?: return@LaunchedEffect
+                historyPolyline?.remove()
+                historyPolyline = null
+
+                if (todayTrackPoints.isNotEmpty()) {
+                        val points = todayTrackPoints.map { LatLng(it.latitude, it.longitude) }
+                        historyPolyline = map.addPolyline(
+                                PolylineOptions()
+                                        .addAll(points)
+                                        .width(14f)
+                                        .color(android.graphics.Color.parseColor("#8000FF9F")) // semi-transparent green
+                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                        .zIndex(50f)
+                        )
+                }
+        }
+
+        // Dedicated effect to redraw live tracking polyline when path changes
         var trackPolyline by remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
         LaunchedEffect(trackingPath) {
                 val map = mapView.map ?: return@LaunchedEffect
-                // Remove old polyline
                 trackPolyline?.remove()
                 trackPolyline = null
                 
