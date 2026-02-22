@@ -128,6 +128,29 @@ fun MapScreen(
                 mapView.map.mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
         }
 
+        // Dedicated effect to redraw tracking polyline when path changes
+        // This is more reliable than relying on AndroidView's update block
+        var trackPolyline by remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
+        LaunchedEffect(trackingPath) {
+                val map = mapView.map ?: return@LaunchedEffect
+                // Remove old polyline
+                trackPolyline?.remove()
+                trackPolyline = null
+                
+                if (trackingPath.isNotEmpty()) {
+                        val points = trackingPath.map { LatLng(it.latitude, it.longitude) }
+                        trackPolyline = map.addPolyline(
+                                PolylineOptions()
+                                        .addAll(points)
+                                        .width(18f)
+                                        .color(android.graphics.Color.parseColor("#00FF9F"))
+                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                        .zIndex(100f)
+                        )
+                }
+        }
+
         // 扩展权限列表
         val permissionsToRequest =
                 mutableListOf(
