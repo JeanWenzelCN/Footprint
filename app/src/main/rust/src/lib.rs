@@ -2,7 +2,7 @@
 
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
-use jni::sys::{jboolean, jint, jdouble, jfloat};
+use jni::sys::{jint, jdouble, jfloat};
 
 mod renderer;
 
