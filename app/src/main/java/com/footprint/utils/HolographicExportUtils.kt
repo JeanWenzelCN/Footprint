@@ -141,7 +141,11 @@ object HolographicExportUtils {
                 append("*{margin:0;padding:0;box-sizing:border-box}")
                 append("html,body{height:100%;width:100%;overflow:hidden;background:#000;color:#fff;")
                 append("font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}")
+                // CSS - add dark mode filter class
                 append("#map{position:absolute;top:0;left:0;width:100%;height:100%}")
+                // Dark mode: invert light tiles to create a proper dark map appearance
+                append("#map.dark-filter{filter:invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9)}")
+                // The overlay must NOT be inverted, so it sits above the filtered map
                 append(".ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;flex-direction:column;z-index:10}")
                 append(".ov.fs{justify-content:flex-end;align-items:center;padding-bottom:80px}")
                 append(".ov.pol{justify-content:flex-end;align-items:center;padding-bottom:60px}")
@@ -156,8 +160,12 @@ object HolographicExportUtils {
                 append(".br{bottom:20px;right:20px;border-left:0;border-top:0}")
                 append("</style>")
                 append("</head><body>")
-                // Map container
-                append("<div id=\"map\"></div>")
+                // Map container — add dark-filter class for dark mode
+                if (styleKey == "dark") {
+                    append("<div id=\"map\" class=\"dark-filter\"></div>")
+                } else {
+                    append("<div id=\"map\"></div>")
+                }
                 // Overlay — structure depends on layout
                 when (layoutName) {
                     "POLAROID" -> {
@@ -185,15 +193,23 @@ object HolographicExportUtils {
                 append(";var S=")
                 append(stateStr)
                 append(";var TC=\"$traceColor\";var HG=$hasGlowStr;")
-                // Map styles
-                append("var MS={")
-                append("void:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#000'}}]},")
-                append("dark:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',")
-                append("light:'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',")
-                append("satellite:{version:8,sources:{sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256}},layers:[{id:'sat',type:'raster',source:'sat'}]}")
-                append("};")
+                // Map styles — all use AMap raster tiles with Chinese labels
+                // Light & Dark both use style=7 (standard map with Chinese labels)
+                // Dark appearance is achieved via CSS filter on the #map div
+                // Satellite uses style=6 (imagery) + style=7 (label overlay)
+                // Void is a pure black background (no tiles)
+                val amapTileUrl = "https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7"
+                val amapSatUrl = "https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=6"
+                // For satellite overlay, use style=8 with ltype=4 (transparent annotation layer)
+                val amapSatLabelUrl = "https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8&ltype=4"
+                append("var amapStyle={version:8,sources:{amap:{type:'raster',tiles:['$amapTileUrl'],tileSize:256}},layers:[{id:'amap',type:'raster',source:'amap'}]};")
+                append("var satStyle={version:8,sources:{sat:{type:'raster',tiles:['$amapSatUrl'],tileSize:256},label:{type:'raster',tiles:['$amapSatLabelUrl'],tileSize:256}},layers:[{id:'sat',type:'raster',source:'sat'},{id:'label',type:'raster',source:'label'}]};")
+                append("var voidStyle={version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#000'}}]};")
+                // Select style based on key
+                append("var styleKey='$styleKey';")
+                append("var mapSt=styleKey==='void'?voidStyle:styleKey==='satellite'?satStyle:amapStyle;")
                 // Init map
-                append("var m=new maplibregl.Map({container:'map',style:MS['$styleKey']||MS.dark,center:[S.lng,S.lat],zoom:S.zoom});")
+                append("var m=new maplibregl.Map({container:'map',style:mapSt,center:[S.lng,S.lat],zoom:S.zoom});")
                 append("m.on('load',function(){")
                 append("m.addSource('t',{type:'geojson',data:D});")
                 if (hasGlow) {
