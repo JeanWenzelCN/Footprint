@@ -137,6 +137,53 @@ fun MapScreen(
         val todayTrackPoints by viewModel.getTrackPoints(todayStart, todayEnd)
                 .collectAsStateWithLifecycle(initialValue = emptyList())
 
+        // --- Track Polyline Management via snapshotFlow ---
+        // This bypasses AndroidView.update entirely for reliable real-time updates
+        var livePolylineRef = remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
+        var histPolylineRef = remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
+
+        LaunchedEffect(mapView) {
+                // Observe trackingPath changes
+                snapshotFlow { trackingPath.toList() }.collect { path ->
+                        val map = mapView.map ?: return@collect
+                        livePolylineRef.value?.remove()
+                        livePolylineRef.value = null
+                        if (path.isNotEmpty()) {
+                                val pts = path.map { LatLng(it.latitude, it.longitude) }
+                                livePolylineRef.value = map.addPolyline(
+                                        PolylineOptions()
+                                                .addAll(pts)
+                                                .width(18f)
+                                                .color(android.graphics.Color.parseColor("#00FF9F"))
+                                                .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                                .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                                .zIndex(100f)
+                                )
+                        }
+                }
+        }
+
+        LaunchedEffect(mapView) {
+                // Observe todayTrackPoints changes
+                snapshotFlow { todayTrackPoints.toList() }.collect { pts ->
+                        val map = mapView.map ?: return@collect
+                        histPolylineRef.value?.remove()
+                        histPolylineRef.value = null
+                        if (pts.isNotEmpty()) {
+                                val latLngs = pts.map { LatLng(it.latitude, it.longitude) }
+                                histPolylineRef.value = map.addPolyline(
+                                        PolylineOptions()
+                                                .addAll(latLngs)
+                                                .width(14f)
+                                                .color(android.graphics.Color.parseColor("#8000FF9F"))
+                                                .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                                .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                                .zIndex(50f)
+                                )
+                        }
+                }
+        }
+
         // 扩展权限列表
         val permissionsToRequest =
                 mutableListOf(
@@ -286,37 +333,36 @@ fun MapScreen(
                                         ) { mv ->
                                                 mv.map.clear()
 
-                                                // 0. Today's Historical Track (from database)
+                                                // NOTE: Track polylines (live + history) are 
+                                                // managed by snapshotFlow LaunchedEffects above.
+                                                // Re-add them after clear() so they aren't wiped.
+                                                livePolylineRef.value = null
+                                                histPolylineRef.value = null
+                                                
+                                                // Re-draw today's tracks after clear
                                                 if (todayTrackPoints.isNotEmpty()) {
                                                         val histPts = todayTrackPoints.map { LatLng(it.latitude, it.longitude) }
-                                                        mv.map.addPolyline(
+                                                        histPolylineRef.value = mv.map.addPolyline(
                                                                 PolylineOptions()
                                                                         .addAll(histPts)
                                                                         .width(14f)
                                                                         .color(android.graphics.Color.parseColor("#8000FF9F"))
                                                                         .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                                                         .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                                                        .zIndex(8f)
+                                                                        .zIndex(50f)
                                                         )
                                                 }
-
-                                                // 1. Real-time Tracking Path (bright, on top)
+                                                // Re-draw live track after clear
                                                 if (trackingPath.isNotEmpty()) {
-                                                        val points =
-                                                                trackingPath.map {
-                                                                        LatLng(
-                                                                                it.latitude,
-                                                                                it.longitude
-                                                                        )
-                                                                }
-                                                        mv.map.addPolyline(
+                                                        val pts = trackingPath.map { LatLng(it.latitude, it.longitude) }
+                                                        livePolylineRef.value = mv.map.addPolyline(
                                                                 PolylineOptions()
-                                                                        .addAll(points)
+                                                                        .addAll(pts)
                                                                         .width(18f)
                                                                         .color(android.graphics.Color.parseColor("#00FF9F"))
                                                                         .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                                                         .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                                                        .zIndex(10f)
+                                                                        .zIndex(100f)
                                                         )
                                                 }
 
