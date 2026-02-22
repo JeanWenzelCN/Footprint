@@ -38,6 +38,15 @@ secrets.xml
 build/
 .tmp_gradle_home/
 
+# Rust
+app/src/main/rust/target/
+**/*.pdb
+**/*.exe
+
 # Kotlin
 /bin/
 /gen/
+
+# IDE
+.idea/deploymentTargetSelector.xml
+.idea/markdown.xml
