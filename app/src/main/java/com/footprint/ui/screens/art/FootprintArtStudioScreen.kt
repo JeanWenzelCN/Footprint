@@ -29,8 +29,14 @@ import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
 import com.footprint.FootprintViewModel
+import com.footprint.utils.HolographicExportUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.OutputStreamWriter
+import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalTime
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +65,26 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                         lifecycle.removeObserver(observer)
                         mapView.onDestroy()
                 }
+        }
+
+        // State for storage picking
+        var pendingExportHtml by remember { mutableStateOf<String?>(null) }
+        val createDocumentLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("text/html")
+        ) { uri ->
+                uri?.let {
+                        try {
+                                context.contentResolver.openOutputStream(it)?.use { os ->
+                                        OutputStreamWriter(os).use { writer ->
+                                                writer.write(pendingExportHtml ?: "")
+                                        }
+                                }
+                                android.widget.Toast.makeText(context, "文件已成功导出", android.widget.Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "导出失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                }
+                pendingExportHtml = null
         }
 
         // State for controls
@@ -137,6 +163,9 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 ArtMapStyle.LIGHT -> AMap.MAP_TYPE_NORMAL
                                 ArtMapStyle.SATELLITE -> AMap.MAP_TYPE_SATELLITE
                         }
+                
+                // Ensure map is visible (fix for map disappearing)
+                map.isMyLocationEnabled = false
 
                 // Customizing for "Void"
                 map.showMapText(mapStyle != ArtMapStyle.VOID)
@@ -167,18 +196,22 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                         .color(selectedColor.toArgb())
                         )
 
-                        // 3. Move Camera
-                        try {
-                                val builder = LatLngBounds.builder()
-                                latLngs.forEach { builder.include(it) }
-                                map.moveCamera(
-                                        CameraUpdateFactory.newLatLngBounds(builder.build(), 150)
-                                )
-                        } catch (e: Exception) {
-                                if (latLngs.isNotEmpty()) {
-                                        map.moveCamera(
-                                                CameraUpdateFactory.newLatLngZoom(latLngs[0], 14f)
-                                        )
+                        // 3. Move Camera - Only if points changed significantly
+                        if (tracePoints.isNotEmpty()) {
+                                try {
+                                        val builder = LatLngBounds.builder()
+                                        latLngs.forEach { builder.include(it) }
+                                        val bounds = builder.build()
+                                        // Use a slight delay to ensure map is ready
+                                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                try {
+                                                        map.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 150))
+                                                } catch (e: Exception) {
+                                                        map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngs[0], 12f))
+                                                }
+                                        }, 100)
+                                } catch (e: Exception) {
+                                        // Ignore bound errors
                                 }
                         }
                 }
@@ -362,1046 +395,195 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         tint = Color.White
                                                 )
                                         }
-
-                                        ExtendedFloatingActionButton(
-                                                onClick = {
-                                                        android.widget.Toast.makeText(
-                                                                        context,
-                                                                        "正在渲染极清海报...",
-                                                                        android.widget.Toast
-                                                                                .LENGTH_LONG
-                                                                )
-                                                                .show()
-                                                        showControls = false
-                                                        android.os.Handler(
-                                                                        android.os.Looper
-                                                                                .getMainLooper()
-                                                                )
-                                                                .postDelayed(
-                                                                        {
-                                                                                val amap =
-                                                                                        mapView.map
-                                                                                val centerLat =
-                                                                                        amap?.cameraPosition
-                                                                                                ?.target
-                                                                                                ?.latitude
-                                                                                                ?: 39.9
-                                                                                val centerLng =
-                                                                                        amap?.cameraPosition
-                                                                                                ?.target
-                                                                                                ?.longitude
-                                                                                                ?: 116.3
-                                                                                val viewWidthStr =
-                                                                                        mapView.width
-                                                                                                .coerceAtLeast(
-                                                                                                        1080
-                                                                                                )
-                                                                                                .toDouble()
-                                                                                val viewHeightStr =
-                                                                                        mapView.height
-                                                                                                .coerceAtLeast(
-                                                                                                        1920
-                                                                                                )
-                                                                                                .toDouble()
-
-                                                                                val maxDim =
-                                                                                        viewWidthStr
-                                                                                                .coerceAtLeast(
-                                                                                                        viewHeightStr
-                                                                                                )
-                                                                                val targetDim =
-                                                                                        6000.0 // Target maximum resolution for the longest side (e.g., 6K resolution)
-                                                                                val scale =
-                                                                                        (targetDim /
-                                                                                                        maxDim)
-                                                                                                .coerceAtLeast(
-                                                                                                        1.0
-                                                                                                )
-                                                                                                .coerceAtMost(
-                                                                                                        8.0
-                                                                                                )
-
-                                                                                val exportWidth =
-                                                                                        (viewWidthStr *
-                                                                                                        scale)
-                                                                                                .toInt()
-                                                                                val exportHeight =
-                                                                                        (viewHeightStr *
-                                                                                                        scale)
-                                                                                                .toInt()
-                                                                                val currentZoom =
-                                                                                        amap?.cameraPosition
-                                                                                                ?.zoom
-                                                                                                ?.toDouble()
-                                                                                                ?: 14.0
-                                                                                val exportZoom =
-                                                                                        currentZoom +
-                                                                                                kotlin.math
-                                                                                                        .log2(
-                                                                                                                scale
-                                                                                                        )
-
-                                                                                val tJson =
-                                                                                        org.json
-                                                                                                .JSONArray()
-                                                                                tracePoints
-                                                                                        .forEach {
-                                                                                                pt
-                                                                                                ->
-                                                                                                val obj =
-                                                                                                        org.json
-                                                                                                                .JSONObject()
-                                                                                                obj.put(
-                                                                                                        "lat",
-                                                                                                        pt.latitude
-                                                                                                )
-                                                                                                obj.put(
-                                                                                                        "lng",
-                                                                                                        pt.longitude
-                                                                                                )
-                                                                                                tJson.put(
-                                                                                                        obj
-                                                                                                )
-                                                                                        }
-                                                                                val traceStr =
-                                                                                        tJson.toString()
-
-                                                                                val fileName =
-                                                                                        "footprint_art_${System.currentTimeMillis()}.png"
-                                                                                val outputFile =
-                                                                                        java.io
-                                                                                                .File(
-                                                                                                        context.cacheDir,
-                                                                                                        fileName
-                                                                                                )
-
-                                                                                val themeStr =
-                                                                                        when (mapStyle
-                                                                                        ) {
-                                                                                                ArtMapStyle
-                                                                                                        .LIGHT ->
-                                                                                                        "light"
-                                                                                                ArtMapStyle
-                                                                                                        .DARK ->
-                                                                                                        "dark"
-                                                                                                ArtMapStyle
-                                                                                                        .SATELLITE ->
-                                                                                                        "satellite"
-                                                                                                ArtMapStyle
-                                                                                                        .VOID ->
-                                                                                                        "void"
-                                                                                        }
-
-                                                                                val traceColorInt =
-                                                                                        when (uiState.artColorStyle
-                                                                                        ) {
-                                                                                                "Deep Blue" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#007AFF"
-                                                                                                                )
-                                                                                                "Cyber Pink" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#FF2D55"
-                                                                                                                )
-                                                                                                "Neon Green" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#00FF9F"
-                                                                                                                )
-                                                                                                "Gold" ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#FFCC00"
-                                                                                                                )
-                                                                                                else ->
-                                                                                                        android.graphics
-                                                                                                                .Color
-                                                                                                                .parseColor(
-                                                                                                                        "#FF453A"
-                                                                                                                )
-                                                                                        }
-                                                                                val traceColorHex =
-                                                                                        String.format(
-                                                                                                "#%06X",
-                                                                                                0xFFFFFF and
-                                                                                                        traceColorInt
-                                                                                        )
-
-                                                                                val typefaceId =
-                                                                                        when (uiState.artFontName
-                                                                                        ) {
-                                                                                                "MaShanZheng" ->
-                                                                                                        com.footprint
-                                                                                                                .R
-                                                                                                                .font
-                                                                                                                .ma_shan_zheng
-                                                                                                "ZhiMangXing" ->
-                                                                                                        com.footprint
-                                                                                                                .R
-                                                                                                                .font
-                                                                                                                .zhi_mang_xing
-                                                                                                "LongCang" ->
-                                                                                                        com.footprint
-                                                                                                                .R
-                                                                                                                .font
-                                                                                                                .long_cang
-                                                                                                "LiuJianMaoCao" ->
-                                                                                                        com.footprint
-                                                                                                                .R
-                                                                                                                .font
-                                                                                                                .liu_jian_mao_cao
-                                                                                                "ZCOOLXiaoWei" ->
-                                                                                                        com.footprint
-                                                                                                                .R
-                                                                                                                .font
-                                                                                                                .zcool_xiao_wei
-                                                                                                else ->
-                                                                                                        null
-                                                                                        }
-                                                                                val customTypeface =
-                                                                                        typefaceId
-                                                                                                ?.let {
-                                                                                                        androidx.core
-                                                                                                                .content
-                                                                                                                .res
-                                                                                                                .ResourcesCompat
-                                                                                                                .getFont(
-                                                                                                                        context,
-                                                                                                                        it
-                                                                                                                )
-                                                                                                }
-                                                                                                ?: android.graphics
-                                                                                                        .Typeface
-                                                                                                        .DEFAULT
-
-                                                                                val finalTypeface =
-                                                                                        if (uiState.artTextItalic
-                                                                                        ) {
-                                                                                                android.graphics
-                                                                                                        .Typeface
-                                                                                                        .create(
-                                                                                                                customTypeface,
-                                                                                                                android.graphics
-                                                                                                                        .Typeface
-                                                                                                                        .ITALIC
-                                                                                                        )
-                                                                                        } else {
-                                                                                                customTypeface
-                                                                                        }
-
-                                                                                val currentTracePoints =
-                                                                                        tracePoints
-                                                                                                .toList()
-
-                                                                                Thread {
-                                                                                                val statusCode =
-                                                                                                        com.footprint
-                                                                                                                .utils
-                                                                                                                .NativeRenderer
-                                                                                                                .generateGigapixelMap(
-                                                                                                                        outputFile
-                                                                                                                                .absolutePath,
-                                                                                                                        traceStr,
-                                                                                                                        themeStr,
-                                                                                                                        traceColorHex,
-                                                                                                                        if (glowRadius >
-                                                                                                                                        10f
-                                                                                                                        )
-                                                                                                                                5.0f
-                                                                                                                        else
-                                                                                                                                (glowRadius /
-                                                                                                                                        2f), // Normalize glow for Skia
-                                                                                                                        exportWidth,
-                                                                                                                        exportHeight,
-                                                                                                                        centerLat,
-                                                                                                                        centerLng,
-                                                                                                                        exportZoom
-                                                                                                                )
-
-                                                                                                val mainHandler =
-                                                                                                        android.os
-                                                                                                                .Handler(
-                                                                                                                        android.os
-                                                                                                                                .Looper
-                                                                                                                                .getMainLooper()
-                                                                                                                )
-                                                                                                if (statusCode ==
-                                                                                                                0 &&
-                                                                                                                outputFile
-                                                                                                                        .exists()
-                                                                                                ) {
-                                                                                                        val opt =
-                                                                                                                android.graphics
-                                                                                                                        .BitmapFactory
-                                                                                                                        .Options()
-                                                                                                        opt.inMutable =
-                                                                                                                true
-                                                                                                        val bitmap =
-                                                                                                                android.graphics
-                                                                                                                        .BitmapFactory
-                                                                                                                        .decodeFile(
-                                                                                                                                outputFile
-                                                                                                                                        .absolutePath,
-                                                                                                                                opt
-                                                                                                                        )
-                                                                                                        if (bitmap !=
-                                                                                                                        null
-                                                                                                        ) {
-                                                                                                                val canvas =
-                                                                                                                        android.graphics
-                                                                                                                                .Canvas(
-                                                                                                                                        bitmap
-                                                                                                                                )
-
-                                                                                                                val textCValue =
-                                                                                                                        when (uiState.artTextColor
-                                                                                                                        ) {
-                                                                                                                                "Black" ->
-                                                                                                                                        android.graphics
-                                                                                                                                                .Color
-                                                                                                                                                .BLACK
-                                                                                                                                "Gold" ->
-                                                                                                                                        android.graphics
-                                                                                                                                                .Color
-                                                                                                                                                .parseColor(
-                                                                                                                                                        "#FFCC00"
-                                                                                                                                                )
-                                                                                                                                "Deep Blue" ->
-                                                                                                                                        android.graphics
-                                                                                                                                                .Color
-                                                                                                                                                .parseColor(
-                                                                                                                                                        "#007AFF"
-                                                                                                                                                )
-                                                                                                                                else ->
-                                                                                                                                        android.graphics
-                                                                                                                                                .Color
-                                                                                                                                                .WHITE
-                                                                                                                        }
-
-                                                                                                                val dateFormatter =
-                                                                                                                        java.time
-                                                                                                                                .format
-                                                                                                                                .DateTimeFormatter
-                                                                                                                                .ofPattern(
-                                                                                                                                        "yyyy.MM.dd"
-                                                                                                                                )
-                                                                                                                val dateRangeStr =
-                                                                                                                        "${startDate.format(dateFormatter)} - ${endDate.format(dateFormatter)}"
-
-                                                                                                                var totalMeters =
-                                                                                                                        0.0
-                                                                                                                val floatRes =
-                                                                                                                        FloatArray(
-                                                                                                                                1
-                                                                                                                        )
-                                                                                                                for (i in
-                                                                                                                        0 until
-                                                                                                                                currentTracePoints
-                                                                                                                                        .size -
-                                                                                                                                        1) {
-                                                                                                                        android.location
-                                                                                                                                .Location
-                                                                                                                                .distanceBetween(
-                                                                                                                                        currentTracePoints[
-                                                                                                                                                        i]
-                                                                                                                                                .latitude,
-                                                                                                                                        currentTracePoints[
-                                                                                                                                                        i]
-                                                                                                                                                .longitude,
-                                                                                                                                        currentTracePoints[
-                                                                                                                                                        i +
-                                                                                                                                                                1]
-                                                                                                                                                .latitude,
-                                                                                                                                        currentTracePoints[
-                                                                                                                                                        i +
-                                                                                                                                                                1]
-                                                                                                                                                .longitude,
-                                                                                                                                        floatRes
-                                                                                                                                )
-                                                                                                                        totalMeters +=
-                                                                                                                                floatRes[
-                                                                                                                                        0]
-                                                                                                                }
-                                                                                                                val totalDistanceKm =
-                                                                                                                        totalMeters /
-                                                                                                                                1000.0
-
-                                                                                                                val subtitleStr =
-                                                                                                                        when (selectedLayout
-                                                                                                                        ) {
-                                                                                                                                ArtLayout
-                                                                                                                                        .GEEK_STATS ->
-                                                                                                                                        "DATE: $dateRangeStr • ${String.format("%.2f", totalDistanceKm)} KM"
-                                                                                                                                else ->
-                                                                                                                                        "$dateRangeStr • ${String.format("%.2f", totalDistanceKm)} KM"
-                                                                                                                        }
-
-                                                                                                                val textPaint =
-                                                                                                                        android.graphics
-                                                                                                                                .Paint()
-                                                                                                                                .apply {
-                                                                                                                                        color =
-                                                                                                                                                textCValue
-                                                                                                                                        isAntiAlias =
-                                                                                                                                                true
-                                                                                                                                        typeface =
-                                                                                                                                                finalTypeface
-                                                                                                                                        setShadowLayer(
-                                                                                                                                                8f *
-                                                                                                                                                        scale.toFloat(),
-                                                                                                                                                0f,
-                                                                                                                                                6f *
-                                                                                                                                                        scale.toFloat(),
-                                                                                                                                                android.graphics
-                                                                                                                                                        .Color
-                                                                                                                                                        .BLACK
-                                                                                                                                        )
-                                                                                                                                }
-
-                                                                                                                val subtitlePaint =
-                                                                                                                        android.graphics
-                                                                                                                                .Paint()
-                                                                                                                                .apply {
-                                                                                                                                        color =
-                                                                                                                                                textCValue
-                                                                                                                                        isAntiAlias =
-                                                                                                                                                true
-                                                                                                                                        typeface =
-                                                                                                                                                finalTypeface
-                                                                                                                                        setShadowLayer(
-                                                                                                                                                4f *
-                                                                                                                                                        scale.toFloat(),
-                                                                                                                                                0f,
-                                                                                                                                                3f *
-                                                                                                                                                        scale.toFloat(),
-                                                                                                                                                android.graphics
-                                                                                                                                                        .Color
-                                                                                                                                                        .BLACK
-                                                                                                                                        )
-                                                                                                                                }
-
-                                                                                                                when (selectedLayout
-                                                                                                                ) {
-                                                                                                                        ArtLayout
-                                                                                                                                .FULLCREEN_A24 -> {
-                                                                                                                                textPaint
-                                                                                                                                        .textSize =
-                                                                                                                                        240f *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                textPaint
-                                                                                                                                        .letterSpacing =
-                                                                                                                                        0.05f // Match 4.sp
-                                                                                                                                subtitlePaint
-                                                                                                                                        .textSize =
-                                                                                                                                        48f *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                subtitlePaint
-                                                                                                                                        .letterSpacing =
-                                                                                                                                        0.02f
-                                                                                                                                subtitlePaint
-                                                                                                                                        .alpha =
-                                                                                                                                        180
-
-                                                                                                                                val titleStr =
-                                                                                                                                        uiState.artAuthorName
-                                                                                                                                                .ifBlank {
-                                                                                                                                                        "漂泊的灵魂"
-                                                                                                                                                }
-                                                                                                                                val textWidth =
-                                                                                                                                        textPaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        titleStr
-                                                                                                                                                )
-                                                                                                                                val subWidth =
-                                                                                                                                        subtitlePaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        subtitleStr
-                                                                                                                                                )
-
-                                                                                                                                val y_base =
-                                                                                                                                        bitmap.height -
-                                                                                                                                                (180f *
-                                                                                                                                                        scale.toFloat())
-                                                                                                                                val x_title =
-                                                                                                                                        (bitmap.width -
-                                                                                                                                                textWidth) /
-                                                                                                                                                2f
-                                                                                                                                val x_sub =
-                                                                                                                                        (bitmap.width -
-                                                                                                                                                subWidth) /
-                                                                                                                                                2f
-
-                                                                                                                                if (uiState.artTextBorder
-                                                                                                                                ) {
-                                                                                                                                        val borderPaint =
-                                                                                                                                                android.graphics
-                                                                                                                                                        .Paint(
-                                                                                                                                                                textPaint
-                                                                                                                                                        )
-                                                                                                                                                        .apply {
-                                                                                                                                                                style =
-                                                                                                                                                                        android.graphics
-                                                                                                                                                                                .Paint
-                                                                                                                                                                                .Style
-                                                                                                                                                                                .STROKE
-                                                                                                                                                                strokeWidth =
-                                                                                                                                                                        6f *
-                                                                                                                                                                                scale.toFloat()
-                                                                                                                                                                color =
-                                                                                                                                                                        android.graphics
-                                                                                                                                                                                .Color
-                                                                                                                                                                                .argb(
-                                                                                                                                                                                        204,
-                                                                                                                                                                                        0,
-                                                                                                                                                                                        0,
-                                                                                                                                                                                        0
-                                                                                                                                                                                )
-                                                                                                                                                        }
-                                                                                                                                        canvas.drawText(
-                                                                                                                                                titleStr,
-                                                                                                                                                x_title,
-                                                                                                                                                y_base,
-                                                                                                                                                borderPaint
-                                                                                                                                        )
-                                                                                                                                }
-                                                                                                                                canvas.drawText(
-                                                                                                                                        titleStr,
-                                                                                                                                        x_title,
-                                                                                                                                        y_base,
-                                                                                                                                        textPaint
-                                                                                                                                )
-                                                                                                                                canvas.drawText(
-                                                                                                                                        subtitleStr,
-                                                                                                                                        x_sub,
-                                                                                                                                        y_base +
-                                                                                                                                                (100f *
-                                                                                                                                                        scale.toFloat()),
-                                                                                                                                        subtitlePaint
-                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        ArtLayout
-                                                                                                                                .POLAROID -> {
-                                                                                                                                // Draw Polaroid Frame
-                                                                                                                                val framePaint =
-                                                                                                                                        android.graphics
-                                                                                                                                                .Paint()
-                                                                                                                                                .apply {
-                                                                                                                                                        color =
-                                                                                                                                                                android.graphics
-                                                                                                                                                                        .Color
-                                                                                                                                                                        .parseColor(
-                                                                                                                                                                                "#FAFAFA"
-                                                                                                                                                                        )
-                                                                                                                                                }
-                                                                                                                                val mapWidth =
-                                                                                                                                        bitmap.width *
-                                                                                                                                                0.9f
-                                                                                                                                val mapHeight =
-                                                                                                                                        mapWidth
-                                                                                                                                val mapLeft =
-                                                                                                                                        (bitmap.width -
-                                                                                                                                                mapWidth) /
-                                                                                                                                                2f
-                                                                                                                                val mapTop =
-                                                                                                                                        bitmap.height *
-                                                                                                                                                0.15f
-                                                                                                                                val mapBottom =
-                                                                                                                                        mapTop +
-                                                                                                                                                mapHeight
-
-                                                                                                                                // 4 Rects for Frame
-                                                                                                                                canvas.drawRect(
-                                                                                                                                        0f,
-                                                                                                                                        0f,
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat(),
-                                                                                                                                        mapTop,
-                                                                                                                                        framePaint
-                                                                                                                                ) // Top
-                                                                                                                                canvas.drawRect(
-                                                                                                                                        0f,
-                                                                                                                                        mapBottom,
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bitmap.height
-                                                                                                                                                .toFloat(),
-                                                                                                                                        framePaint
-                                                                                                                                ) // Bottom (Chin)
-                                                                                                                                canvas.drawRect(
-                                                                                                                                        0f,
-                                                                                                                                        mapTop,
-                                                                                                                                        mapLeft,
-                                                                                                                                        mapBottom,
-                                                                                                                                        framePaint
-                                                                                                                                ) // Left
-                                                                                                                                canvas.drawRect(
-                                                                                                                                        mapLeft +
-                                                                                                                                                mapWidth,
-                                                                                                                                        mapTop,
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat(),
-                                                                                                                                        mapBottom,
-                                                                                                                                        framePaint
-                                                                                                                                ) // Right
-
-                                                                                                                                // Inner shadow/border
-                                                                                                                                val shadowPaint =
-                                                                                                                                        android.graphics
-                                                                                                                                                .Paint()
-                                                                                                                                                .apply {
-                                                                                                                                                        color =
-                                                                                                                                                                android.graphics
-                                                                                                                                                                        .Color
-                                                                                                                                                                        .argb(
-                                                                                                                                                                                25,
-                                                                                                                                                                                0,
-                                                                                                                                                                                0,
-                                                                                                                                                                                0
-                                                                                                                                                                        )
-                                                                                                                                                        style =
-                                                                                                                                                                android.graphics
-                                                                                                                                                                        .Paint
-                                                                                                                                                                        .Style
-                                                                                                                                                                        .STROKE
-                                                                                                                                                        strokeWidth =
-                                                                                                                                                                2f *
-                                                                                                                                                                        scale.toFloat()
-                                                                                                                                                }
-                                                                                                                                canvas.drawRect(
-                                                                                                                                        mapLeft,
-                                                                                                                                        mapTop,
-                                                                                                                                        mapLeft +
-                                                                                                                                                mapWidth,
-                                                                                                                                        mapTop +
-                                                                                                                                                mapHeight,
-                                                                                                                                        shadowPaint
-                                                                                                                                )
-
-                                                                                                                                textPaint
-                                                                                                                                        .textSize =
-                                                                                                                                        240f *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                textPaint
-                                                                                                                                        .color =
-                                                                                                                                        android.graphics
-                                                                                                                                                .Color
-                                                                                                                                                .BLACK // Force dark for Polaroid
-                                                                                                                                textPaint
-                                                                                                                                        .letterSpacing =
-                                                                                                                                        0.02f
-                                                                                                                                subtitlePaint
-                                                                                                                                        .textSize =
-                                                                                                                                        48f *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                subtitlePaint
-                                                                                                                                        .color =
-                                                                                                                                        android.graphics
-                                                                                                                                                .Color
-                                                                                                                                                .GRAY // Force gray for Polaroid
-
-                                                                                                                                val titleStr =
-                                                                                                                                        uiState.artAuthorName
-                                                                                                                                                .ifBlank {
-                                                                                                                                                        "My Journey"
-                                                                                                                                                }
-                                                                                                                                val textWidth =
-                                                                                                                                        textPaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        titleStr
-                                                                                                                                                )
-                                                                                                                                val subWidth =
-                                                                                                                                        subtitlePaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        subtitleStr
-                                                                                                                                                )
-
-                                                                                                                                val x_title =
-                                                                                                                                        (bitmap.width -
-                                                                                                                                                textWidth) /
-                                                                                                                                                2f
-                                                                                                                                val x_sub =
-                                                                                                                                        (bitmap.width -
-                                                                                                                                                subWidth) /
-                                                                                                                                                2f
-                                                                                                                                val y_base =
-                                                                                                                                        bitmap.height -
-                                                                                                                                                (180f *
-                                                                                                                                                        scale.toFloat())
-
-                                                                                                                                if (uiState.artTextBorder
-                                                                                                                                ) {
-                                                                                                                                        val borderPaint =
-                                                                                                                                                android.graphics
-                                                                                                                                                        .Paint(
-                                                                                                                                                                textPaint
-                                                                                                                                                        )
-                                                                                                                                                        .apply {
-                                                                                                                                                                style =
-                                                                                                                                                                        android.graphics
-                                                                                                                                                                                .Paint
-                                                                                                                                                                                .Style
-                                                                                                                                                                                .STROKE
-                                                                                                                                                                strokeWidth =
-                                                                                                                                                                        6f *
-                                                                                                                                                                                scale.toFloat()
-                                                                                                                                                                color =
-                                                                                                                                                                        android.graphics
-                                                                                                                                                                                .Color
-                                                                                                                                                                                .argb(
-                                                                                                                                                                                        50,
-                                                                                                                                                                                        0,
-                                                                                                                                                                                        0,
-                                                                                                                                                                                        0
-                                                                                                                                                                                ) // Subtle border for Polaroid
-                                                                                                                                                        }
-                                                                                                                                        canvas.drawText(
-                                                                                                                                                titleStr,
-                                                                                                                                                x_title,
-                                                                                                                                                y_base,
-                                                                                                                                                borderPaint
-                                                                                                                                        )
-                                                                                                                                }
-                                                                                                                                canvas.drawText(
-                                                                                                                                        titleStr,
-                                                                                                                                        x_title,
-                                                                                                                                        y_base,
-                                                                                                                                        textPaint
-                                                                                                                                )
-                                                                                                                                canvas.drawText(
-                                                                                                                                        subtitleStr,
-                                                                                                                                        x_sub,
-                                                                                                                                        y_base +
-                                                                                                                                                (100f *
-                                                                                                                                                        scale.toFloat()),
-                                                                                                                                        subtitlePaint
-                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        ArtLayout
-                                                                                                                                .GEEK_STATS -> {
-                                                                                                                                val density =
-                                                                                                                                        context.resources
-                                                                                                                                                .displayMetrics
-                                                                                                                                                .density
-                                                                                                                                val margin =
-                                                                                                                                        16f *
-                                                                                                                                                density *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                val padding =
-                                                                                                                                        16f *
-                                                                                                                                                density *
-                                                                                                                                                scale.toFloat()
-
-                                                                                                                                textPaint
-                                                                                                                                        .textSize =
-                                                                                                                                        32f *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                subtitlePaint
-                                                                                                                                        .textSize =
-                                                                                                                                        32f *
-                                                                                                                                                scale.toFloat()
-
-                                                                                                                                val titleStr =
-                                                                                                                                        uiState.artAuthorName
-                                                                                                                                                .uppercase()
-                                                                                                                                                .ifBlank {
-                                                                                                                                                        "DATA VISUALIZATION"
-                                                                                                                                                }
-                                                                                                                                val modeStr =
-                                                                                                                                        "MODE: TRACKING"
-
-                                                                                                                                val titleWidth =
-                                                                                                                                        textPaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        titleStr
-                                                                                                                                                )
-                                                                                                                                val subWidth =
-                                                                                                                                        subtitlePaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        subtitleStr
-                                                                                                                                                )
-                                                                                                                                val modeWidth =
-                                                                                                                                        subtitlePaint
-                                                                                                                                                .measureText(
-                                                                                                                                                        modeStr
-                                                                                                                                                )
-
-                                                                                                                                val boxWidth =
-                                                                                                                                        maxOf(
-                                                                                                                                                titleWidth,
-                                                                                                                                                subWidth,
-                                                                                                                                                modeWidth
-                                                                                                                                        ) +
-                                                                                                                                                padding *
-                                                                                                                                                        2
-                                                                                                                                val boxHeight =
-                                                                                                                                        textPaint
-                                                                                                                                                .textSize +
-                                                                                                                                                subtitlePaint
-                                                                                                                                                        .textSize *
-                                                                                                                                                        2 +
-                                                                                                                                                padding *
-                                                                                                                                                        2 +
-                                                                                                                                                (8f *
-                                                                                                                                                        scale.toFloat()) *
-                                                                                                                                                        2
-
-                                                                                                                                val boxLeft =
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat() -
-                                                                                                                                                margin -
-                                                                                                                                                boxWidth
-                                                                                                                                val boxTop =
-                                                                                                                                        margin
-
-                                                                                                                                // Stats Box BG
-                                                                                                                                val boxPaint =
-                                                                                                                                        android.graphics
-                                                                                                                                                .Paint()
-                                                                                                                                                .apply {
-                                                                                                                                                        color =
-                                                                                                                                                                android.graphics
-                                                                                                                                                                        .Color
-                                                                                                                                                                        .argb(
-                                                                                                                                                                                178,
-                                                                                                                                                                                0,
-                                                                                                                                                                                0,
-                                                                                                                                                                                0
-                                                                                                                                                                        )
-                                                                                                                                                }
-                                                                                                                                val cornerRadius =
-                                                                                                                                        8f *
-                                                                                                                                                density *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                canvas.drawRoundRect(
-                                                                                                                                        boxLeft,
-                                                                                                                                        boxTop,
-                                                                                                                                        boxLeft +
-                                                                                                                                                boxWidth,
-                                                                                                                                        boxTop +
-                                                                                                                                                boxHeight,
-                                                                                                                                        cornerRadius,
-                                                                                                                                        cornerRadius,
-                                                                                                                                        boxPaint
-                                                                                                                                )
-
-                                                                                                                                val tx =
-                                                                                                                                        boxLeft +
-                                                                                                                                                padding
-                                                                                                                                var ty =
-                                                                                                                                        boxTop +
-                                                                                                                                                padding +
-                                                                                                                                                textPaint
-                                                                                                                                                        .textSize *
-                                                                                                                                                        0.8f
-
-                                                                                                                                if (uiState.artTextBorder
-                                                                                                                                ) {
-                                                                                                                                        val borderPaint =
-                                                                                                                                                android.graphics
-                                                                                                                                                        .Paint(
-                                                                                                                                                                textPaint
-                                                                                                                                                        )
-                                                                                                                                                        .apply {
-                                                                                                                                                                style =
-                                                                                                                                                                        android.graphics
-                                                                                                                                                                                .Paint
-                                                                                                                                                                                .Style
-                                                                                                                                                                                .STROKE
-                                                                                                                                                                strokeWidth =
-                                                                                                                                                                        4f *
-                                                                                                                                                                                scale.toFloat()
-                                                                                                                                                                color =
-                                                                                                                                                                        android.graphics
-                                                                                                                                                                                .Color
-                                                                                                                                                                                .argb(
-                                                                                                                                                                                        204,
-                                                                                                                                                                                        0,
-                                                                                                                                                                                        0,
-                                                                                                                                                                                        0
-                                                                                                                                                                                )
-                                                                                                                                                        }
-                                                                                                                                        canvas.drawText(
-                                                                                                                                                titleStr,
-                                                                                                                                                tx,
-                                                                                                                                                ty,
-                                                                                                                                                borderPaint
-                                                                                                                                        )
-                                                                                                                                }
-                                                                                                                                canvas.drawText(
-                                                                                                                                        titleStr,
-                                                                                                                                        tx,
-                                                                                                                                        ty,
-                                                                                                                                        textPaint
-                                                                                                                                )
-
-                                                                                                                                ty +=
-                                                                                                                                        (8f *
-                                                                                                                                                scale.toFloat()) +
-                                                                                                                                                subtitlePaint
-                                                                                                                                                        .textSize
-                                                                                                                                canvas.drawText(
-                                                                                                                                        subtitleStr,
-                                                                                                                                        tx,
-                                                                                                                                        ty,
-                                                                                                                                        subtitlePaint
-                                                                                                                                )
-
-                                                                                                                                ty +=
-                                                                                                                                        (8f *
-                                                                                                                                                scale.toFloat()) +
-                                                                                                                                                subtitlePaint
-                                                                                                                                                        .textSize
-                                                                                                                                canvas.drawText(
-                                                                                                                                        modeStr,
-                                                                                                                                        tx,
-                                                                                                                                        ty,
-                                                                                                                                        subtitlePaint
-                                                                                                                                )
-
-                                                                                                                                // Corner Brackets
-                                                                                                                                val bracketPaint =
-                                                                                                                                        android.graphics
-                                                                                                                                                .Paint()
-                                                                                                                                                .apply {
-                                                                                                                                                        color =
-                                                                                                                                                                traceColorInt
-                                                                                                                                                        alpha =
-                                                                                                                                                                128
-                                                                                                                                                        style =
-                                                                                                                                                                android.graphics
-                                                                                                                                                                        .Paint
-                                                                                                                                                                        .Style
-                                                                                                                                                                        .STROKE
-                                                                                                                                                        strokeWidth =
-                                                                                                                                                                2f *
-                                                                                                                                                                        density *
-                                                                                                                                                                        scale.toFloat()
-                                                                                                                                                }
-                                                                                                                                val bLen =
-                                                                                                                                        40f *
-                                                                                                                                                density *
-                                                                                                                                                scale.toFloat()
-                                                                                                                                // Top Left
-                                                                                                                                canvas.drawLine(
-                                                                                                                                        0f,
-                                                                                                                                        0f,
-                                                                                                                                        bLen,
-                                                                                                                                        0f,
-                                                                                                                                        bracketPaint
-                                                                                                                                )
-                                                                                                                                canvas.drawLine(
-                                                                                                                                        0f,
-                                                                                                                                        0f,
-                                                                                                                                        0f,
-                                                                                                                                        bLen,
-                                                                                                                                        bracketPaint
-                                                                                                                                )
-                                                                                                                                // Bottom Right
-                                                                                                                                canvas.drawLine(
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bitmap.height
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat() -
-                                                                                                                                                bLen,
-                                                                                                                                        bitmap.height
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bracketPaint
-                                                                                                                                )
-                                                                                                                                canvas.drawLine(
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bitmap.height
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bitmap.width
-                                                                                                                                                .toFloat(),
-                                                                                                                                        bitmap.height
-                                                                                                                                                .toFloat() -
-                                                                                                                                                bLen,
-                                                                                                                                        bracketPaint
-                                                                                                                                )
-                                                                                                                        }
-                                                                                                                }
-
-                                                                                                                com.footprint
-                                                                                                                        .utils
-                                                                                                                        .ExportUtils
-                                                                                                                        .saveBitmapToGallery(
-                                                                                                                                context,
-                                                                                                                                bitmap
-                                                                                                                        )
-                                                                                                        }
-
-                                                                                                        mainHandler
-                                                                                                                .post {
-                                                                                                                        android.widget
-                                                                                                                                .Toast
-                                                                                                                                .makeText(
-                                                                                                                                        context,
-                                                                                                                                        "超清海报已保存",
-                                                                                                                                        android.widget
-                                                                                                                                                .Toast
-                                                                                                                                                .LENGTH_SHORT
-                                                                                                                                )
-                                                                                                                                .show()
-                                                                                                                        showControls =
-                                                                                                                                true
-                                                                                                                }
-                                                                                                } else {
-                                                                                                        val errorMsg =
-                                                                                                                when (statusCode
-                                                                                                                ) {
-                                                                                                                        -1 ->
-                                                                                                                                "参数传递失败 (JNI Error)"
-                                                                                                                        1 ->
-                                                                                                                                "轨迹格式错误 (JSON Parse Error)"
-                                                                                                                        2 ->
-                                                                                                                                "无法创建输出文件 (File Create Error)"
-                                                                                                                        3 ->
-                                                                                                                                "图片写入失败 (PNG Header Error)"
-                                                                                                                        4 ->
-                                                                                                                                "内存分配失败 (Skia Allocation Error)"
-                                                                                                                        5 ->
-                                                                                                                                "图像块渲染失败 (Chunk Write Error)"
-                                                                                                                        else ->
-                                                                                                                                "海报渲染失败, 代码: $statusCode"
-                                                                                                                }
-                                                                                                        mainHandler
-                                                                                                                .post {
-                                                                                                                        android.widget
-                                                                                                                                .Toast
-                                                                                                                                .makeText(
-                                                                                                                                        context,
-                                                                                                                                        errorMsg,
-                                                                                                                                        android.widget
-                                                                                                                                                .Toast
-                                                                                                                                                .LENGTH_SHORT
-                                                                                                                                )
-                                                                                                                                .show()
-                                                                                                                        showControls =
-                                                                                                                                true
-                                                                                                                }
-                                                                                                }
-                                                                                        }
-                                                                                        .start()
-                                                                        },
-                                                                        200
-                                                                )
-                                                },
+                                        Row(
                                                 modifier = Modifier.align(Alignment.TopEnd),
-                                                containerColor = selectedColor,
-                                                contentColor = Color.Black
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                                Icon(Icons.Default.Download, "导出")
-                                                Spacer(Modifier.width(8.dp))
-                                                Text("导出高清海报")
+                                                // 1. Digital Poster Export (Static PNG)
+                                                ExtendedFloatingActionButton(
+                                                        onClick = {
+                                                                android.widget.Toast.makeText(context, "正在渲染极清海报...", android.widget.Toast.LENGTH_SHORT).show()
+                                                                showControls = false
+                                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                                        val amap = mapView.map
+                                                                        val centerLat = amap?.cameraPosition?.target?.latitude ?: 39.9
+                                                                        val centerLng = amap?.cameraPosition?.target?.longitude ?: 116.3
+                                                                        
+                                                                        // Calculate target resolution and scale
+                                                                        val viewWidth = mapView.width.coerceAtLeast(1080).toDouble()
+                                                                        val viewHeight = mapView.height.coerceAtLeast(1920).toDouble()
+                                                                        val maxDim = if (viewWidth > viewHeight) viewWidth else viewHeight
+                                                                        val targetDim = 6000.0 // 6K Resolution Goal
+                                                                        val scale = (targetDim / maxDim).coerceIn(1.0, 8.0)
+
+                                                                        val exportWidth = (viewWidth * scale).toInt()
+                                                                        val exportHeight = (viewHeight * scale).toInt()
+                                                                        val currentZoom = amap?.cameraPosition?.zoom?.toDouble() ?: 14.0
+                                                                        val exportZoom = currentZoom + Math.log(scale) / Math.log(2.0)
+
+                                                                        // Format trace data
+                                                                        val tJson = org.json.JSONArray()
+                                                                        tracePoints.forEach { pt ->
+                                                                                val obj = org.json.JSONObject()
+                                                                                obj.put("lat", pt.latitude)
+                                                                                obj.put("lng", pt.longitude)
+                                                                                tJson.put(obj)
+                                                                        }
+                                                                        val traceStr = tJson.toString()
+
+                                                                        val fileName = "footprint_art_${System.currentTimeMillis()}.png"
+                                                                        val outputFile = java.io.File(context.cacheDir, fileName)
+
+                                                                        val themeStr = when (mapStyle) {
+                                                                                ArtMapStyle.LIGHT -> "light"
+                                                                                ArtMapStyle.DARK -> "dark"
+                                                                                ArtMapStyle.SATELLITE -> "satellite"
+                                                                                ArtMapStyle.VOID -> "void"
+                                                                        }
+
+                                                                        val traceColorInt = when (uiState.artColorStyle) {
+                                                                                "Deep Blue" -> android.graphics.Color.parseColor("#007AFF")
+                                                                                "Cyber Pink" -> android.graphics.Color.parseColor("#FF2D55")
+                                                                                "Neon Green" -> android.graphics.Color.parseColor("#00FF9F")
+                                                                                "Gold" -> android.graphics.Color.parseColor("#FFCC00")
+                                                                                else -> android.graphics.Color.parseColor("#FF453A")
+                                                                        }
+                                                                        val traceColorHex = String.format("#%06X", 0xFFFFFF and traceColorInt)
+
+                                                                        val typefaceId = when (uiState.artFontName) {
+                                                                                "MaShanZheng" -> com.footprint.R.font.ma_shan_zheng
+                                                                                "ZhiMangXing" -> com.footprint.R.font.zhi_mang_xing
+                                                                                "LongCang" -> com.footprint.R.font.long_cang
+                                                                                "LiuJianMaoCao" -> com.footprint.R.font.liu_jian_mao_cao
+                                                                                "ZCOOLXiaoWei" -> com.footprint.R.font.zcool_xiao_wei
+                                                                                else -> null
+                                                                        }
+                                                                        val customTypeface = typefaceId?.let {
+                                                                                androidx.core.content.res.ResourcesCompat.getFont(context, it)
+                                                                        } ?: android.graphics.Typeface.DEFAULT
+
+                                                                        val finalTypeface = if (uiState.artTextItalic) {
+                                                                                android.graphics.Typeface.create(customTypeface, android.graphics.Typeface.ITALIC)
+                                                                        } else {
+                                                                                customTypeface
+                                                                        }
+
+                                                                        // Perform heavy rendering in background thread
+                                                                        Thread {
+                                                                                val statusCode = com.footprint.utils.NativeRenderer.generateGigapixelMap(
+                                                                                        outputFile.absolutePath,
+                                                                                        traceStr,
+                                                                                        themeStr,
+                                                                                        traceColorHex,
+                                                                                        if (glowRadius > 10f) 5.0f else (glowRadius / 2f),
+                                                                                        exportWidth,
+                                                                                        exportHeight,
+                                                                                        centerLat,
+                                                                                        centerLng,
+                                                                                        exportZoom
+                                                                                )
+
+                                                                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                                                        if (statusCode == 0 && outputFile.exists()) {
+                                                                                                try {
+                                                                                                        val opt = android.graphics.BitmapFactory.Options().apply { inMutable = true }
+                                                                                                        val bitmap = android.graphics.BitmapFactory.decodeFile(outputFile.absolutePath, opt)
+                                                                                                        
+                                                                                                        val canvas = android.graphics.Canvas(bitmap)
+                                                                                                        com.footprint.utils.ArtLayoutOverlayUtils.drawOverlay(
+                                                                                                                context = context,
+                                                                                                                canvas = canvas,
+                                                                                                                bitmap = bitmap,
+                                                                                                                layout = selectedLayout,
+                                                                                                                uiState = uiState,
+                                                                                                                totalDistanceKm = totalDistanceKm,
+                                                                                                                startDate = startDate,
+                                                                                                                endDate = endDate,
+                                                                                                                customTypeface = finalTypeface,
+                                                                                                                scale = scale
+                                                                                                        )
+
+                                                                                                        com.footprint.utils.ExportUtils.saveBitmapToGallery(context, bitmap)
+                                                                                                        android.widget.Toast.makeText(context, "海报已保存至相册", android.widget.Toast.LENGTH_SHORT).show()
+                                                                                                } catch (e: Exception) {
+                                                                                                        android.widget.Toast.makeText(context, "渲染处理失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                                                                                }
+                                                                                        } else {
+                                                                                                android.widget.Toast.makeText(context, "海报生成失败 ($statusCode)", android.widget.Toast.LENGTH_SHORT).show()
+                                                                                        }
+                                                                                        showControls = true
+                                                                                }
+                                                                        }.start()
+                                                                }, 200)
+                                                        },
+                                                        containerColor = selectedColor,
+                                                        contentColor = Color.Black
+                                                ) {
+                                                        Icon(Icons.Default.Download, contentDescription = null)
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text("高清海报")
+                                                }
+
+                                                // 2. Holographic Scroll Export (Interactive HTML)
+                                                ExtendedFloatingActionButton(
+                                                        onClick = {
+                                                                val amap = mapView.map
+                                                                val center = amap?.cameraPosition?.target ?: LatLng(39.9, 116.3)
+                                                                val zoom = amap?.cameraPosition?.zoom?.toDouble() ?: 14.0
+                                                                val bounds = amap?.projection?.visibleRegion?.latLngBounds
+
+                                                                val themeStr = when (mapStyle) {
+                                                                        ArtMapStyle.LIGHT -> "light"
+                                                                        ArtMapStyle.DARK -> "dark"
+                                                                        ArtMapStyle.SATELLITE -> "satellite"
+                                                                        ArtMapStyle.VOID -> "void"
+                                                                }
+
+                                                                val traceColorInt = when (uiState.artColorStyle) {
+                                                                        "Deep Blue" -> android.graphics.Color.parseColor("#007AFF")
+                                                                        "Cyber Pink" -> android.graphics.Color.parseColor("#FF2D55")
+                                                                        "Neon Green" -> android.graphics.Color.parseColor("#00FF9F")
+                                                                        "Gold" -> android.graphics.Color.parseColor("#FFCC00")
+                                                                        else -> android.graphics.Color.parseColor("#FF453A")
+                                                                }
+                                                                val traceColorHex = String.format("#%06X", 0xFFFFFF and traceColorInt)
+
+                                                                val dateStr = "${startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"))} - ${endDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd"))}"
+                                                                val metadata = "$dateStr • %.2f KM".format(totalDistanceKm)
+
+                                                                val latLngPoints = tracePoints.map { LatLng(it.latitude, it.longitude) }
+
+                                                                 val htmlContent = com.footprint.utils.HolographicExportUtils.generateHolographicScrollContent(
+                                                                         context = context,
+                                                                         title = uiState.artAuthorName.ifBlank { "漂泊的灵魂" },
+                                                                         metadata = metadata,
+                                                                         tracePoints = latLngPoints,
+                                                                         mapStyle = themeStr,
+                                                                         traceColor = traceColorHex,
+                                                                         hasGlow = glowRadius > 5f,
+                                                                         initialCenter = center,
+                                                                         initialZoom = zoom,
+                                                                         uiState = uiState,
+                                                                         artLayout = selectedLayout,
+                                                                         bounds = bounds
+                                                                 )
+
+                                                                 if (htmlContent != null) {
+                                                                         pendingExportHtml = htmlContent
+                                                                         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+                                                                         val fileName = "Footprint_Art_$timeStamp.html"
+                                                                         createDocumentLauncher.launch(fileName)
+                                                                 } else {
+                                                                         android.widget.Toast.makeText(context, "全息画卷内容生成失败", android.widget.Toast.LENGTH_SHORT).show()
+                                                                 }
+                                                        },
+                                                        containerColor = Color.Black.copy(alpha = 0.7f),
+                                                        contentColor = selectedColor
+                                                ) {
+                                                        Icon(com.footprint.ui.screens.art.ArtIcons.Holographic, contentDescription = null)
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text("全息画卷")
+                                                }
                                         }
                                 }
                         }
