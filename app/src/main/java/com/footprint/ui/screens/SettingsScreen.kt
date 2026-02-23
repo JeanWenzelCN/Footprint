@@ -348,12 +348,14 @@ fun SettingsScreen(
                                                         supportingContent = {
                                                                 val versionName = remember {
                                                                         try {
-                                                                                context.packageManager.getPackageInfo(
-                                                                                        context.packageName,
-                                                                                        0
-                                                                                ).versionName
+                                                                                context.packageManager
+                                                                                        .getPackageInfo(
+                                                                                                context.packageName,
+                                                                                                0
+                                                                                        )
+                                                                                        .versionName
                                                                         } catch (e: Exception) {
-                                                                                "2.9.0"
+                                                                                "2.10.1"
                                                                         }
                                                                 }
                                                                 Text("v$versionName")
