@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -291,6 +292,8 @@ fun MapScreen(
         var fogHoleOffsets by remember { mutableStateOf<List<Offset>>(emptyList()) }
         var fogTrackOffsets by remember { mutableStateOf<List<Offset>>(emptyList()) }
         var fogPixelRadius by remember { mutableStateOf(0f) }
+        // The camera position used when the offsets were last projected
+        var fogAnchorCamera by remember { mutableStateOf<com.amap.api.maps.model.CameraPosition?>(null) }
 
         // Background Projection Engine for Fog Mode
         LaunchedEffect(amapInstance, heatmapPoints, trackingPath, mapMode) {
@@ -311,20 +314,30 @@ fun MapScreen(
                                         val mpp = (156543.03392 * Math.cos(centerLat * Math.PI / 180.0) / Math.pow(2.0, zoom.toDouble())).toFloat()
                                         val radius = (50.0 / mpp).toFloat()
 
-                                        // 2. Project historical holes (capped and sampled)
-                                        val maxHist = 200
-                                        val histStep = maxOf(1, heatmapPoints.size / maxHist)
-                                        val sampledHist = heatmapPoints.filterIndexed { i, _ -> i % histStep == 0 }.take(maxHist)
-                                        val holes = sampledHist.map { pt ->
+                                        // 2. Project historical trajectories (Grouped by time)
+                                        // Grouping points into segments if time gap > 10 minutes
+                                        val trajectories = mutableListOf<List<Offset>>()
+                                        if (heatmapPoints.isNotEmpty()) {
+                                            var currentSegment = mutableListOf<Offset>()
+                                            var lastTime = heatmapPoints[0].timestamp
+                                            
+                                            heatmapPoints.forEach { pt ->
+                                                if (pt.timestamp - lastTime > 10 * 60 * 1000) {
+                                                    if (currentSegment.isNotEmpty()) trajectories.add(currentSegment)
+                                                    currentSegment = mutableListOf()
+                                                }
                                                 val p = projection.toScreenLocation(LatLng(pt.latitude, pt.longitude))
-                                                Offset(p.x.toFloat(), p.y.toFloat())
+                                                currentSegment.add(Offset(p.x.toFloat(), p.y.toFloat()))
+                                                lastTime = pt.timestamp
+                                            }
+                                            if (currentSegment.isNotEmpty()) trajectories.add(currentSegment)
                                         }
+                                        
+                                        // Flatten for simple drawing but keeping it grouped for potential future path logic
+                                        val holes = trajectories.flatten()
 
-                                        // 3. Project tracking trace (capped and sampled)
-                                        val maxTrack = 100
-                                        val trackStep = maxOf(1, trackingPath.size / maxTrack)
-                                        val sampledTrack = trackingPath.filterIndexed { i, _ -> i % trackStep == 0 }.take(maxTrack)
-                                        val track = sampledTrack.map { loc ->
+                                        // 3. Project tracking trace
+                                        val track = trackingPath.map { loc ->
                                                 val p = projection.toScreenLocation(LatLng(loc.latitude, loc.longitude))
                                                 Offset(p.x.toFloat(), p.y.toFloat())
                                         }
@@ -334,6 +347,7 @@ fun MapScreen(
                                                 fogHoleOffsets = holes
                                                 fogTrackOffsets = track
                                                 fogPixelRadius = radius
+                                                fogAnchorCamera = pos
                                         }
                                 } catch (e: Exception) {
                                         // Projection failed
@@ -478,7 +492,9 @@ fun MapScreen(
                                         holeOffsets = fogHoleOffsets,
                                         trackOffsets = fogTrackOffsets,
                                         pixelRadius = fogPixelRadius,
-                                        pulseValue = pulseValue
+                                        pulseValue = pulseValue,
+                                        amap = amapInstance,
+                                        anchorCamera = fogAnchorCamera
                                 )
                         }
 
@@ -913,60 +929,135 @@ fun PermissionDenyOverlay(onRetry: () -> Unit) {
 
 @Composable
 fun CloudMistFog(
-        holeOffsets: List<Offset>,
-        trackOffsets: List<Offset>,
-        pixelRadius: Float,
-        pulseValue: Float
+    holeOffsets: List<Offset>,
+    trackOffsets: List<Offset>,
+    pixelRadius: Float,
+    pulseValue: Float,
+    amap: AMap?,
+    anchorCamera: com.amap.api.maps.model.CameraPosition?
 ) {
-        Box(
-                modifier =
-                        Modifier.fillMaxSize()
-                                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                                .drawWithContent {
-                                        // 1. Full fog layer covering the entire map
-                                        drawRect(
-                                                Brush.verticalGradient(
-                                                        colors = listOf(
-                                                                Color(0xFF1B2631).copy(alpha = 0.92f),
-                                                                Color(0xFF2E4053).copy(alpha = 0.95f)
-                                                        )
-                                                )
-                                        )
+    // 1. Precise Anchoring Transformation (Position, Scale, and Rotation)
+    val transformation = remember(amap?.cameraPosition, anchorCamera) {
+        val map = amap ?: return@remember null
+        val anchor = anchorCamera ?: return@remember null
+        
+        try {
+            val projection = map.projection ?: return@remember null
+            
+            // Current geographic center of the anchor point on screen
+            val currentAnchorScreenPos = projection.toScreenLocation(anchor.target)
+            
+            // Calculate scale and rotation deltas
+            val scale = Math.pow(2.0, (map.cameraPosition.zoom - anchor.zoom).toDouble()).toFloat()
+            val rotationDelta = map.cameraPosition.bearing - anchor.bearing
+            
+            Triple(currentAnchorScreenPos, scale, rotationDelta)
+        } catch (e: Exception) {
+            null
+        }
+    }
 
-                                        // 2. Subtle breathing mist
-                                        drawRect(Color.White.copy(alpha = 0.04f * pulseValue))
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+            .noiseTexture(0.06f) // Fine atmospheric grain
+            .drawWithContent {
+                val (anchorPos, scale, rotation) = transformation ?: Triple(android.graphics.Point(size.width.toInt()/2, size.height.toInt()/2), 1f, 0f)
+                val screenCenter = Offset(size.width / 2, size.height / 2)
+                val anchorOffset = Offset(anchorPos.x.toFloat(), anchorPos.y.toFloat())
+                
+                // 2. Cinematic Layered Parallax Fog
+                // Layer 1: Ground Mist (Deep Base)
+                drawRect(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF0F172A).copy(alpha = 0.94f), 
+                            Color(0xFF1E293B).copy(alpha = 0.97f)
+                        )
+                    )
+                )
 
-                                        // 3. Punch holes for explored areas
-                                        // A. Tracking path as corridor
-                                        if (trackOffsets.size > 1) {
-                                                val path = Path()
-                                                path.moveTo(trackOffsets[0].x, trackOffsets[0].y)
-                                                trackOffsets.drop(1).forEach { pt ->
-                                                        path.lineTo(pt.x, pt.y)
-                                                }
-                                                drawPath(
-                                                        path = path,
-                                                        color = Color.Black,
-                                                        style = Stroke(
-                                                                width = pixelRadius * 2.5f,
-                                                                cap = StrokeCap.Round,
-                                                                join = StrokeJoin.Round
-                                                        ),
-                                                        blendMode = BlendMode.DstOut
-                                                )
-                                        }
+                // Layer 2 & 3: Atmospheric Cloud Banks with Parallax
+                // We use different "anchor" points or speeds to simulate height
+                fun drawCloudLayer(layerIdx: Int, alphaMult: Float, parallaxFactor: Float) {
+                    val layerOffset = (anchorOffset - screenCenter) * parallaxFactor
+                    val cloudPulse = pulseValue * (1.0f + layerIdx * 0.2f)
+                    
+                    repeat(5) { i ->
+                        val angle = (i * 72 + cloudPulse * 20) * (Math.PI / 180.0)
+                        val dist = 150f + i * 50f
+                        val center = screenCenter + layerOffset + Offset(
+                            (Math.cos(angle) * dist).toFloat(),
+                            (Math.sin(angle) * dist).toFloat()
+                        )
+                        
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.04f * alphaMult),
+                                    Color.Transparent
+                                ),
+                                center = center,
+                                radius = size.maxDimension * 0.5f
+                            ),
+                            radius = size.maxDimension * 0.5f,
+                            center = center
+                        )
+                    }
+                }
 
-                                        // B. Circles for individual historical points
-                                        holeOffsets.forEach { center ->
-                                                drawCircle(
-                                                        color = Color.Black,
-                                                        radius = pixelRadius * 1.5f,
-                                                        center = center,
-                                                        blendMode = BlendMode.DstOut
-                                                )
-                                        }
-                                }
-        )
+                // Middle Clouds
+                drawCloudLayer(1, 0.8f, 0.85f)
+                // High Altitude Clouds
+                drawCloudLayer(2, 1.2f, 1.15f)
+
+                // 3. Precision Punch-through (Locked to Map)
+                withTransform({
+                    // Rotate and scale around the anchor point's current position
+                    translate(anchorOffset.x - screenCenter.x, anchorOffset.y - screenCenter.y)
+                    rotate(-rotation, pivot = screenCenter)
+                    scale(scale, scale, pivot = screenCenter)
+                }) {
+                    // Trajectory Corridors
+                    if (trackOffsets.size > 1) {
+                        val path = Path()
+                        path.moveTo(trackOffsets[0].x, trackOffsets[0].y)
+                        trackOffsets.drop(1).forEach { pt -> path.lineTo(pt.x, pt.y) }
+                        
+                        // Soft glow corridor
+                        drawPath(
+                            path = path,
+                            color = Color.Black.copy(alpha = 0.4f),
+                            style = Stroke(width = pixelRadius * 5.5f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                            blendMode = BlendMode.DstOut
+                        )
+                        // Main corridor
+                        drawPath(
+                            path = path,
+                            color = Color.Black,
+                            style = Stroke(width = pixelRadius * 3.8f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                            blendMode = BlendMode.DstOut
+                        )
+                    }
+
+                    // Soft Radial Holes
+                    (holeOffsets + trackOffsets).forEach { center ->
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color.Black, Color.Transparent),
+                                center = center,
+                                radius = pixelRadius * 2.8f
+                            ),
+                            radius = pixelRadius * 2.8f,
+                            center = center,
+                            blendMode = BlendMode.DstOut
+                        )
+                    }
+                }
+            }
+            .noiseTexture(0.03f) // Top level mist grain
+    )
 }
 
 
