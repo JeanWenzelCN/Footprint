@@ -59,7 +59,9 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MapScreen(
@@ -141,6 +143,11 @@ fun MapScreen(
         // This bypasses AndroidView.update entirely for reliable real-time updates
         var livePolylineRef = remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
         var histPolylineRef = remember { mutableStateOf<com.amap.api.maps.model.Polyline?>(null) }
+
+        // --- Mode-specific overlay refs (stable across recompositions) ---
+        val standardMarkerRefs = remember { mutableListOf<com.amap.api.maps.model.Marker>() }
+        val capsuleMarkerRefs = remember { mutableListOf<com.amap.api.maps.model.Marker>() }
+        val heatmapCircleRefs = remember { mutableListOf<com.amap.api.maps.model.Circle>() }
 
         LaunchedEffect(mapView) {
                 // Observe trackingPath changes
@@ -247,6 +254,7 @@ fun MapScreen(
                                 else flowOf(emptyList())
                         }
                         .collectAsStateWithLifecycle(initialValue = emptyList())
+        
 
         // ... (Existing MapView lifecycle)
 
@@ -279,6 +287,136 @@ fun MapScreen(
         val hazeState = remember { HazeState() }
         var amapInstance by remember { mutableStateOf<AMap?>(null) }
 
+        // --- Fog Offset States (Pre-computed in background) ---
+        var fogHoleOffsets by remember { mutableStateOf<List<Offset>>(emptyList()) }
+        var fogTrackOffsets by remember { mutableStateOf<List<Offset>>(emptyList()) }
+        var fogPixelRadius by remember { mutableStateOf(0f) }
+
+        // Background Projection Engine for Fog Mode
+        LaunchedEffect(amapInstance, heatmapPoints, trackingPath, mapMode) {
+                if (mapMode != MapMode.FOG) return@LaunchedEffect
+                
+                val map = amapInstance ?: return@LaunchedEffect
+                
+                // Observe camera changes via snapshotFlow
+                snapshotFlow { map.cameraPosition }.collect { pos ->
+                        if (pos == null) return@collect
+                        withContext(Dispatchers.Default) {
+                                try {
+                                        val projection = map.projection ?: return@withContext
+                                        val zoom = pos.zoom
+                                        val centerLat = pos.target.latitude
+
+                                        // 1. Calculate pixel radius once
+                                        val mpp = (156543.03392 * Math.cos(centerLat * Math.PI / 180.0) / Math.pow(2.0, zoom.toDouble())).toFloat()
+                                        val radius = (50.0 / mpp).toFloat()
+
+                                        // 2. Project historical holes (capped and sampled)
+                                        val maxHist = 200
+                                        val histStep = maxOf(1, heatmapPoints.size / maxHist)
+                                        val sampledHist = heatmapPoints.filterIndexed { i, _ -> i % histStep == 0 }.take(maxHist)
+                                        val holes = sampledHist.map { pt ->
+                                                val p = projection.toScreenLocation(LatLng(pt.latitude, pt.longitude))
+                                                Offset(p.x.toFloat(), p.y.toFloat())
+                                        }
+
+                                        // 3. Project tracking trace (capped and sampled)
+                                        val maxTrack = 100
+                                        val trackStep = maxOf(1, trackingPath.size / maxTrack)
+                                        val sampledTrack = trackingPath.filterIndexed { i, _ -> i % trackStep == 0 }.take(maxTrack)
+                                        val track = sampledTrack.map { loc ->
+                                                val p = projection.toScreenLocation(LatLng(loc.latitude, loc.longitude))
+                                                Offset(p.x.toFloat(), p.y.toFloat())
+                                        }
+
+                                        // Update states on Main thread
+                                        withContext(Dispatchers.Main) {
+                                                fogHoleOffsets = holes
+                                                fogTrackOffsets = track
+                                                fogPixelRadius = radius
+                                        }
+                                } catch (e: Exception) {
+                                        // Projection failed
+                                }
+                        }
+                }
+        }
+
+        // --- Mode-specific overlay management via LaunchedEffect ---
+        // STANDARD markers
+        LaunchedEffect(mapView) {
+                snapshotFlow { mapMode to entries.toList() }.collect { (mode, entryList) ->
+                        val map = mapView.map ?: return@collect
+                        standardMarkerRefs.forEach { it.remove() }
+                        standardMarkerRefs.clear()
+                        if (mode == MapMode.STANDARD) {
+                                entryList.forEach { entry ->
+                                        if (entry.latitude != null && entry.longitude != null) {
+                                                standardMarkerRefs.add(map.addMarker(
+                                                        MarkerOptions()
+                                                                .position(LatLng(entry.latitude, entry.longitude))
+                                                                .title(entry.title)
+                                                                .snippet(entry.id.toString())
+                                                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+                                                ))
+                                        }
+                                }
+                        }
+                }
+        }
+
+        // CAPSULE markers
+        LaunchedEffect(mapView) {
+                snapshotFlow { Triple(mapMode, unlockedCapsules.toList(), lockedCapsules.toList()) }.collect { (mode, unlocked, locked) ->
+                        val map = mapView.map ?: return@collect
+                        capsuleMarkerRefs.forEach { it.remove() }
+                        capsuleMarkerRefs.clear()
+                        if (mode == MapMode.CAPSULE) {
+                                unlocked.forEach { capsule ->
+                                        capsuleMarkerRefs.add(map.addMarker(
+                                                MarkerOptions()
+                                                        .position(LatLng(capsule.latitude, capsule.longitude))
+                                                        .title("Time Capsule")
+                                                        .snippet(capsule.id.toString())
+                                                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
+                                        ))
+                                }
+                                locked.forEach { capsule ->
+                                        capsuleMarkerRefs.add(map.addMarker(
+                                                MarkerOptions()
+                                                        .position(LatLng(capsule.latitude, capsule.longitude))
+                                                        .title("Locked Capsule")
+                                                        .snippet(capsule.id.toString())
+                                                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
+                                        ))
+                                }
+                        }
+                }
+        }
+
+        // FOG mode is handled entirely by CloudMistFog Compose overlay below.
+        // No AMap polygon needed.
+
+        // HEATMAP circles
+        LaunchedEffect(mapView) {
+                snapshotFlow { mapMode to heatmapPoints.toList() }.collect { (mode, pts) ->
+                        val map = mapView.map ?: return@collect
+                        heatmapCircleRefs.forEach { it.remove() }
+                        heatmapCircleRefs.clear()
+                        if (mode == MapMode.HEATMAP) {
+                                pts.filterIndexed { i, _ -> i % 5 == 0 }.forEach { pt ->
+                                        heatmapCircleRefs.add(map.addCircle(
+                                                com.amap.api.maps.model.CircleOptions()
+                                                        .center(LatLng(pt.latitude, pt.longitude))
+                                                        .radius(50.0)
+                                                        .fillColor(android.graphics.Color.parseColor("#1A33FF00"))
+                                                        .strokeWidth(0f)
+                                        ))
+                                }
+                        }
+                }
+        }
+
         CompositionLocalProvider(LocalHazeState provides hazeState) {
                 Box(
                         modifier =
@@ -300,235 +438,28 @@ fun MapScreen(
 
                                                                         // ... (Existing setup)
 
-                                                                        setOnMarkerClickListener {
-                                                                                marker ->
-                                                                                val entryId =
-                                                                                        marker.snippet
-                                                                                                ?.toLongOrNull()
-                                                                                if (entryId != null
-                                                                                ) {
-                                                                                        // Check if
-                                                                                        // it's a
-                                                                                        // capsule
-                                                                                        // or entry
-                                                                                        if (marker.title ==
-                                                                                                        "Time Capsule"
-                                                                                        ) {
-                                                                                                // Show
-                                                                                                // capsule
-                                                                                                // dialog
-                                                                                        } else {
-                                                                                                onNavigateToDetail(
-                                                                                                        entryId
-                                                                                                )
-                                                                                        }
+                                                                        setOnMarkerClickListener { marker ->
+                                                                val id = marker.snippet?.toLongOrNull()
+                                                                if (id != null) {
+                                                                        if (marker.title == "Time Capsule" || marker.title == "Locked Capsule") {
+                                                                                val capsule = (unlockedCapsules + lockedCapsules).find { it.id == id }
+                                                                                if (capsule != null) {
+                                                                                        selectedCapsule = capsule
                                                                                 }
-                                                                                true
+                                                                        } else {
+                                                                                onNavigateToDetail(id)
                                                                         }
-                                                                        // ...
+                                                                }
+                                                                true
+                                                        }
                                                                 }
                                                         }
                                                 },
                                                 modifier = Modifier.fillMaxSize()
-                                        ) { mv ->
-                                                mv.map.clear()
-
-                                                // NOTE: Track polylines (live + history) are 
-                                                // managed by snapshotFlow LaunchedEffects above.
-                                                // Re-add them after clear() so they aren't wiped.
-                                                livePolylineRef.value = null
-                                                histPolylineRef.value = null
-                                                
-                                                // Re-draw today's tracks after clear
-                                                if (todayTrackPoints.isNotEmpty()) {
-                                                        val histPts = todayTrackPoints.map { LatLng(it.latitude, it.longitude) }
-                                                        histPolylineRef.value = mv.map.addPolyline(
-                                                                PolylineOptions()
-                                                                        .addAll(histPts)
-                                                                        .width(14f)
-                                                                        .color(android.graphics.Color.parseColor("#8000FF9F"))
-                                                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                                                        .zIndex(50f)
-                                                        )
-                                                }
-                                                // Re-draw live track after clear
-                                                if (trackingPath.isNotEmpty()) {
-                                                        val pts = trackingPath.map { LatLng(it.latitude, it.longitude) }
-                                                        livePolylineRef.value = mv.map.addPolyline(
-                                                                PolylineOptions()
-                                                                        .addAll(pts)
-                                                                        .width(18f)
-                                                                        .color(android.graphics.Color.parseColor("#00FF9F"))
-                                                                        .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                                                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                                                        .zIndex(100f)
-                                                        )
-                                                }
-
-                                                // 2. Standard Mode: Footprint Markers
-                                                if (mapMode == MapMode.STANDARD) {
-                                                        entries.forEach { entry ->
-                                                                if (entry.latitude != null && entry.longitude != null) {
-                                                                        mv.map.addMarker(
-                                                                                MarkerOptions()
-                                                                                        .position(LatLng(entry.latitude, entry.longitude))
-                                                                                        .title(entry.title)
-                                                                                        .snippet(entry.id.toString())
-                                                                                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
-                                                                        )
-                                                                }
-                                                        }
-                                                }
-
-                                                // Capsule Mode
-                                                if (mapMode == MapMode.CAPSULE) {
-                                                        unlockedCapsules.forEach { capsule ->
-                                                                mv.map.addMarker(
-                                                                        MarkerOptions()
-                                                                                .position(
-                                                                                        LatLng(
-                                                                                                capsule.latitude,
-                                                                                                capsule.longitude
-                                                                                        )
-                                                                                )
-                                                                                .title(
-                                                                                        "Time Capsule"
-                                                                                )
-                                                                                .snippet(
-                                                                                        capsule.id
-                                                                                                .toString()
-                                                                                )
-                                                                                .icon(
-                                                                                        BitmapDescriptorFactory
-                                                                                                .defaultMarker(
-                                                                                                        BitmapDescriptorFactory
-                                                                                                                .HUE_YELLOW
-                                                                                                )
-                                                                                )
-                                                                )
-                                                        }
-                                                        lockedCapsules.forEach { capsule ->
-                                                                mv.map.addMarker(
-                                                                        MarkerOptions()
-                                                                                .position(
-                                                                                        LatLng(
-                                                                                                capsule.latitude,
-                                                                                                capsule.longitude
-                                                                                        )
-                                                                                )
-                                                                                .title(
-                                                                                        "Locked Capsule"
-                                                                                )
-                                                                                .snippet(
-                                                                                        capsule.id
-                                                                                                .toString()
-                                                                                )
-                                                                                .icon(
-                                                                                        BitmapDescriptorFactory
-                                                                                                .defaultMarker(
-                                                                                                        BitmapDescriptorFactory
-                                                                                                                .HUE_RED
-                                                                                                )
-                                                                                )
-                                                                )
-                                                        }
-                                                }
-
-                                                // 4. Cloud & Mist Overlay (Compose Side)
-                                                // We use a dummy overlay here to ensure the AMap
-                                                // polygon
-                                                // clears
-                                                // elements,
-                                                // but we will also draw the "Cloud" in Compose.
-                                                if (mapMode == MapMode.FOG) {
-                                                        // Still use AMap polygon to hide everything
-                                                        // underneath
-                                                        // efficiently
-                                                        val worldCoords =
-                                                                listOf(
-                                                                        LatLng(85.0, -179.9),
-                                                                        LatLng(85.0, 179.9),
-                                                                        LatLng(-85.0, 179.9),
-                                                                        LatLng(-85.0, -179.9)
-                                                                )
-                                                        val fogArea =
-                                                                com.amap.api.maps.model
-                                                                        .PolygonOptions()
-                                                                        .addAll(worldCoords)
-                                                                        .fillColor(
-                                                                                android.graphics
-                                                                                        .Color
-                                                                                        .parseColor(
-                                                                                                "#4D4F4F4F"
-                                                                                        )
-                                                                        ) // Much more transparent
-                                                                        // base
-                                                                        .strokeWidth(0f)
-                                                                        .zIndex(2f)
-
-                                                        val sampledHistorical =
-                                                                heatmapPoints
-                                                                        .filterIndexed { index, _ ->
-                                                                                index % 20 == 0
-                                                                        }
-                                                                        .map {
-                                                                                LatLng(
-                                                                                        it.latitude,
-                                                                                        it.longitude
-                                                                                )
-                                                                        }
-                                                        val sampledLive =
-                                                                trackingPath
-                                                                        .filterIndexed { index, _ ->
-                                                                                index % 10 == 0
-                                                                        }
-                                                                        .map {
-                                                                                LatLng(
-                                                                                        it.latitude,
-                                                                                        it.longitude
-                                                                                )
-                                                                        }
-                                                        (sampledHistorical + sampledLive).forEach {
-                                                                latLng ->
-                                                                fogArea.addHoles(
-                                                                        com.amap.api.maps.model
-                                                                                .CircleHoleOptions()
-                                                                                .center(latLng)
-                                                                                .radius(50.0)
-                                                                )
-                                                        }
-                                                        mv.map.addPolygon(fogArea)
-                                                }
-
-                                                // Heatmap Mode
-                                                if (mapMode == MapMode.HEATMAP) {
-                                                        // Optimized visualization: Larger radius,
-                                                        // lower
-                                                        // opacity for
-                                                        // blending
-                                                        heatmapPoints.forEach { pt ->
-                                                                mv.map.addCircle(
-                                                                        com.amap.api.maps.model
-                                                                                .CircleOptions()
-                                                                                .center(
-                                                                                        LatLng(
-                                                                                                pt.latitude,
-                                                                                                pt.longitude
-                                                                                        )
-                                                                                )
-                                                                                .radius(50.0)
-                                                                                .fillColor(
-                                                                                        android.graphics
-                                                                                                .Color
-                                                                                                .parseColor(
-                                                                                                        "#1A33FF00"
-                                                                                                )
-                                                                                )
-                                                                                .strokeWidth(0f)
-                                                                )
-                                                        }
-                                                }
+                                        ) { _ ->
+                                                // All overlays (Polylines, Markers, Circles) are managed 
+                                                // by dedicated LaunchedEffects above to prevent flickering
+                                                // and high CPU usage during recomposition.
                                         }
                                 } else {
                                         PermissionDenyOverlay {
@@ -544,11 +475,10 @@ fun MapScreen(
                         // High-Fidelity Cloud & Mist Layer (Android 12+)
                         if (mapMode == MapMode.FOG) {
                                 CloudMistFog(
-                                        amap = amapInstance,
-                                        heatmapPoints = heatmapPoints,
-                                        trackingPath = trackingPath,
-                                        pulseValue = pulseValue,
-                                        hazeState = hazeState
+                                        holeOffsets = fogHoleOffsets,
+                                        trackOffsets = fogTrackOffsets,
+                                        pixelRadius = fogPixelRadius,
+                                        pulseValue = pulseValue
                                 )
                         }
 
@@ -983,226 +913,63 @@ fun PermissionDenyOverlay(onRetry: () -> Unit) {
 
 @Composable
 fun CloudMistFog(
-        amap: AMap?,
-        heatmapPoints: List<TrackPointEntity>,
-        trackingPath: List<AMapLocation>,
-        pulseValue: Float,
-        hazeState: HazeState
+        holeOffsets: List<Offset>,
+        trackOffsets: List<Offset>,
+        pixelRadius: Float,
+        pulseValue: Float
 ) {
-        val a = amap ?: return
-        val zoom = a.cameraPosition.zoom
-
-        // Sample and map to LatLng for unified processing
-        val sampledPoints =
-                (heatmapPoints.filterIndexed { i, _ -> i % 10 == 0 }.map {
-                        LatLng(it.latitude, it.longitude)
-                } +
-                        trackingPath.filterIndexed { i, _ -> i % 5 == 0 }.map {
-                                LatLng(it.latitude, it.longitude)
-                        })
-
-        // Calculate dynamic hole size in pixels
-        val targetRadiusMeters = 50.0
-
-        // Separate points for clearer path construction
-        val heatmapLines = heatmapPoints.filterIndexed { i, _ -> i % 10 == 0 }
-        val trackingLines = trackingPath.filterIndexed { i, _ -> i % 3 == 0 }
-
         Box(
                 modifier =
                         Modifier.fillMaxSize()
-                                .hazeChild(
-                                        state = hazeState,
-                                        shape = RectangleShape,
-                                        style = HazeStyle(blurRadius = 40.dp)
-                                )
                                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                                 .drawWithContent {
-                                        // 1. Draw Base "Cloud/Smoke" Atmospheric Texture
-                                        // Layer 1: Deep Base
+                                        // 1. Full fog layer covering the entire map
                                         drawRect(
                                                 Brush.verticalGradient(
-                                                        colors =
-                                                                listOf(
-                                                                        Color(0xFF1B2631)
-                                                                                .copy(
-                                                                                        alpha =
-                                                                                                0.96f
-                                                                                ),
-                                                                        Color(0xFF2E4053)
-                                                                                .copy(alpha = 0.98f)
-                                                                )
+                                                        colors = listOf(
+                                                                Color(0xFF1B2631).copy(alpha = 0.92f),
+                                                                Color(0xFF2E4053).copy(alpha = 0.95f)
+                                                        )
                                                 )
                                         )
 
-                                        // Layer 2: Cloud Splotches (Noise-like gradients)
-                                        drawRect(
-                                                Brush.radialGradient(
-                                                        colors =
-                                                                listOf(
-                                                                        Color.White.copy(
-                                                                                alpha = 0.05f
-                                                                        ),
-                                                                        Color.Transparent
-                                                                ),
-                                                        center =
-                                                                Offset(
-                                                                        size.width * 0.3f,
-                                                                        size.height * 0.2f
-                                                                ),
-                                                        radius = size.width * 0.8f
-                                                )
-                                        )
-                                        drawRect(
-                                                Brush.radialGradient(
-                                                        colors =
-                                                                listOf(
-                                                                        Color.White.copy(
-                                                                                alpha = 0.03f
-                                                                        ),
-                                                                        Color.Transparent
-                                                                ),
-                                                        center =
-                                                                Offset(
-                                                                        size.width * 0.7f,
-                                                                        size.height * 0.8f
-                                                                ),
-                                                        radius = size.width * 0.6f
-                                                )
-                                        )
+                                        // 2. Subtle breathing mist
+                                        drawRect(Color.White.copy(alpha = 0.04f * pulseValue))
 
-                                        // 2. Breathing mist effect
-                                        drawRect(Color.White.copy(alpha = 0.05f * pulseValue))
-
-                                        // 3. Punch Holes (Explored Areas)
-                                        val projection = a.projection
-
-                                        // A. CONNECTED PATH for tracking trace
-                                        if (trackingLines.size > 1) {
+                                        // 3. Punch holes for explored areas
+                                        // A. Tracking path as corridor
+                                        if (trackOffsets.size > 1) {
                                                 val path = Path()
-                                                val firstPoint = trackingLines[0]
-                                                val firstPos =
-                                                        projection.toScreenLocation(
-                                                                LatLng(
-                                                                        firstPoint.latitude,
-                                                                        firstPoint.longitude
-                                                                )
-                                                        )
-                                                path.moveTo(
-                                                        firstPos.x.toFloat(),
-                                                        firstPos.y.toFloat()
-                                                )
-
-                                                trackingLines.drop(1).forEach { loc ->
-                                                        val pos =
-                                                                projection.toScreenLocation(
-                                                                        LatLng(
-                                                                                loc.latitude,
-                                                                                loc.longitude
-                                                                        )
-                                                                )
-                                                        path.lineTo(
-                                                                pos.x.toFloat(),
-                                                                pos.y.toFloat()
-                                                        )
+                                                path.moveTo(trackOffsets[0].x, trackOffsets[0].y)
+                                                trackOffsets.drop(1).forEach { pt ->
+                                                        path.lineTo(pt.x, pt.y)
                                                 }
-
-                                                // Calculate pixels for ~60m width
-                                                val centerLat =
-                                                        trackingLines[trackingLines.size / 2]
-                                                                .latitude
-                                                val metersPerPixel =
-                                                        (156543.03392 *
-                                                                        Math.cos(
-                                                                                centerLat *
-                                                                                        Math.PI /
-                                                                                        180.0
-                                                                        ) /
-                                                                        Math.pow(
-                                                                                2.0,
-                                                                                zoom.toDouble()
-                                                                        ))
-                                                                .toFloat()
-                                                val pixelRadius =
-                                                        (targetRadiusMeters / metersPerPixel)
-                                                                .toFloat()
-
                                                 drawPath(
                                                         path = path,
                                                         color = Color.Black,
-                                                        style =
-                                                                Stroke(
-                                                                        width =
-                                                                                pixelRadius *
-                                                                                        2.2f, // Slightly wider corridor
-                                                                        cap = StrokeCap.Round,
-                                                                        join = StrokeJoin.Round
-                                                                ),
-                                                        blendMode = BlendMode.DstOut
-                                                )
-
-                                                // Add a softer outer glow/blur to the path
-                                                drawPath(
-                                                        path = path,
-                                                        color = Color.Black.copy(alpha = 0.4f),
-                                                        style =
-                                                                Stroke(
-                                                                        width = pixelRadius * 3.5f,
-                                                                        cap = StrokeCap.Round,
-                                                                        join = StrokeJoin.Round
-                                                                ),
+                                                        style = Stroke(
+                                                                width = pixelRadius * 2.5f,
+                                                                cap = StrokeCap.Round,
+                                                                join = StrokeJoin.Round
+                                                        ),
                                                         blendMode = BlendMode.DstOut
                                                 )
                                         }
 
-                                        // B. BLOBS for individual heatmap points (also soft)
-                                        heatmapLines.forEach { pt ->
-                                                val latLng = LatLng(pt.latitude, pt.longitude)
-                                                val pos = projection.toScreenLocation(latLng)
-                                                val metersPerPixel =
-                                                        (156543.03392 *
-                                                                        Math.cos(
-                                                                                latLng.latitude *
-                                                                                        Math.PI /
-                                                                                        180.0
-                                                                        ) /
-                                                                        Math.pow(
-                                                                                2.0,
-                                                                                zoom.toDouble()
-                                                                        ))
-                                                                .toFloat()
-                                                val pixelRadius =
-                                                        (targetRadiusMeters / metersPerPixel)
-                                                                .toFloat()
-
-                                                // Soft inner core
+                                        // B. Circles for individual historical points
+                                        holeOffsets.forEach { center ->
                                                 drawCircle(
                                                         color = Color.Black,
-                                                        radius = pixelRadius,
-                                                        center =
-                                                                Offset(
-                                                                        pos.x.toFloat(),
-                                                                        pos.y.toFloat()
-                                                                ),
-                                                        blendMode = BlendMode.DstOut
-                                                )
-
-                                                // Soft outer glow
-                                                drawCircle(
-                                                        color = Color.Black.copy(alpha = 0.3f),
-                                                        radius = pixelRadius * 1.8f,
-                                                        center =
-                                                                Offset(
-                                                                        pos.x.toFloat(),
-                                                                        pos.y.toFloat()
-                                                                ),
+                                                        radius = pixelRadius * 1.5f,
+                                                        center = center,
                                                         blendMode = BlendMode.DstOut
                                                 )
                                         }
                                 }
-                                .noiseTexture(0.2f)
         )
 }
+
+
 
 @Composable
 fun CapsuleContentDialog(capsule: TimeCapsuleEntity, onDismiss: () -> Unit) {
