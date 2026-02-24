@@ -27,3 +27,9 @@ enum class WoodType {
     WALNUT, // 胡桃木 (深邃)
     VINTAGE_OAK // 做旧橡木 (裂纹)
 }
+
+enum class ArmorType {
+    GUNMETAL, // 拉丝黑钛
+    CARBON_FIBER, // 碳纤维网格
+    WORN_OLIVE // 战损哑光绿
+}

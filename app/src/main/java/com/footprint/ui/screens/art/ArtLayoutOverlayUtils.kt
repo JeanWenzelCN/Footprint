@@ -326,61 +326,131 @@ object ArtLayoutOverlayUtils {
                                                 )
                                         }
                                         "HEAVY_MECHANICAL" -> {
-                                                val rivetPaint =
-                                                        Paint().apply {
+                                                val armorColor = when (uiState.armorType) {
+                                                        ArmorType.GUNMETAL -> Color.parseColor("#2C2C2E")
+                                                        ArmorType.CARBON_FIBER -> Color.parseColor("#1C1C1E")
+                                                        ArmorType.WORN_OLIVE -> Color.parseColor("#4B5320")
+                                                }
+                                                val framePaint = Paint().apply {
+                                                        color = armorColor
+                                                        isAntiAlias = true
+                                                }
+                                                
+                                                // 1. Chamfered Frame Path
+                                                val chamfer = 60f * scale.toFloat()
+                                                val framePath = Path().apply {
+                                                        moveTo(chamfer, 0f)
+                                                        lineTo(bitmap.width - chamfer, 0f)
+                                                        lineTo(bitmap.width.toFloat(), chamfer)
+                                                        lineTo(bitmap.width.toFloat(), bitmap.height - chamfer)
+                                                        lineTo(bitmap.width - chamfer, bitmap.height.toFloat())
+                                                        lineTo(chamfer, bitmap.height.toFloat())
+                                                        lineTo(0f, bitmap.height - chamfer)
+                                                        lineTo(0f, chamfer)
+                                                        close()
+                                                        // Hole for map
+                                                        addRect(mapLeft, mapTop, mapLeft + mapWidth, mapTop + mapHeight, Path.Direction.CCW)
+                                                        fillType = Path.FillType.EVEN_ODD
+                                                }
+                                                canvas.drawPath(framePath, framePaint)
+
+                                                // 2. Armor Texture (Simulated)
+                                                if (uiState.canvasGrain > 0f) {
+                                                        val noisePaint = Paint().apply {
                                                                 color = Color.BLACK
-                                                                alpha = 60
-                                                                isAntiAlias = true
+                                                                alpha = (25 * uiState.canvasGrain).toInt()
+                                                                xfermode = PorterDuffXfermode(PorterDuff.Mode.OVERLAY)
                                                         }
-                                                val rivetRadius = 8f * scale.toFloat()
-                                                val rivets =
-                                                        listOf(
-                                                                PointF(mapLeft / 2, mapTop / 2),
-                                                                PointF(
-                                                                        bitmap.width - mapLeft / 2,
-                                                                        mapTop / 2
-                                                                ),
-                                                                PointF(
-                                                                        mapLeft / 2,
-                                                                        bitmap.height -
-                                                                                (40f *
-                                                                                        scale.toFloat())
-                                                                ),
-                                                                PointF(
-                                                                        bitmap.width - mapLeft / 2,
-                                                                        bitmap.height -
-                                                                                (40f *
-                                                                                        scale.toFloat())
-                                                                )
-                                                        )
-                                                rivets.forEach { pos ->
-                                                        canvas.drawCircle(
-                                                                pos.x,
-                                                                pos.y,
-                                                                rivetRadius,
-                                                                rivetPaint
-                                                        )
+                                                        canvas.drawRect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat(), noisePaint)
                                                 }
 
-                                                val stripePaint =
-                                                        Paint().apply {
-                                                                color = Color.parseColor("#FBC02D")
-                                                                alpha = 100
-                                                        }
-                                                val stripeWidth = 20f * scale.toFloat()
-                                                for (i in 0 until 5) {
-                                                        val xOffset =
-                                                                bitmap.width -
-                                                                        (120f * scale.toFloat()) +
-                                                                        (i * stripeWidth * 2)
-                                                        canvas.drawRect(
-                                                                xOffset,
-                                                                mapBottom + (20f * scale.toFloat()),
-                                                                xOffset + stripeWidth,
-                                                                mapBottom + (60f * scale.toFloat()),
-                                                                stripePaint
-                                                        )
+                                                // 3. Rivets
+                                                val rivetPaint = Paint().apply {
+                                                        color = Color.BLACK
+                                                        alpha = 100
+                                                        isAntiAlias = true
                                                 }
+                                                val rivetHighlight = Paint().apply {
+                                                        color = Color.WHITE
+                                                        alpha = 50
+                                                        isAntiAlias = true
+                                                }
+                                                val rRadius = (6f + (uiState.mechanicalSeams * 8f)) * scale.toFloat()
+                                                val rSpacing = (150f + (1.0f - uiState.mechanicalSeams) * 250f) * scale.toFloat()
+
+                                                fun drawRivet(x: Float, y: Float) {
+                                                        canvas.drawCircle(x, y, rRadius, rivetPaint)
+                                                        canvas.drawCircle(x - 2f * scale.toFloat(), y - 2f * scale.toFloat(), rRadius * 0.5f, rivetHighlight)
+                                                }
+
+                                                // Frame Rivets
+                                                drawRivet(mapLeft / 2, mapTop / 2)
+                                                drawRivet(bitmap.width - mapLeft / 2, mapTop / 2)
+                                                drawRivet(mapLeft / 2, bitmap.height - (60f * scale.toFloat()))
+                                                drawRivet(bitmap.width - mapLeft / 2, bitmap.height - (60f * scale.toFloat()))
+
+                                                var rx = mapLeft + rSpacing
+                                                while (rx < mapLeft + mapWidth - rSpacing) {
+                                                        drawRivet(rx, mapTop / 2)
+                                                        drawRivet(rx, bitmap.height - (60f * scale.toFloat()))
+                                                        rx += rSpacing
+                                                }
+
+                                                // 4. Hazard Striping
+                                                if (uiState.hasHazardStriping) {
+                                                        val sWidth = 40f * scale.toFloat()
+                                                        val sHeight = 70f * scale.toFloat()
+                                                        val sSpacing = 80f * scale.toFloat()
+                                                        val sPaint = Paint().apply {
+                                                                color = Color.parseColor("#FBC02D")
+                                                                alpha = 200
+                                                                isAntiAlias = true
+                                                        }
+                                                        val sStartX = (mapLeft + mapWidth) - (300f * scale.toFloat())
+                                                        val sY = mapTop + mapHeight + (40f * scale.toFloat())
+
+                                                        for (i in 0 until 6) {
+                                                                val x = sStartX + (i * sSpacing)
+                                                                val sPath = Path().apply {
+                                                                        moveTo(x, sY)
+                                                                        lineTo(x + sWidth, sY)
+                                                                        lineTo(x + sWidth - (20f * scale.toFloat()), sY + sHeight)
+                                                                        lineTo(x - (20f * scale.toFloat()), sY + sHeight)
+                                                                        close()
+                                                                }
+                                                                canvas.drawPath(sPath, sPaint)
+                                                        }
+                                                }
+
+                                                // 5. Tactical HUD (Post-processing on map area)
+                                                val hudColor = Color.parseColor(uiState.artColorStyle)
+                                                val gridPaint = Paint().apply {
+                                                        color = hudColor
+                                                        alpha = 40
+                                                        strokeWidth = 1f * scale.toFloat()
+                                                }
+                                                val gridCount = 10
+                                                for (i in 1 until gridCount) {
+                                                        val gx = mapLeft + (mapWidth / gridCount) * i
+                                                        val gy = mapTop + (mapHeight / gridCount) * i
+                                                        canvas.drawLine(gx, mapTop, gx, mapTop + mapHeight, gridPaint)
+                                                        canvas.drawLine(mapLeft, gy, mapLeft + mapWidth, gy, gridPaint)
+                                                }
+                                                
+                                                val retPaint = Paint().apply {
+                                                        color = hudColor
+                                                        alpha = 180
+                                                        style = Paint.Style.STROKE
+                                                        strokeWidth = 3f * scale.toFloat()
+                                                }
+                                                val rs = 60f * scale.toFloat()
+                                                // Corner Reticles
+                                                canvas.drawLines(floatArrayOf(
+                                                        mapLeft, mapTop, mapLeft + rs, mapTop,
+                                                        mapLeft, mapTop, mapLeft, mapTop + rs,
+                                                        mapLeft + mapWidth, mapTop + mapHeight, mapLeft + mapWidth - rs, mapTop + mapHeight,
+                                                        mapLeft + mapWidth, mapTop + mapHeight, mapLeft + mapWidth, mapTop + mapHeight - rs
+                                                ), retPaint)
                                         }
                                         "CYBER_GLITCH" -> {
                                                 val neonPaint =
@@ -508,9 +578,16 @@ object ArtLayoutOverlayUtils {
                                 subtitlePaint.color = subColor
                                 subtitlePaint.textSize = 48f * scale.toFloat()
 
-                                val titleStr = uiState.artAuthorName.ifBlank { "My Journey" }
+                                val titleStrRaw = uiState.artAuthorName.ifBlank { "My Journey" }
+                                val titleStr = if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") "[ $titleStrRaw ]" else titleStrRaw
                                 val textWidth = textPaint.measureText(titleStr)
-                                val subWidth = subtitlePaint.measureText(subtitleStr)
+                                
+                                val exportDateRange = if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") dateRangeStr.replace(".", "-") else dateRangeStr
+                                val exportSubtitleStr = if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") {
+                                        "$exportDateRange · ${String.format("%.2f", totalDistanceKm)} KM"
+                                } else subtitleStr
+                                
+                                val subWidth = subtitlePaint.measureText(exportSubtitleStr)
 
                                 val x_title = (bitmap.width - textWidth) / 2f
                                 val x_sub = (bitmap.width - subWidth) / 2f
@@ -542,6 +619,25 @@ object ArtLayoutOverlayUtils {
                                                 }
                                         canvas.drawText(titleStr, x_title, y_base, engravingPaint)
                                 } else {
+                                        if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") {
+                                                val borderPaint = Paint().apply {
+                                                        color = titleColor
+                                                        alpha = 80
+                                                        style = Paint.Style.STROKE
+                                                        strokeWidth = 2f * scale.toFloat()
+                                                        isAntiAlias = true
+                                                }
+                                                val rectPadding = 40f * scale.toFloat()
+                                                canvas.drawRoundRect(
+                                                        x_title - rectPadding,
+                                                        y_base - textPaint.textSize * 0.8f,
+                                                        x_title + textWidth + rectPadding,
+                                                        y_base + 10f * scale.toFloat(),
+                                                        40f * scale.toFloat(),
+                                                        40f * scale.toFloat(),
+                                                        borderPaint
+                                                )
+                                        }
                                         canvas.drawText(titleStr, x_title, y_base, textPaint)
                                 }
 
@@ -558,14 +654,14 @@ object ArtLayoutOverlayUtils {
                                                                 )
                                                 }
                                         canvas.drawText(
-                                                subtitleStr,
+                                                exportSubtitleStr,
                                                 x_sub,
                                                 y_base + (100f * scale.toFloat()),
                                                 subEngravingPaint
                                         )
                                 } else {
                                         canvas.drawText(
-                                                subtitleStr,
+                                                exportSubtitleStr,
                                                 x_sub,
                                                 y_base + (100f * scale.toFloat()),
                                                 subtitlePaint

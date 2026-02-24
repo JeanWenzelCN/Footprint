@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -484,6 +486,30 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         uiState.engravingDepth,
                                                         it
                                                 )
+                                        },
+                                        armorType = uiState.armorType,
+                                        onArmorTypeChange = {
+                                                viewModel.updateMechanicalSettings(
+                                                        it,
+                                                        uiState.mechanicalSeams,
+                                                        uiState.hasHazardStriping
+                                                )
+                                        },
+                                        mechanicalSeams = uiState.mechanicalSeams,
+                                        onMechanicalSeamsChange = {
+                                                viewModel.updateMechanicalSettings(
+                                                        uiState.armorType,
+                                                        it,
+                                                        uiState.hasHazardStriping
+                                                )
+                                        },
+                                        hasHazardStriping = uiState.hasHazardStriping,
+                                        onHasHazardStripingChange = {
+                                                viewModel.updateMechanicalSettings(
+                                                        uiState.armorType,
+                                                        uiState.mechanicalSeams,
+                                                        it
+                                                )
                                         }
                                 )
                         }
@@ -515,6 +541,9 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 woodType = uiState.woodType,
                                 engravingDepth = uiState.engravingDepth,
                                 canvasGrain = uiState.canvasGrain,
+                                armorType = uiState.armorType,
+                                mechanicalSeams = uiState.mechanicalSeams,
+                                hasHazardStriping = uiState.hasHazardStriping,
                                 userNickname = uiState.userNickname,
                                 hazeState = hazeState
                         )
@@ -1128,6 +1157,9 @@ fun ArtLayoutOverlay(
         woodType: WoodType = WoodType.ASH,
         engravingDepth: Float = 0.5f,
         canvasGrain: Float = 0.3f,
+        armorType: ArmorType = ArmorType.GUNMETAL,
+        mechanicalSeams: Float = 0.5f,
+        hasHazardStriping: Boolean = false,
         userNickname: String = "旅行者",
         hazeState: HazeState? = null
 ) {
@@ -1367,7 +1399,13 @@ fun ArtLayoutOverlay(
                                                         "LIQUID_GLASS" ->
                                                                 Color.White.copy(alpha = 0.4f)
                                                         "ACOUSTIC_WOOD" -> woodBaseColor
-                                                        "HEAVY_MECHANICAL" -> Color(0xFF455A64)
+                                                        "HEAVY_MECHANICAL" -> {
+                                                                when (armorType) {
+                                                                        ArmorType.GUNMETAL -> Color(0xFF2C2C2E)
+                                                                        ArmorType.CARBON_FIBER -> Color(0xFF1C1C1E)
+                                                                        ArmorType.WORN_OLIVE -> Color(0xFF4B5320)
+                                                                }
+                                                        }
                                                         "CYBER_GLITCH" -> Color(0xFF0D0D0D)
                                                         else -> Color(0xFFFAFAFA)
                                                 }
@@ -1480,83 +1518,106 @@ fun ArtLayoutOverlay(
                                                         drawLine(Color.Black.copy(alpha = 0.2f), Offset(0f, size.height), Offset(size.width, size.height), 2f)
                                                 }
                                                 "HEAVY_MECHANICAL" -> {
-                                                        // Rivets at corners
-                                                        val rivetRadius = 4f
-                                                        val rivets =
-                                                                listOf(
-                                                                        Offset(
-                                                                                mapLeft / 2,
-                                                                                mapTop / 2
-                                                                        ),
-                                                                        Offset(
-                                                                                size.width -
-                                                                                        mapLeft / 2,
-                                                                                mapTop / 2
-                                                                        ),
-                                                                        Offset(
-                                                                                mapLeft / 2,
-                                                                                size.height - 20f
-                                                                        ),
-                                                                        Offset(
-                                                                                size.width -
-                                                                                        mapLeft / 2,
-                                                                                size.height - 20f
-                                                                        )
-                                                                )
-                                                        rivets.forEach { pos ->
-                                                                drawCircle(
-                                                                        Color.Black.copy(
-                                                                                alpha = 0.3f
-                                                                        ),
-                                                                        radius = rivetRadius,
-                                                                        center = pos
-                                                                )
-                                                                drawCircle(
-                                                                        Color.White.copy(
-                                                                                alpha = 0.2f
-                                                                        ),
-                                                                        radius = rivetRadius * 0.7f,
-                                                                        center =
-                                                                                pos.copy(
-                                                                                        x =
-                                                                                                pos.x -
-                                                                                                        1f,
-                                                                                        y =
-                                                                                                pos.y -
-                                                                                                        1f
-                                                                                )
-                                                                )
+                                                        // 1. Chamfered Corners for the frame
+                                                        val chamferSize = 24f
+                                                        val framePath = androidx.compose.ui.graphics.Path().apply {
+                                                                // Outer Frame
+                                                                moveTo(chamferSize, 0f)
+                                                                lineTo(size.width - chamferSize, 0f)
+                                                                lineTo(size.width, chamferSize)
+                                                                lineTo(size.width, size.height - chamferSize)
+                                                                lineTo(size.width - chamferSize, size.height)
+                                                                lineTo(chamferSize, size.height)
+                                                                lineTo(0f, size.height - chamferSize)
+                                                                lineTo(0f, chamferSize)
+                                                                close()
+                                                                // Subtract Inner Map Area
+                                                                addRect(androidx.compose.ui.geometry.Rect(mapLeft, mapTop, mapRight, mapBottom))
+                                                                fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd
+                                                        }
+                                                        drawPath(framePath, frameColor)
+
+                                                        // 2. Armor Texture (Noise/Brushed)
+                                                        val noiseAlpha = 0.1f * canvasGrain
+                                                        drawRect(
+                                                                color = Color.Black.copy(alpha = noiseAlpha),
+                                                                blendMode = androidx.compose.ui.graphics.BlendMode.Overlay
+                                                        )
+
+                                                        // 3. Rivets along the seams
+                                                        val rivetColor = Color.Black.copy(alpha = 0.4f)
+                                                        val rivetHighlight = Color.White.copy(alpha = 0.2f)
+                                                        val rivetRadius = 3f + (mechanicalSeams * 2f)
+                                                        val rivetSpacing = 60f + (1.0f - mechanicalSeams) * 100f
+
+                                                        fun drawRivet(x: Float, y: Float) {
+                                                                drawCircle(rivetColor, radius = rivetRadius, center = Offset(x, y))
+                                                                drawCircle(rivetHighlight, radius = rivetRadius * 0.5f, center = Offset(x - 1f, y - 1f))
                                                         }
 
-                                                        // Caution Stripes on the bottom right
-                                                        val stripeWidth = 10f
-                                                        for (i in 0 until 5) {
-                                                                val xOffset =
-                                                                        size.width - 60f +
-                                                                                (i *
-                                                                                        stripeWidth *
-                                                                                        2)
-                                                                drawRect(
-                                                                        color =
-                                                                                Color(0xFFFBC02D)
-                                                                                        .copy(
-                                                                                                alpha =
-                                                                                                        0.4f
-                                                                                        ),
-                                                                        topLeft =
-                                                                                Offset(
-                                                                                        xOffset,
-                                                                                        mapBottom +
-                                                                                                10f
-                                                                                ),
-                                                                        size =
-                                                                                androidx.compose.ui
-                                                                                        .geometry
-                                                                                        .Size(
-                                                                                                stripeWidth,
-                                                                                                20f
-                                                                                        )
-                                                                )
+                                                        // Draw rivets at frame corners
+                                                        drawRivet(mapLeft / 2, mapTop / 2)
+                                                        drawRivet(size.width - mapLeft / 2, mapTop / 2)
+                                                        drawRivet(mapLeft / 2, size.height - 30f)
+                                                        drawRivet(size.width - mapLeft / 2, size.height - 30f)
+
+                                                        // Draw rivets along the edges
+                                                        var currentX = mapLeft + rivetSpacing
+                                                        while (currentX < mapRight - rivetSpacing) {
+                                                                drawRivet(currentX, mapTop / 2)
+                                                                drawRivet(currentX, size.height - 30f)
+                                                                currentX += rivetSpacing
+                                                        }
+
+                                                        // 4. Hazard Striping
+                                                        if (hasHazardStriping) {
+                                                                val stripeWidth = 15f
+                                                                val stripeHeight = 25f
+                                                                val stripeSpacing = 30f
+                                                                val stripeColor = Color(0xFFFBC02D).copy(alpha = 0.8f) // Industrial Yellow
+                                                                
+                                                                // Bottom Right Corner
+                                                                val stripeStartX = mapRight - 120f
+                                                                val stripeY = mapBottom + 15f
+                                                                
+                                                                for (i in 0 until 6) {
+                                                                        val path = androidx.compose.ui.graphics.Path().apply {
+                                                                                val x = stripeStartX + (i * stripeSpacing)
+                                                                                moveTo(x, stripeY)
+                                                                                lineTo(x + stripeWidth, stripeY)
+                                                                                lineTo(x + stripeWidth - 10f, stripeY + stripeHeight)
+                                                                                lineTo(x - 10f, stripeY + stripeHeight)
+                                                                                close()
+                                                                        }
+                                                                        drawPath(path, stripeColor)
+                                                                        drawPath(path, Color.Black.copy(alpha = 0.3f), style = Stroke(width = 1f))
+                                                                }
+                                                        }
+
+                                                        // 5. Tactical HUD (On top of map area)
+                                                        clipRect(mapLeft, mapTop, mapRight, mapBottom) {
+                                                                // Grid lines
+                                                                val gridCount = 8
+                                                                val gridColor = artColor.copy(alpha = 0.15f)
+                                                                for (i in 1 until gridCount) {
+                                                                        val gx = mapLeft + (mapWidth / gridCount) * i
+                                                                        val gy = mapTop + (mapHeight / gridCount) * i
+                                                                        drawLine(gridColor, Offset(gx, mapTop), Offset(gx, mapBottom), 0.5f)
+                                                                        drawLine(gridColor, Offset(mapLeft, gy), Offset(mapRight, gy), 0.5f)
+                                                                }
+                                                                
+                                                                // Border highlight
+                                                                drawRect(artColor.copy(alpha = 0.2f), Offset(mapLeft, mapTop), androidx.compose.ui.geometry.Size(mapWidth, mapHeight), style = Stroke(width = 1f))
+                                                                
+                                                                // Corner Reticles
+                                                                val retSize = 20f
+                                                                val retThickness = 2f
+                                                                // Top-Left
+                                                                drawLine(artColor, Offset(mapLeft, mapTop), Offset(mapLeft + retSize, mapTop), retThickness)
+                                                                drawLine(artColor, Offset(mapLeft, mapTop), Offset(mapLeft, mapTop + retSize), retThickness)
+                                                                // Bottom-Right
+                                                                drawLine(artColor, Offset(mapRight, mapBottom), Offset(mapRight - retSize, mapBottom), retThickness)
+                                                                drawLine(artColor, Offset(mapRight, mapBottom), Offset(mapRight, mapBottom - retSize), retThickness)
                                                         }
                                                 }
                                                 "CYBER_GLITCH" -> {
@@ -1706,7 +1767,16 @@ fun ArtLayoutOverlay(
                                                         fontFamily = fontFamily,
                                                         fontStyle = fontStyle
                                                 )
-                                        Text(artName.ifBlank { "时光足迹" }, style = titleStyle, modifier = if (polaroidFrameStyle == "ACOUSTIC_WOOD") Modifier.graphicsLayer(alpha = 0.95f) else Modifier)
+                                        Text(
+                                                artName.ifBlank { "时光足迹" }.let { if (polaroidFrameStyle == "HEAVY_MECHANICAL") "[ $it ]" else it },
+                                                style = titleStyle,
+                                                modifier =
+                                                        if (polaroidFrameStyle == "ACOUSTIC_WOOD")
+                                                                Modifier.graphicsLayer(alpha = 0.95f)
+                                                        else if (polaroidFrameStyle == "HEAVY_MECHANICAL")
+                                                                Modifier.border(1.dp, titleColor.copy(alpha = 0.3f), CircleShape).padding(horizontal = 16.dp, vertical = 4.dp)
+                                                        else Modifier
+                                        )
 
                                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1740,12 +1810,13 @@ fun ArtLayoutOverlay(
                                                 // Left Side: Meta Data
                                                 Column(modifier = Modifier.weight(1f)) {
                                                         Text(
-                                                                dateRange,
+                                                                if (polaroidFrameStyle == "HEAVY_MECHANICAL") dateRange.replace(".", "-") else dateRange,
                                                                 style =
                                                                         MaterialTheme.typography
-                                                                                .labelSmall,
+                                                                                .labelSmall.copy(
+                                                                                        fontFamily = if (polaroidFrameStyle == "HEAVY_MECHANICAL") androidx.compose.ui.text.font.FontFamily.Monospace else fontFamily
+                                                                                ),
                                                                 color = Color.Gray,
-                                                                fontFamily = fontFamily
                                                         )
                                                         Text(
                                                                 "TOTAL DISTANCE: %.2f KM".format(

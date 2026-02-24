@@ -56,7 +56,13 @@ fun ArtStyleControls(
         engravingDepth: Float = 0.5f,
         onEngravingDepthChange: (Float) -> Unit = {},
         canvasGrain: Float = 0.3f,
-        onCanvasGrainChange: (Float) -> Unit = {}
+        onCanvasGrainChange: (Float) -> Unit = {},
+        armorType: ArmorType = ArmorType.GUNMETAL,
+        onArmorTypeChange: (ArmorType) -> Unit = {},
+        mechanicalSeams: Float = 0.5f,
+        onMechanicalSeamsChange: (Float) -> Unit = {},
+        hasHazardStriping: Boolean = false,
+        onHasHazardStripingChange: (Boolean) -> Unit = {}
 ) {
         val scrollState = rememberScrollState()
         Column(
@@ -396,6 +402,124 @@ fun ArtStyleControls(
                                         color = Color.White.copy(alpha = 0.1f),
                                         modifier = Modifier.padding(vertical = 8.dp)
                                 )
+                        }
+
+                        // Heavy Mechanical Tweaks
+                        if (polaroidFrameStyle == "HEAVY_MECHANICAL") {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        // Armor Plating Selector
+                                        Column {
+                                                Text(
+                                                        "装甲涂装 (Armor Plating)",
+                                                        color = Color.Gray,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                )
+                                                Spacer(Modifier.height(8.dp))
+                                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                        val armorTypes =
+                                                                listOf(
+                                                                        ArmorType.GUNMETAL to
+                                                                                Color(0xFF2C2C2E), // 拉丝黑钛
+                                                                        ArmorType.CARBON_FIBER to
+                                                                                Color(0xFF1C1C1E), // 碳纤维
+                                                                        ArmorType.WORN_OLIVE to
+                                                                                Color(0xFF4B5320) // 战损绿
+                                                                )
+                                                        armorTypes.forEach { (aType, color) ->
+                                                                val selected = armorType == aType
+                                                                Box(
+                                                                        modifier =
+                                                                                Modifier.size(32.dp)
+                                                                                        .clip(CircleShape)
+                                                                                        .background(color)
+                                                                                        .border(
+                                                                                                width =
+                                                                                                        if (selected
+                                                                                                        )
+                                                                                                                2.dp
+                                                                                                        else
+                                                                                                                0.dp,
+                                                                                                color =
+                                                                                                        if (selected
+                                                                                                        )
+                                                                                                                accentColor
+                                                                                                        else
+                                                                                                                Color.Transparent,
+                                                                                                shape =
+                                                                                                        CircleShape
+                                                                                        )
+                                                                                        .clickable {
+                                                                                                onArmorTypeChange(
+                                                                                                        aType
+                                                                                                )
+                                                                                        }
+                                                                )
+                                                        }
+                                                }
+                                        }
+
+                                        // Rivets & Seams Slider
+                                        Column {
+                                                Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement =
+                                                                Arrangement.SpaceBetween
+                                                ) {
+                                                        Text(
+                                                                "铆钉与接缝 (Rivets & Seams)",
+                                                                color = Color.Gray,
+                                                                style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                        Text(
+                                                                "${(mechanicalSeams * 100).toInt()}%",
+                                                                color = accentColor,
+                                                                style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                }
+                                                Slider(
+                                                        value = mechanicalSeams,
+                                                        onValueChange = onMechanicalSeamsChange,
+                                                        colors =
+                                                                SliderDefaults.colors(
+                                                                        thumbColor = accentColor,
+                                                                        activeTrackColor = accentColor
+                                                                )
+                                                )
+                                        }
+
+                                        // Hazard Striping Toggle
+                                        Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                        ) {
+                                                Column {
+                                                        Text(
+                                                                "警戒涂装 (Hazard)",
+                                                                color = Color.Gray,
+                                                                style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                        Text(
+                                                                "黄黑斜纹警告线",
+                                                                color = Color.DarkGray,
+                                                                style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                }
+                                                Switch(
+                                                        checked = hasHazardStriping,
+                                                        onCheckedChange = onHasHazardStripingChange,
+                                                        colors = SwitchDefaults.colors(
+                                                                checkedThumbColor = accentColor,
+                                                                checkedTrackColor = accentColor.copy(alpha = 0.5f)
+                                                        )
+                                                )
+                                        }
+
+                                        HorizontalDivider(
+                                                color = Color.White.copy(alpha = 0.1f),
+                                                modifier = Modifier.padding(vertical = 8.dp)
+                                        )
+                                }
                         }
 
                         // Frame Padding Slider

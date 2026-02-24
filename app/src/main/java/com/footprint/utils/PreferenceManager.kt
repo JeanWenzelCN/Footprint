@@ -120,4 +120,25 @@ class PreferenceManager(context: Context) {
     var canvasGrain: Float
         get() = prefs.getFloat("canvas_grain", 0.3f)
         set(value) = prefs.edit().putFloat("canvas_grain", value).apply()
+
+    var armorType: com.footprint.ui.screens.art.ArmorType
+        get() {
+            val name = prefs.getString("armor_type", com.footprint.ui.screens.art.ArmorType.GUNMETAL.name)
+            return try {
+                com.footprint.ui.screens.art.ArmorType.valueOf(
+                        name ?: com.footprint.ui.screens.art.ArmorType.GUNMETAL.name
+                )
+            } catch (e: Exception) {
+                com.footprint.ui.screens.art.ArmorType.GUNMETAL
+            }
+        }
+        set(value) = prefs.edit().putString("armor_type", value.name).apply()
+
+    var mechanicalSeams: Float
+        get() = prefs.getFloat("mechanical_seams", 0.5f)
+        set(value) = prefs.edit().putFloat("mechanical_seams", value).apply()
+
+    var hasHazardStriping: Boolean
+        get() = prefs.getBoolean("has_hazard_striping", false)
+        set(value) = prefs.edit().putBoolean("has_hazard_striping", value).apply()
 }

@@ -4,6 +4,7 @@ import com.footprint.data.model.FootprintEntry
 import com.footprint.data.model.FootprintSummary
 import com.footprint.data.model.Mood
 import com.footprint.data.model.TravelGoal
+import com.footprint.ui.screens.art.ArmorType
 import com.footprint.ui.screens.art.WoodType
 import com.footprint.ui.theme.ThemeMode
 import java.time.LocalDate
@@ -41,6 +42,9 @@ data class FootprintUiState(
         val woodType: WoodType = WoodType.ASH,
         val engravingDepth: Float = 0.5f,
         val canvasGrain: Float = 0.3f,
+        val armorType: ArmorType = ArmorType.GUNMETAL,
+        val mechanicalSeams: Float = 0.5f,
+        val hasHazardStriping: Boolean = false,
         val randomMemory: FootprintEntry? = null,
         val memoryQuote: String? = null,
         val isLoading: Boolean = true

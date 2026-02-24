@@ -68,6 +68,9 @@ class FootprintViewModel(
     private val woodType = MutableStateFlow(preferenceManager.woodType)
     private val engravingDepth = MutableStateFlow(preferenceManager.engravingDepth)
     private val canvasGrain = MutableStateFlow(preferenceManager.canvasGrain)
+    private val armorType = MutableStateFlow(preferenceManager.armorType)
+    private val mechanicalSeams = MutableStateFlow(preferenceManager.mechanicalSeams)
+    private val hasHazardStriping = MutableStateFlow(preferenceManager.hasHazardStriping)
     private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
     val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
@@ -109,7 +112,10 @@ class FootprintViewModel(
             val polInnerBorder: Float,
             val woodType: com.footprint.ui.screens.art.WoodType,
             val engravingDepth: Float,
-            val canvasGrain: Float
+            val canvasGrain: Float,
+            val armorType: com.footprint.ui.screens.art.ArmorType,
+            val mechanicalSeams: Float,
+            val hasHazardStriping: Boolean
     )
 
     // 强类型合并流
@@ -151,7 +157,10 @@ class FootprintViewModel(
                     polaroidInnerBorder,
                     woodType,
                     engravingDepth,
-                    canvasGrain
+                    canvasGrain,
+                    armorType,
+                    mechanicalSeams,
+                    hasHazardStriping
             ) { args: Array<Any?> ->
                 val style = args[0] as String
                 val padding = args[1] as Float
@@ -159,7 +168,10 @@ class FootprintViewModel(
                 val wType = args[3] as com.footprint.ui.screens.art.WoodType
                 val eDepth = args[4] as Float
                 val cGrain = args[5] as Float
-                Triple(style, padding, border) to Triple(wType, eDepth, cGrain)
+                val aType = args[6] as com.footprint.ui.screens.art.ArmorType
+                val mSeams = args[7] as Float
+                val hHazard = args[8] as Boolean
+                Triple(style, padding, border) to (Triple(wType, eDepth, cGrain) to Triple(aType, mSeams, hHazard))
             }
 
     private val artCombinedFlow = combine(artBaseFlow, artTextFlow) { base, text -> base to text }
@@ -171,7 +183,8 @@ class FootprintViewModel(
                     artCombined,
                     polCombined ->
                 val (artBase, artText) = artCombined
-                val (polBase, polWood) = polCombined
+                val (polBase, polExtras) = polCombined
+                val (polWood, polMech) = polExtras
                 PrefsGroup(
                         theme = appearance.first,
                         style = appearance.second,
@@ -190,7 +203,10 @@ class FootprintViewModel(
                         polInnerBorder = polBase.third,
                         woodType = polWood.first,
                         engravingDepth = polWood.second,
-                        canvasGrain = polWood.third
+                        canvasGrain = polWood.third,
+                        armorType = polMech.first,
+                        mechanicalSeams = polMech.second,
+                        hasHazardStriping = polMech.third
                 )
             }
 
@@ -276,6 +292,9 @@ class FootprintViewModel(
                                 woodType = prefs.woodType,
                                 engravingDepth = prefs.engravingDepth,
                                 canvasGrain = prefs.canvasGrain,
+                                armorType = prefs.armorType,
+                                mechanicalSeams = prefs.mechanicalSeams,
+                                hasHazardStriping = prefs.hasHazardStriping,
                                 randomMemory = randomMemory,
                                 memoryQuote = memoryQuote,
                                 isLoading = false
@@ -804,6 +823,29 @@ class FootprintViewModel(
         return repository.getTrackPoints(start, end)
     }
     // ----------------
+    fun setArmorType(type: com.footprint.ui.screens.art.ArmorType) {
+        armorType.value = type
+        preferenceManager.armorType = type
+    }
+
+    fun setMechanicalSeams(seams: Float) {
+        mechanicalSeams.value = seams
+        preferenceManager.mechanicalSeams = seams
+    }
+
+    fun setHasHazardStriping(has: Boolean) {
+        hasHazardStriping.value = has
+        preferenceManager.hasHazardStriping = has
+    }
+
+    fun updateMechanicalSettings(type: com.footprint.ui.screens.art.ArmorType, seams: Float, hazard: Boolean) {
+        armorType.value = type
+        preferenceManager.armorType = type
+        mechanicalSeams.value = seams
+        preferenceManager.mechanicalSeams = seams
+        hasHazardStriping.value = hazard
+        preferenceManager.hasHazardStriping = hazard
+    }
 
     companion object {
         val Factory =
