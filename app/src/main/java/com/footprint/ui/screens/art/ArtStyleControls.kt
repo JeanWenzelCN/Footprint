@@ -1,9 +1,10 @@
 package com.footprint.ui.screens.art
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -49,7 +50,13 @@ fun ArtStyleControls(
         polaroidFramePadding: Float = 0.5f,
         onPolaroidFramePaddingChange: (Float) -> Unit = {},
         polaroidInnerBorder: Float = 1f,
-        onPolaroidInnerBorderChange: (Float) -> Unit = {}
+        onPolaroidInnerBorderChange: (Float) -> Unit = {},
+        woodType: WoodType = WoodType.ASH,
+        onWoodTypeChange: (WoodType) -> Unit = {},
+        engravingDepth: Float = 0.5f,
+        onEngravingDepthChange: (Float) -> Unit = {},
+        canvasGrain: Float = 0.3f,
+        onCanvasGrainChange: (Float) -> Unit = {}
 ) {
         val scrollState = rememberScrollState()
         Column(
@@ -267,6 +274,128 @@ fun ArtStyleControls(
                                                 )
                                         }
                                 }
+                        }
+
+                        // Wood Tweaks
+                        if (polaroidFrameStyle == "ACOUSTIC_WOOD") {
+                                HorizontalDivider(
+                                        color = Color.White.copy(alpha = 0.1f),
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                )
+
+                                // Wood Type Color Blocks
+                                Column {
+                                        Text(
+                                                "木材种类",
+                                                color = Color.Gray,
+                                                style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.padding(top = 8.dp)
+                                        ) {
+                                                val woodTypes =
+                                                        listOf(
+                                                                WoodType.ASH to
+                                                                        Color(0xFFE5D3B3), // 明亮白蜡
+                                                                WoodType.WALNUT to
+                                                                        Color(0xFF5D4037), // 深邃胡桃
+                                                                WoodType.VINTAGE_OAK to
+                                                                        Color(0xFFD2B48C) // 做旧橡木
+                                                        )
+                                                woodTypes.forEach { (wType, color) ->
+                                                        val selected = woodType == wType
+                                                        Box(
+                                                                modifier =
+                                                                        Modifier.size(32.dp)
+                                                                                .clip(CircleShape)
+                                                                                .background(color)
+                                                                                .border(
+                                                                                        width =
+                                                                                                if (selected
+                                                                                                )
+                                                                                                        2.dp
+                                                                                                else
+                                                                                                        0.dp,
+                                                                                        color =
+                                                                                                if (selected
+                                                                                                )
+                                                                                                        Color.White
+                                                                                                else
+                                                                                                        Color.Transparent,
+                                                                                        shape =
+                                                                                                CircleShape
+                                                                                )
+                                                                                .clickable {
+                                                                                        onWoodTypeChange(
+                                                                                                wType
+                                                                                        )
+                                                                                }
+                                                        )
+                                                }
+                                        }
+                                }
+
+                                // Engraving Depth Slider
+                                Column {
+                                        Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                                Text(
+                                                        "雕刻深度 (Engraving)",
+                                                        color = Color.Gray,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                )
+                                                Text(
+                                                        "${(engravingDepth * 100).toInt()}%",
+                                                        color = accentColor,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                )
+                                        }
+                                        Slider(
+                                                value = engravingDepth,
+                                                onValueChange = onEngravingDepthChange,
+                                                colors =
+                                                        SliderDefaults.colors(
+                                                                thumbColor = accentColor,
+                                                                activeTrackColor = accentColor
+                                                        )
+                                        )
+                                }
+
+                                // Canvas Grain Slider
+                                Column {
+                                        Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                                Text(
+                                                        "纸张质感 (Grain)",
+                                                        color = Color.Gray,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                )
+                                                Text(
+                                                        "${(canvasGrain * 100).toInt()}%",
+                                                        color = accentColor,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                )
+                                        }
+                                        Slider(
+                                                value = canvasGrain,
+                                                onValueChange = onCanvasGrainChange,
+                                                colors =
+                                                        SliderDefaults.colors(
+                                                                thumbColor = accentColor,
+                                                                activeTrackColor = accentColor
+                                                        )
+                                        )
+                                }
+
+                                HorizontalDivider(
+                                        color = Color.White.copy(alpha = 0.1f),
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                )
                         }
 
                         // Frame Padding Slider

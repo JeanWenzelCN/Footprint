@@ -21,3 +21,9 @@ enum class PolaroidFrameStyle {
     CYBER_GLITCH, // 赛博霓虹 (Cyber Glitch)
     LIQUID_GLASS // 液态毛玻璃
 }
+
+enum class WoodType {
+    ASH, // 白蜡木 (明亮)
+    WALNUT, // 胡桃木 (深邃)
+    VINTAGE_OAK // 做旧橡木 (裂纹)
+}

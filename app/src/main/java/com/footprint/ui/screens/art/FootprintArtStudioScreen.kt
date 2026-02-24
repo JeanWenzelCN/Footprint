@@ -16,9 +16,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,10 +90,19 @@ const val CYBER_GLITCH_SHADER =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
+        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
         val context = LocalContext.current
         val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
         val mapView = remember { TextureMapView(context).apply { onCreate(null) } }
         val hazeState = remember { HazeState() }
+    val haptic = LocalHapticFeedback.current
+
+    // Haptic feedback for Woodcraft Studio
+    LaunchedEffect(uiState.polaroidFrameStyle) {
+        if (uiState.polaroidFrameStyle == "ACOUSTIC_WOOD" && uiState.hapticFeedbackEnabled) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
 
         // Map Lifecycle
         DisposableEffect(lifecycle, mapView) {
@@ -142,7 +158,6 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                 }
 
         // State for controls
-        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
         val defaultColor =
                 remember(uiState.artColorStyle) {
@@ -287,6 +302,7 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                         }
                 }
         }
+
 
         val scaffoldState =
                 androidx.compose.material3.rememberBottomSheetScaffoldState(
@@ -444,6 +460,30 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         uiState.polaroidFramePadding,
                                                         it
                                                 )
+                                        },
+                                        woodType = uiState.woodType,
+                                        onWoodTypeChange = {
+                                                viewModel.updateWoodSettings(
+                                                        it,
+                                                        uiState.engravingDepth,
+                                                        uiState.canvasGrain
+                                                )
+                                        },
+                                        engravingDepth = uiState.engravingDepth,
+                                        onEngravingDepthChange = {
+                                                viewModel.updateWoodSettings(
+                                                        uiState.woodType,
+                                                        it,
+                                                        uiState.canvasGrain
+                                                )
+                                        },
+                                        canvasGrain = uiState.canvasGrain,
+                                        onCanvasGrainChange = {
+                                                viewModel.updateWoodSettings(
+                                                        uiState.woodType,
+                                                        uiState.engravingDepth,
+                                                        it
+                                                )
                                         }
                                 )
                         }
@@ -472,6 +512,9 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 polaroidFrameStyle = uiState.polaroidFrameStyle,
                                 polaroidFramePadding = uiState.polaroidFramePadding,
                                 polaroidInnerBorder = uiState.polaroidInnerBorder,
+                                woodType = uiState.woodType,
+                                engravingDepth = uiState.engravingDepth,
+                                canvasGrain = uiState.canvasGrain,
                                 userNickname = uiState.userNickname,
                                 hazeState = hazeState
                         )
@@ -1082,6 +1125,9 @@ fun ArtLayoutOverlay(
         polaroidFrameStyle: String = "CLASSIC_WHITE",
         polaroidFramePadding: Float = 0.5f,
         polaroidInnerBorder: Float = 1f,
+        woodType: WoodType = WoodType.ASH,
+        engravingDepth: Float = 0.5f,
+        canvasGrain: Float = 0.3f,
         userNickname: String = "旅行者",
         hazeState: HazeState? = null
 ) {
@@ -1309,12 +1355,18 @@ fun ArtLayoutOverlay(
                                 // 1. Map Frame & Material logic
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                         // Material Colors
+                                        val woodBaseColor = when (woodType) {
+                                                WoodType.ASH -> Color(0xFFE5D3B3)
+                                                WoodType.WALNUT -> Color(0xFF5D4037)
+                                                WoodType.VINTAGE_OAK -> Color(0xFFD2B48C)
+                                        }
+
                                         val frameColor =
                                                 when (polaroidFrameStyle) {
                                                         "CLASSIC_BLACK" -> Color(0xFF1A1A1A)
                                                         "LIQUID_GLASS" ->
                                                                 Color.White.copy(alpha = 0.4f)
-                                                        "ACOUSTIC_WOOD" -> Color(0xFFD2B48C)
+                                                        "ACOUSTIC_WOOD" -> woodBaseColor
                                                         "HEAVY_MECHANICAL" -> Color(0xFF455A64)
                                                         "CYBER_GLITCH" -> Color(0xFF0D0D0D)
                                                         else -> Color(0xFFFAFAFA)
@@ -1361,34 +1413,71 @@ fun ArtLayoutOverlay(
                                         // Material Textures / Effects
                                         when (polaroidFrameStyle) {
                                                 "ACOUSTIC_WOOD" -> {
-                                                        // Simulated Grain
-                                                        for (i in 0 until 40) {
-                                                                val y = (i / 40f) * size.height
-                                                                // Top & Bottom grain
-                                                                if (y < mapTop || y > mapBottom) {
-                                                                        drawLine(
-                                                                                color =
-                                                                                        Color.Black
-                                                                                                .copy(
-                                                                                                        alpha =
-                                                                                                                0.03f
-                                                                                                ),
-                                                                                start =
-                                                                                        Offset(
-                                                                                                0f,
-                                                                                                y
-                                                                                        ),
-                                                                                end =
-                                                                                        Offset(
-                                                                                                size.width,
-                                                                                                y +
-                                                                                                        (size.width *
-                                                                                                                0.05f)
-                                                                                        ),
-                                                                                strokeWidth = 1f
-                                                                        )
+                                                        // 1. Miter Joints & Directional Grain
+                                                        val pathTop = androidx.compose.ui.graphics.Path().apply {
+                                                                moveTo(0f, 0f)
+                                                                lineTo(size.width, 0f)
+                                                                lineTo(mapRight, mapTop)
+                                                                lineTo(mapLeft, mapTop)
+                                                                close()
+                                                        }
+                                                        val pathBottom = androidx.compose.ui.graphics.Path().apply {
+                                                                moveTo(0f, size.height)
+                                                                lineTo(size.width, size.height)
+                                                                lineTo(mapRight, mapBottom)
+                                                                lineTo(mapLeft, mapBottom)
+                                                                close()
+                                                        }
+                                                        val pathLeft = androidx.compose.ui.graphics.Path().apply {
+                                                                moveTo(0f, 0f)
+                                                                lineTo(0f, size.height)
+                                                                lineTo(mapLeft, mapBottom)
+                                                                lineTo(mapLeft, mapTop)
+                                                                close()
+                                                        }
+                                                        val pathRight = androidx.compose.ui.graphics.Path().apply {
+                                                                moveTo(size.width, 0f)
+                                                                lineTo(size.width, size.height)
+                                                                lineTo(mapRight, mapBottom)
+                                                                lineTo(mapRight, mapTop)
+                                                                close()
+                                                        }
+
+                                                        // Draw grain for each section
+                                                        fun DrawScope.drawSectionGrain(path: androidx.compose.ui.graphics.Path, isVertical: Boolean) {
+                                                                clipPath(path) {
+                                                                        val density = if (woodType == WoodType.VINTAGE_OAK) 60 else 35
+                                                                        for (i in 0 until density) {
+                                                                                val offset = (i.toFloat() / density.toFloat()) * (if (isVertical) size.width else size.height)
+                                                                                if (isVertical) {
+                                                                                        drawLine(
+                                                                                                color = Color.Black.copy(alpha = 0.05f),
+                                                                                                start = Offset(offset, 0f),
+                                                                                                end = Offset(offset + size.width * 0.02f, size.height),
+                                                                                                strokeWidth = 1.5f
+                                                                                        )
+                                                                                } else {
+                                                                                        drawLine(
+                                                                                                color = Color.Black.copy(alpha = 0.05f),
+                                                                                                start = Offset(0f, offset),
+                                                                                                end = Offset(size.width, offset + size.height * 0.02f),
+                                                                                                strokeWidth = 1.5f
+                                                                                        )
+                                                                                }
+                                                                        }
                                                                 }
                                                         }
+
+                                                        drawSectionGrain(pathTop, false)
+                                                        drawSectionGrain(pathBottom, false)
+                                                        drawSectionGrain(pathLeft, true)
+                                                        drawSectionGrain(pathRight, true)
+
+                                                        // 2. Bevel & Emboss (Inner Border Highlights)
+                                                        drawLine(Color.White.copy(alpha = 0.2f), Offset(0f, 0f), Offset(size.width, 0f), 2f)
+                                                        drawLine(Color.White.copy(alpha = 0.2f), Offset(0f, 0f), Offset(0f, size.height), 2f)
+                                                        drawLine(Color.Black.copy(alpha = 0.2f), Offset(size.width, 0f), Offset(size.width, size.height), 2f)
+                                                        drawLine(Color.Black.copy(alpha = 0.2f), Offset(0f, size.height), Offset(size.width, size.height), 2f)
                                                 }
                                                 "HEAVY_MECHANICAL" -> {
                                                         // Rivets at corners
@@ -1571,6 +1660,17 @@ fun ArtLayoutOverlay(
                                         if (filterColor != Color.Transparent) {
                                                 drawRect(filterColor, size = size)
                                         }
+
+                                        // 5. Canvas Grain Overlay (Noise on map)
+                                        if (canvasGrain > 0f) {
+                                                val grainAlpha = 0.15f * canvasGrain
+                                                drawRect(
+                                                        color = Color.Black.copy(alpha = grainAlpha),
+                                                        topLeft = Offset(mapLeft, mapTop),
+                                                        size = androidx.compose.ui.geometry.Size(mapWidth, mapHeight),
+                                                        blendMode = androidx.compose.ui.graphics.BlendMode.Softlight
+                                                )
+                                        }
                                 }
 
                                 // 4. Polaroid Watermark & Typography
@@ -1606,7 +1706,7 @@ fun ArtLayoutOverlay(
                                                         fontFamily = fontFamily,
                                                         fontStyle = fontStyle
                                                 )
-                                        Text(artName.ifBlank { "时光足迹" }, style = titleStyle)
+                                        Text(artName.ifBlank { "时光足迹" }, style = titleStyle, modifier = if (polaroidFrameStyle == "ACOUSTIC_WOOD") Modifier.graphicsLayer(alpha = 0.95f) else Modifier)
 
                                         Spacer(modifier = Modifier.height(12.dp))
 

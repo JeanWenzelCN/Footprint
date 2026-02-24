@@ -65,6 +65,9 @@ class FootprintViewModel(
     private val polaroidFrameStyle = MutableStateFlow(preferenceManager.polaroidFrameStyle)
     private val polaroidFramePadding = MutableStateFlow(preferenceManager.polaroidFramePadding)
     private val polaroidInnerBorder = MutableStateFlow(preferenceManager.polaroidInnerBorder)
+    private val woodType = MutableStateFlow(preferenceManager.woodType)
+    private val engravingDepth = MutableStateFlow(preferenceManager.engravingDepth)
+    private val canvasGrain = MutableStateFlow(preferenceManager.canvasGrain)
     private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
     val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
@@ -103,7 +106,10 @@ class FootprintViewModel(
             val artTextBorder: Boolean,
             val polFrameStyle: String,
             val polFramePadding: Float,
-            val polInnerBorder: Float
+            val polInnerBorder: Float,
+            val woodType: com.footprint.ui.screens.art.WoodType,
+            val engravingDepth: Float,
+            val canvasGrain: Float
     )
 
     // 强类型合并流
@@ -139,11 +145,21 @@ class FootprintViewModel(
             }
 
     private val polaroidFlow =
-            combine(polaroidFrameStyle, polaroidFramePadding, polaroidInnerBorder) {
-                    style,
-                    padding,
-                    border ->
-                Triple(style, padding, border)
+            combine(
+                    polaroidFrameStyle,
+                    polaroidFramePadding,
+                    polaroidInnerBorder,
+                    woodType,
+                    engravingDepth,
+                    canvasGrain
+            ) { args: Array<Any?> ->
+                val style = args[0] as String
+                val padding = args[1] as Float
+                val border = args[2] as Float
+                val wType = args[3] as com.footprint.ui.screens.art.WoodType
+                val eDepth = args[4] as Float
+                val cGrain = args[5] as Float
+                Triple(style, padding, border) to Triple(wType, eDepth, cGrain)
             }
 
     private val artCombinedFlow = combine(artBaseFlow, artTextFlow) { base, text -> base to text }
@@ -153,8 +169,9 @@ class FootprintViewModel(
                     appearance,
                     user,
                     artCombined,
-                    pol ->
+                    polCombined ->
                 val (artBase, artText) = artCombined
+                val (polBase, polWood) = polCombined
                 PrefsGroup(
                         theme = appearance.first,
                         style = appearance.second,
@@ -168,9 +185,12 @@ class FootprintViewModel(
                         artTextColor = artText.first,
                         artTextItalic = artText.second,
                         artTextBorder = artText.third,
-                        polFrameStyle = pol.first,
-                        polFramePadding = pol.second,
-                        polInnerBorder = pol.third
+                        polFrameStyle = polBase.first,
+                        polFramePadding = polBase.second,
+                        polInnerBorder = polBase.third,
+                        woodType = polWood.first,
+                        engravingDepth = polWood.second,
+                        canvasGrain = polWood.third
                 )
             }
 
@@ -253,6 +273,9 @@ class FootprintViewModel(
                                 polaroidFrameStyle = prefs.polFrameStyle,
                                 polaroidFramePadding = prefs.polFramePadding,
                                 polaroidInnerBorder = prefs.polInnerBorder,
+                                woodType = prefs.woodType,
+                                engravingDepth = prefs.engravingDepth,
+                                canvasGrain = prefs.canvasGrain,
                                 randomMemory = randomMemory,
                                 memoryQuote = memoryQuote,
                                 isLoading = false
@@ -276,7 +299,10 @@ class FootprintViewModel(
                                             polaroidFramePadding =
                                                     preferenceManager.polaroidFramePadding,
                                             polaroidInnerBorder =
-                                                    preferenceManager.polaroidInnerBorder
+                                                    preferenceManager.polaroidInnerBorder,
+                                            woodType = preferenceManager.woodType,
+                                            engravingDepth = preferenceManager.engravingDepth,
+                                            canvasGrain = preferenceManager.canvasGrain
                                     )
                     )
 
@@ -332,6 +358,20 @@ class FootprintViewModel(
         preferenceManager.polaroidFrameStyle = frameStyle
         preferenceManager.polaroidFramePadding = padding
         preferenceManager.polaroidInnerBorder = border
+    }
+
+    fun updateWoodSettings(
+            type: com.footprint.ui.screens.art.WoodType,
+            depth: Float,
+            grain: Float
+    ) {
+        woodType.value = type
+        engravingDepth.value = depth
+        canvasGrain.value = grain
+
+        preferenceManager.woodType = type
+        preferenceManager.engravingDepth = depth
+        preferenceManager.canvasGrain = grain
     }
 
     fun updateAvatar(uri: Uri) {

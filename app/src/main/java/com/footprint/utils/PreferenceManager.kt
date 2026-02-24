@@ -99,4 +99,25 @@ class PreferenceManager(context: Context) {
     var polaroidInnerBorder: Float
         get() = prefs.getFloat("polaroid_inner_border", 1f)
         set(value) = prefs.edit().putFloat("polaroid_inner_border", value).apply()
+
+    var woodType: com.footprint.ui.screens.art.WoodType
+        get() {
+            val name = prefs.getString("wood_type", com.footprint.ui.screens.art.WoodType.ASH.name)
+            return try {
+                com.footprint.ui.screens.art.WoodType.valueOf(
+                        name ?: com.footprint.ui.screens.art.WoodType.ASH.name
+                )
+            } catch (e: Exception) {
+                com.footprint.ui.screens.art.WoodType.ASH
+            }
+        }
+        set(value) = prefs.edit().putString("wood_type", value.name).apply()
+
+    var engravingDepth: Float
+        get() = prefs.getFloat("engraving_depth", 0.5f)
+        set(value) = prefs.edit().putFloat("engraving_depth", value).apply()
+
+    var canvasGrain: Float
+        get() = prefs.getFloat("canvas_grain", 0.3f)
+        set(value) = prefs.edit().putFloat("canvas_grain", value).apply()
 }

@@ -101,11 +101,20 @@ object ArtLayoutOverlayUtils {
                                 )
                         }
                         ArtLayout.POLAROID -> {
+                                val woodBaseColor =
+                                        when (uiState.woodType) {
+                                                com.footprint.ui.screens.art.WoodType.ASH ->
+                                                        Color.parseColor("#E5D3B3")
+                                                com.footprint.ui.screens.art.WoodType.WALNUT ->
+                                                        Color.parseColor("#5D4037")
+                                                com.footprint.ui.screens.art.WoodType.VINTAGE_OAK ->
+                                                        Color.parseColor("#D2B48C")
+                                        }
                                 val frameColor =
                                         when (uiState.polaroidFrameStyle) {
                                                 "CLASSIC_BLACK" -> Color.parseColor("#1A1A1A")
                                                 "LIQUID_GLASS" -> Color.argb(120, 255, 255, 255)
-                                                "ACOUSTIC_WOOD" -> Color.parseColor("#D2B48C")
+                                                "ACOUSTIC_WOOD" -> woodBaseColor
                                                 "HEAVY_MECHANICAL" -> Color.parseColor("#455A64")
                                                 "CYBER_GLITCH" -> Color.parseColor("#0D0D0D")
                                                 else -> Color.parseColor("#FAFAFA")
@@ -174,21 +183,147 @@ object ArtLayoutOverlayUtils {
                                                 val grainPaint =
                                                         Paint().apply {
                                                                 color = Color.BLACK
-                                                                alpha = 10
-                                                                strokeWidth = 1f * scale.toFloat()
+                                                                alpha = 15
+                                                                strokeWidth = 2f * scale.toFloat()
                                                         }
-                                                for (i in 0 until 60) {
-                                                        val y = (i / 60f) * bitmap.height
-                                                        if (y < mapTop || y > mapBottom) {
-                                                                canvas.drawLine(
-                                                                        0f,
-                                                                        y,
+
+                                                // 1. Miter Joints & Directional Grain
+                                                val pathTop =
+                                                        Path().apply {
+                                                                moveTo(0f, 0f)
+                                                                lineTo(bitmap.width.toFloat(), 0f)
+                                                                lineTo(mapLeft + mapWidth, mapTop)
+                                                                lineTo(mapLeft, mapTop)
+                                                                close()
+                                                        }
+                                                val pathBottom =
+                                                        Path().apply {
+                                                                moveTo(0f, bitmap.height.toFloat())
+                                                                lineTo(
                                                                         bitmap.width.toFloat(),
-                                                                        y + (bitmap.width * 0.05f),
-                                                                        grainPaint
+                                                                        bitmap.height.toFloat()
                                                                 )
+                                                                lineTo(
+                                                                        mapLeft + mapWidth,
+                                                                        mapBottom
+                                                                )
+                                                                lineTo(mapLeft, mapBottom)
+                                                                close()
                                                         }
+                                                val pathLeft =
+                                                        Path().apply {
+                                                                moveTo(0f, 0f)
+                                                                lineTo(0f, bitmap.height.toFloat())
+                                                                lineTo(mapLeft, mapBottom)
+                                                                lineTo(mapLeft, mapTop)
+                                                                close()
+                                                        }
+                                                val pathRight =
+                                                        Path().apply {
+                                                                moveTo(bitmap.width.toFloat(), 0f)
+                                                                lineTo(
+                                                                        bitmap.width.toFloat(),
+                                                                        bitmap.height.toFloat()
+                                                                )
+                                                                lineTo(
+                                                                        mapLeft + mapWidth,
+                                                                        mapBottom
+                                                                )
+                                                                lineTo(mapLeft + mapWidth, mapTop)
+                                                                close()
+                                                        }
+
+                                                fun drawSectionGrain(
+                                                        path: Path,
+                                                        isVertical: Boolean
+                                                ) {
+                                                        canvas.save()
+                                                        canvas.clipPath(path)
+                                                        val density =
+                                                                if (uiState.woodType ==
+                                                                                com.footprint.ui
+                                                                                        .screens.art
+                                                                                        .WoodType
+                                                                                        .VINTAGE_OAK
+                                                                )
+                                                                        80
+                                                                else 50
+                                                        for (i in 0 until density) {
+                                                                val offset =
+                                                                        (i.toFloat() / density) *
+                                                                                (if (isVertical)
+                                                                                        bitmap.width
+                                                                                                .toFloat()
+                                                                                else
+                                                                                        bitmap.height
+                                                                                                .toFloat())
+                                                                if (isVertical) {
+                                                                        canvas.drawLine(
+                                                                                offset,
+                                                                                0f,
+                                                                                offset +
+                                                                                        bitmap.width *
+                                                                                                0.02f,
+                                                                                bitmap.height
+                                                                                        .toFloat(),
+                                                                                grainPaint
+                                                                        )
+                                                                } else {
+                                                                        canvas.drawLine(
+                                                                                0f,
+                                                                                offset,
+                                                                                bitmap.width
+                                                                                        .toFloat(),
+                                                                                offset +
+                                                                                        bitmap.height *
+                                                                                                0.02f,
+                                                                                grainPaint
+                                                                        )
+                                                                }
+                                                        }
+                                                        canvas.restore()
                                                 }
+
+                                                drawSectionGrain(pathTop, false)
+                                                drawSectionGrain(pathBottom, false)
+                                                drawSectionGrain(pathLeft, true)
+                                                drawSectionGrain(pathRight, true)
+
+                                                // 2. Bevel & Emboss Highlights
+                                                val bevelPaint =
+                                                        Paint().apply {
+                                                                strokeWidth = 3f * scale.toFloat()
+                                                        }
+                                                bevelPaint.color = Color.argb(60, 255, 255, 255)
+                                                canvas.drawLine(
+                                                        0f,
+                                                        0f,
+                                                        bitmap.width.toFloat(),
+                                                        0f,
+                                                        bevelPaint
+                                                )
+                                                canvas.drawLine(
+                                                        0f,
+                                                        0f,
+                                                        0f,
+                                                        bitmap.height.toFloat(),
+                                                        bevelPaint
+                                                )
+                                                bevelPaint.color = Color.argb(60, 0, 0, 0)
+                                                canvas.drawLine(
+                                                        bitmap.width.toFloat(),
+                                                        0f,
+                                                        bitmap.width.toFloat(),
+                                                        bitmap.height.toFloat(),
+                                                        bevelPaint
+                                                )
+                                                canvas.drawLine(
+                                                        0f,
+                                                        bitmap.height.toFloat(),
+                                                        bitmap.width.toFloat(),
+                                                        bitmap.height.toFloat(),
+                                                        bevelPaint
+                                                )
                                         }
                                         "HEAVY_MECHANICAL" -> {
                                                 val rivetPaint =
@@ -330,6 +465,27 @@ object ArtLayoutOverlayUtils {
                                         canvas.drawColor(tintColor)
                                 }
 
+                                // 5. Canvas Grain Overlay (Noise on map)
+                                if (uiState.canvasGrain > 0f) {
+                                        val grainAlpha = (40 * uiState.canvasGrain).toInt()
+                                        val noisePaint =
+                                                Paint().apply {
+                                                        color = Color.BLACK
+                                                        alpha = grainAlpha
+                                                        xfermode =
+                                                                PorterDuffXfermode(
+                                                                        PorterDuff.Mode.DARKEN
+                                                                )
+                                                }
+                                        canvas.drawRect(
+                                                mapLeft,
+                                                mapTop,
+                                                mapLeft + mapWidth,
+                                                mapBottom,
+                                                noisePaint
+                                        )
+                                }
+
                                 val titleColor =
                                         when (uiState.polaroidFrameStyle) {
                                                 "CLASSIC_BLACK", "HEAVY_MECHANICAL" -> Color.WHITE
@@ -369,13 +525,52 @@ object ArtLayoutOverlayUtils {
                                                 }
                                         canvas.drawText(titleStr, x_title, y_base, borderPaint)
                                 }
-                                canvas.drawText(titleStr, x_title, y_base, textPaint)
-                                canvas.drawText(
-                                        subtitleStr,
-                                        x_sub,
-                                        y_base + (100f * scale.toFloat()),
-                                        subtitlePaint
-                                )
+
+                                // Laser Engraving Effect for Acoustic Wood
+                                if (uiState.polaroidFrameStyle == "ACOUSTIC_WOOD") {
+                                        val engravingPaint =
+                                                Paint(textPaint).apply {
+                                                        alpha =
+                                                                (255 *
+                                                                                0.95f *
+                                                                                uiState.engravingDepth)
+                                                                        .toInt()
+                                                        xfermode =
+                                                                PorterDuffXfermode(
+                                                                        PorterDuff.Mode.MULTIPLY
+                                                                )
+                                                }
+                                        canvas.drawText(titleStr, x_title, y_base, engravingPaint)
+                                } else {
+                                        canvas.drawText(titleStr, x_title, y_base, textPaint)
+                                }
+
+                                // Laser Engraving Effect for subtitle
+                                if (uiState.polaroidFrameStyle == "ACOUSTIC_WOOD") {
+                                        val subEngravingPaint =
+                                                Paint(subtitlePaint).apply {
+                                                        alpha =
+                                                                (180 * uiState.engravingDepth)
+                                                                        .toInt()
+                                                        xfermode =
+                                                                PorterDuffXfermode(
+                                                                        PorterDuff.Mode.MULTIPLY
+                                                                )
+                                                }
+                                        canvas.drawText(
+                                                subtitleStr,
+                                                x_sub,
+                                                y_base + (100f * scale.toFloat()),
+                                                subEngravingPaint
+                                        )
+                                } else {
+                                        canvas.drawText(
+                                                subtitleStr,
+                                                x_sub,
+                                                y_base + (100f * scale.toFloat()),
+                                                subtitlePaint
+                                        )
+                                }
                         }
                         ArtLayout.GEEK_STATS -> {
                                 val density = context.resources.displayMetrics.density
