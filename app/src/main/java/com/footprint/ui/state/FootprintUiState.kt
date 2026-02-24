@@ -34,6 +34,9 @@ data class FootprintUiState(
         val artTextColor: String = "White",
         val artTextItalic: Boolean = false,
         val artTextBorder: Boolean = false,
+        val polaroidFrameStyle: String = "CLASSIC_WHITE",
+        val polaroidFramePadding: Float = 0.5f,
+        val polaroidInnerBorder: Float = 1f,
         val randomMemory: FootprintEntry? = null,
         val memoryQuote: String? = null,
         val isLoading: Boolean = true

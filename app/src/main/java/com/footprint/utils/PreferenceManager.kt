@@ -87,4 +87,16 @@ class PreferenceManager(context: Context) {
     var artTextBorder: Boolean
         get() = prefs.getBoolean("art_text_border", false)
         set(value) = prefs.edit().putBoolean("art_text_border", value).apply()
+
+    var polaroidFrameStyle: String
+        get() = prefs.getString("polaroid_frame_style", "CLASSIC_WHITE") ?: "CLASSIC_WHITE"
+        set(value) = prefs.edit().putString("polaroid_frame_style", value).apply()
+
+    var polaroidFramePadding: Float
+        get() = prefs.getFloat("polaroid_frame_padding", 0.5f)
+        set(value) = prefs.edit().putFloat("polaroid_frame_padding", value).apply()
+
+    var polaroidInnerBorder: Float
+        get() = prefs.getFloat("polaroid_inner_border", 1f)
+        set(value) = prefs.edit().putFloat("polaroid_inner_border", value).apply()
 }

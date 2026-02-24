@@ -62,6 +62,9 @@ class FootprintViewModel(
     private val artTextColor = MutableStateFlow(preferenceManager.artTextColor)
     private val artTextItalic = MutableStateFlow(preferenceManager.artTextItalic)
     private val artTextBorder = MutableStateFlow(preferenceManager.artTextBorder)
+    private val polaroidFrameStyle = MutableStateFlow(preferenceManager.polaroidFrameStyle)
+    private val polaroidFramePadding = MutableStateFlow(preferenceManager.polaroidFramePadding)
+    private val polaroidInnerBorder = MutableStateFlow(preferenceManager.polaroidInnerBorder)
     private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
     val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
@@ -97,7 +100,10 @@ class FootprintViewModel(
             val artColor: String,
             val artTextColor: String,
             val artTextItalic: Boolean,
-            val artTextBorder: Boolean
+            val artTextBorder: Boolean,
+            val polFrameStyle: String,
+            val polFramePadding: Float,
+            val polInnerBorder: Float
     )
 
     // 强类型合并流
@@ -132,12 +138,23 @@ class FootprintViewModel(
                 Triple(color, italic, border)
             }
 
+    private val polaroidFlow =
+            combine(polaroidFrameStyle, polaroidFramePadding, polaroidInnerBorder) {
+                    style,
+                    padding,
+                    border ->
+                Triple(style, padding, border)
+            }
+
+    private val artCombinedFlow = combine(artBaseFlow, artTextFlow) { base, text -> base to text }
+
     private val prefsFlow: Flow<PrefsGroup> =
-            combine(appearanceFlow, userFlow, artBaseFlow, artTextFlow) {
+            combine(appearanceFlow, userFlow, artCombinedFlow, polaroidFlow) {
                     appearance,
                     user,
-                    artBase,
-                    artText ->
+                    artCombined,
+                    pol ->
+                val (artBase, artText) = artCombined
                 PrefsGroup(
                         theme = appearance.first,
                         style = appearance.second,
@@ -150,7 +167,10 @@ class FootprintViewModel(
                         artColor = artBase.third,
                         artTextColor = artText.first,
                         artTextItalic = artText.second,
-                        artTextBorder = artText.third
+                        artTextBorder = artText.third,
+                        polFrameStyle = pol.first,
+                        polFramePadding = pol.second,
+                        polInnerBorder = pol.third
                 )
             }
 
@@ -230,6 +250,9 @@ class FootprintViewModel(
                                 artTextColor = prefs.artTextColor,
                                 artTextItalic = prefs.artTextItalic,
                                 artTextBorder = prefs.artTextBorder,
+                                polaroidFrameStyle = prefs.polFrameStyle,
+                                polaroidFramePadding = prefs.polFramePadding,
+                                polaroidInnerBorder = prefs.polInnerBorder,
                                 randomMemory = randomMemory,
                                 memoryQuote = memoryQuote,
                                 isLoading = false
@@ -247,7 +270,13 @@ class FootprintViewModel(
                                             artColorStyle = preferenceManager.artColorStyle,
                                             artTextColor = preferenceManager.artTextColor,
                                             artTextItalic = preferenceManager.artTextItalic,
-                                            artTextBorder = preferenceManager.artTextBorder
+                                            artTextBorder = preferenceManager.artTextBorder,
+                                            polaroidFrameStyle =
+                                                    preferenceManager.polaroidFrameStyle,
+                                            polaroidFramePadding =
+                                                    preferenceManager.polaroidFramePadding,
+                                            polaroidInnerBorder =
+                                                    preferenceManager.polaroidInnerBorder
                                     )
                     )
 
@@ -293,6 +322,16 @@ class FootprintViewModel(
         preferenceManager.artTextColor = textColor
         preferenceManager.artTextItalic = italic
         preferenceManager.artTextBorder = border
+    }
+
+    fun updatePolaroidSettings(frameStyle: String, padding: Float, border: Float) {
+        polaroidFrameStyle.value = frameStyle
+        polaroidFramePadding.value = padding
+        polaroidInnerBorder.value = border
+
+        preferenceManager.polaroidFrameStyle = frameStyle
+        preferenceManager.polaroidFramePadding = padding
+        preferenceManager.polaroidInnerBorder = border
     }
 
     fun updateAvatar(uri: Uri) {
