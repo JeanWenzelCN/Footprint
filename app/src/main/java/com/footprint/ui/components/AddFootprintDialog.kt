@@ -407,7 +407,7 @@ fun AddFootprintDialog(
                                 // Stat Controls: Distance, Energy, Mood
                                 Row(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.Top
                                 ) {
                                         // Distance
@@ -425,12 +425,15 @@ fun AddFootprintDialog(
                                                         value = distance,
                                                         onValueChange = { distance = it },
                                                         label = { Text("里程", fontSize = 10.sp) },
-                                                        modifier = Modifier.fillMaxWidth(),
+                                                        modifier =
+                                                                Modifier.fillMaxWidth()
+                                                                        .height(52.dp),
                                                         shape = RoundedCornerShape(12.dp),
                                                         singleLine = true,
                                                         textStyle =
-                                                                MaterialTheme.typography.bodySmall,
-                                                        suffix = { Text("KM", fontSize = 10.sp) }
+                                                                MaterialTheme.typography.bodySmall
+                                                                        .copy(fontSize = 11.sp),
+                                                        suffix = { Text("KM", fontSize = 9.sp) }
                                                 )
                                         }
 
@@ -487,23 +490,35 @@ fun AddFootprintDialog(
                                                                 value = mood.label,
                                                                 onValueChange = {},
                                                                 readOnly = true,
+                                                                singleLine = true,
                                                                 label = {
                                                                         Text("心情", fontSize = 10.sp)
                                                                 },
                                                                 trailingIcon = {
-                                                                        ExposedDropdownMenuDefaults
-                                                                                .TrailingIcon(
-                                                                                        expanded =
-                                                                                                expandedMood
-                                                                                )
+                                                                        Icon(
+                                                                                if (expandedMood)
+                                                                                        Icons.Default
+                                                                                                .ArrowDropUp
+                                                                                else
+                                                                                        Icons.Default
+                                                                                                .ArrowDropDown,
+                                                                                null,
+                                                                                modifier =
+                                                                                        Modifier.size(
+                                                                                                20.dp
+                                                                                        )
+                                                                        )
                                                                 },
                                                                 modifier =
                                                                         Modifier.menuAnchor()
-                                                                                .fillMaxWidth(),
+                                                                                .fillMaxWidth()
+                                                                                .height(52.dp),
                                                                 shape = RoundedCornerShape(12.dp),
                                                                 textStyle =
                                                                         MaterialTheme.typography
-                                                                                .bodySmall
+                                                                                .bodySmall.copy(
+                                                                                fontSize = 11.sp
+                                                                        )
                                                         )
                                                         ExposedDropdownMenu(
                                                                 expanded = expandedMood,
