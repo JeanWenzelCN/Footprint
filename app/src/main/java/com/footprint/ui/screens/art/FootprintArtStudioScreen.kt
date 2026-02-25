@@ -18,16 +18,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,14 +96,15 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
         val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
         val mapView = remember { TextureMapView(context).apply { onCreate(null) } }
         val hazeState = remember { HazeState() }
-    val haptic = LocalHapticFeedback.current
+        val haptic = LocalHapticFeedback.current
 
-    // Haptic feedback for Woodcraft Studio
-    LaunchedEffect(uiState.polaroidFrameStyle) {
-        if (uiState.polaroidFrameStyle == "ACOUSTIC_WOOD" && uiState.hapticFeedbackEnabled) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        // Haptic feedback for Woodcraft Studio
+        LaunchedEffect(uiState.polaroidFrameStyle) {
+                if (uiState.polaroidFrameStyle == "ACOUSTIC_WOOD" && uiState.hapticFeedbackEnabled
+                ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                }
         }
-    }
 
         // Map Lifecycle
         DisposableEffect(lifecycle, mapView) {
@@ -304,7 +304,6 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                         }
                 }
         }
-
 
         val scaffoldState =
                 androidx.compose.material3.rememberBottomSheetScaffoldState(
@@ -510,7 +509,15 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         uiState.mechanicalSeams,
                                                         it
                                                 )
-                                        }
+                                        },
+                                        frostRadius = uiState.frostRadius,
+                                        onFrostRadiusChange = { viewModel.setFrostRadius(it) },
+                                        chromaticAberration = uiState.chromaticAberration,
+                                        onChromaticAberrationChange = {
+                                                viewModel.setChromaticAberration(it)
+                                        },
+                                        glassTint = uiState.glassTint,
+                                        onGlassTintChange = { viewModel.setGlassTint(it) }
                                 )
                         }
                 }
@@ -545,6 +552,9 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 mechanicalSeams = uiState.mechanicalSeams,
                                 hasHazardStriping = uiState.hasHazardStriping,
                                 userNickname = uiState.userNickname,
+                                frostRadius = uiState.frostRadius,
+                                chromaticAberration = uiState.chromaticAberration,
+                                glassTint = uiState.glassTint,
                                 hazeState = hazeState
                         )
 
@@ -1161,6 +1171,9 @@ fun ArtLayoutOverlay(
         mechanicalSeams: Float = 0.5f,
         hasHazardStriping: Boolean = false,
         userNickname: String = "旅行者",
+        frostRadius: Float = 20f,
+        chromaticAberration: Float = 0.5f,
+        glassTint: String = "Clear",
         hazeState: HazeState? = null
 ) {
         val fontFamily =
@@ -1325,6 +1338,7 @@ fun ArtLayoutOverlay(
                                                         Modifier.fillMaxSize()
                                                                 .hazeChild(
                                                                         state = hazeState,
+                                                                        blurRadius = frostRadius.dp,
                                                                         shape =
                                                                                 object :
                                                                                         androidx.compose.ui.graphics.Shape {
@@ -1387,26 +1401,42 @@ fun ArtLayoutOverlay(
                                 // 1. Map Frame & Material logic
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                         // Material Colors
-                                        val woodBaseColor = when (woodType) {
-                                                WoodType.ASH -> Color(0xFFE5D3B3)
-                                                WoodType.WALNUT -> Color(0xFF5D4037)
-                                                WoodType.VINTAGE_OAK -> Color(0xFFD2B48C)
-                                        }
+                                        val woodBaseColor =
+                                                when (woodType) {
+                                                        WoodType.ASH -> Color(0xFFE5D3B3)
+                                                        WoodType.WALNUT -> Color(0xFF5D4037)
+                                                        WoodType.VINTAGE_OAK -> Color(0xFFD2B48C)
+                                                }
 
                                         val frameColor =
                                                 when (polaroidFrameStyle) {
                                                         "CLASSIC_BLACK" -> Color(0xFF1A1A1A)
-                                                        "LIQUID_GLASS" ->
-                                                                Color.White.copy(alpha = 0.4f)
-                                                        "ACOUSTIC_WOOD" -> woodBaseColor
-                                                        "HEAVY_MECHANICAL" -> {
-                                                                when (armorType) {
-                                                                        ArmorType.GUNMETAL -> Color(0xFF2C2C2E)
-                                                                        ArmorType.CARBON_FIBER -> Color(0xFF1C1C1E)
-                                                                        ArmorType.WORN_OLIVE -> Color(0xFF4B5320)
+                                                        "LIQUID_GLASS" -> {
+                                                                when (glassTint) {
+                                                                        "Cyan" ->
+                                                                                Color.Cyan.copy(
+                                                                                        alpha =
+                                                                                                0.15f
+                                                                                )
+                                                                        "Gold" ->
+                                                                                Color(0xFFFFD700)
+                                                                                        .copy(
+                                                                                                alpha =
+                                                                                                        0.15f
+                                                                                        )
+                                                                        "Rose" ->
+                                                                                Color(0xFFFFB6C1)
+                                                                                        .copy(
+                                                                                                alpha =
+                                                                                                        0.15f
+                                                                                        )
+                                                                        else ->
+                                                                                Color.White.copy(
+                                                                                        alpha =
+                                                                                                0.15f
+                                                                                )
                                                                 }
                                                         }
-                                                        "CYBER_GLITCH" -> Color(0xFF0D0D0D)
                                                         else -> Color(0xFFFAFAFA)
                                                 }
 
@@ -1452,54 +1482,152 @@ fun ArtLayoutOverlay(
                                         when (polaroidFrameStyle) {
                                                 "ACOUSTIC_WOOD" -> {
                                                         // 1. Miter Joints & Directional Grain
-                                                        val pathTop = androidx.compose.ui.graphics.Path().apply {
-                                                                moveTo(0f, 0f)
-                                                                lineTo(size.width, 0f)
-                                                                lineTo(mapRight, mapTop)
-                                                                lineTo(mapLeft, mapTop)
-                                                                close()
-                                                        }
-                                                        val pathBottom = androidx.compose.ui.graphics.Path().apply {
-                                                                moveTo(0f, size.height)
-                                                                lineTo(size.width, size.height)
-                                                                lineTo(mapRight, mapBottom)
-                                                                lineTo(mapLeft, mapBottom)
-                                                                close()
-                                                        }
-                                                        val pathLeft = androidx.compose.ui.graphics.Path().apply {
-                                                                moveTo(0f, 0f)
-                                                                lineTo(0f, size.height)
-                                                                lineTo(mapLeft, mapBottom)
-                                                                lineTo(mapLeft, mapTop)
-                                                                close()
-                                                        }
-                                                        val pathRight = androidx.compose.ui.graphics.Path().apply {
-                                                                moveTo(size.width, 0f)
-                                                                lineTo(size.width, size.height)
-                                                                lineTo(mapRight, mapBottom)
-                                                                lineTo(mapRight, mapTop)
-                                                                close()
-                                                        }
+                                                        val pathTop =
+                                                                androidx.compose.ui.graphics.Path()
+                                                                        .apply {
+                                                                                moveTo(0f, 0f)
+                                                                                lineTo(
+                                                                                        size.width,
+                                                                                        0f
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapRight,
+                                                                                        mapTop
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapLeft,
+                                                                                        mapTop
+                                                                                )
+                                                                                close()
+                                                                        }
+                                                        val pathBottom =
+                                                                androidx.compose.ui.graphics.Path()
+                                                                        .apply {
+                                                                                moveTo(
+                                                                                        0f,
+                                                                                        size.height
+                                                                                )
+                                                                                lineTo(
+                                                                                        size.width,
+                                                                                        size.height
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapRight,
+                                                                                        mapBottom
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapLeft,
+                                                                                        mapBottom
+                                                                                )
+                                                                                close()
+                                                                        }
+                                                        val pathLeft =
+                                                                androidx.compose.ui.graphics.Path()
+                                                                        .apply {
+                                                                                moveTo(0f, 0f)
+                                                                                lineTo(
+                                                                                        0f,
+                                                                                        size.height
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapLeft,
+                                                                                        mapBottom
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapLeft,
+                                                                                        mapTop
+                                                                                )
+                                                                                close()
+                                                                        }
+                                                        val pathRight =
+                                                                androidx.compose.ui.graphics.Path()
+                                                                        .apply {
+                                                                                moveTo(
+                                                                                        size.width,
+                                                                                        0f
+                                                                                )
+                                                                                lineTo(
+                                                                                        size.width,
+                                                                                        size.height
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapRight,
+                                                                                        mapBottom
+                                                                                )
+                                                                                lineTo(
+                                                                                        mapRight,
+                                                                                        mapTop
+                                                                                )
+                                                                                close()
+                                                                        }
 
                                                         // Draw grain for each section
-                                                        fun DrawScope.drawSectionGrain(path: androidx.compose.ui.graphics.Path, isVertical: Boolean) {
+                                                        fun DrawScope.drawSectionGrain(
+                                                                path:
+                                                                        androidx.compose.ui.graphics.Path,
+                                                                isVertical: Boolean
+                                                        ) {
                                                                 clipPath(path) {
-                                                                        val density = if (woodType == WoodType.VINTAGE_OAK) 60 else 35
+                                                                        val density =
+                                                                                if (woodType ==
+                                                                                                WoodType.VINTAGE_OAK
+                                                                                )
+                                                                                        60
+                                                                                else 35
                                                                         for (i in 0 until density) {
-                                                                                val offset = (i.toFloat() / density.toFloat()) * (if (isVertical) size.width else size.height)
+                                                                                val offset =
+                                                                                        (i.toFloat() /
+                                                                                                density.toFloat()) *
+                                                                                                (if (isVertical
+                                                                                                )
+                                                                                                        size.width
+                                                                                                else
+                                                                                                        size.height)
                                                                                 if (isVertical) {
                                                                                         drawLine(
-                                                                                                color = Color.Black.copy(alpha = 0.05f),
-                                                                                                start = Offset(offset, 0f),
-                                                                                                end = Offset(offset + size.width * 0.02f, size.height),
-                                                                                                strokeWidth = 1.5f
+                                                                                                color =
+                                                                                                        Color.Black
+                                                                                                                .copy(
+                                                                                                                        alpha =
+                                                                                                                                0.05f
+                                                                                                                ),
+                                                                                                start =
+                                                                                                        Offset(
+                                                                                                                offset,
+                                                                                                                0f
+                                                                                                        ),
+                                                                                                end =
+                                                                                                        Offset(
+                                                                                                                offset +
+                                                                                                                        size.width *
+                                                                                                                                0.02f,
+                                                                                                                size.height
+                                                                                                        ),
+                                                                                                strokeWidth =
+                                                                                                        1.5f
                                                                                         )
                                                                                 } else {
                                                                                         drawLine(
-                                                                                                color = Color.Black.copy(alpha = 0.05f),
-                                                                                                start = Offset(0f, offset),
-                                                                                                end = Offset(size.width, offset + size.height * 0.02f),
-                                                                                                strokeWidth = 1.5f
+                                                                                                color =
+                                                                                                        Color.Black
+                                                                                                                .copy(
+                                                                                                                        alpha =
+                                                                                                                                0.05f
+                                                                                                                ),
+                                                                                                start =
+                                                                                                        Offset(
+                                                                                                                0f,
+                                                                                                                offset
+                                                                                                        ),
+                                                                                                end =
+                                                                                                        Offset(
+                                                                                                                size.width,
+                                                                                                                offset +
+                                                                                                                        size.height *
+                                                                                                                                0.02f
+                                                                                                        ),
+                                                                                                strokeWidth =
+                                                                                                        1.5f
                                                                                         )
                                                                                 }
                                                                         }
@@ -1511,61 +1639,160 @@ fun ArtLayoutOverlay(
                                                         drawSectionGrain(pathLeft, true)
                                                         drawSectionGrain(pathRight, true)
 
-                                                        // 2. Bevel & Emboss (Inner Border Highlights)
-                                                        drawLine(Color.White.copy(alpha = 0.2f), Offset(0f, 0f), Offset(size.width, 0f), 2f)
-                                                        drawLine(Color.White.copy(alpha = 0.2f), Offset(0f, 0f), Offset(0f, size.height), 2f)
-                                                        drawLine(Color.Black.copy(alpha = 0.2f), Offset(size.width, 0f), Offset(size.width, size.height), 2f)
-                                                        drawLine(Color.Black.copy(alpha = 0.2f), Offset(0f, size.height), Offset(size.width, size.height), 2f)
+                                                        // 2. Bevel & Emboss (Inner Border
+                                                        // Highlights)
+                                                        drawLine(
+                                                                Color.White.copy(alpha = 0.2f),
+                                                                Offset(0f, 0f),
+                                                                Offset(size.width, 0f),
+                                                                2f
+                                                        )
+                                                        drawLine(
+                                                                Color.White.copy(alpha = 0.2f),
+                                                                Offset(0f, 0f),
+                                                                Offset(0f, size.height),
+                                                                2f
+                                                        )
+                                                        drawLine(
+                                                                Color.Black.copy(alpha = 0.2f),
+                                                                Offset(size.width, 0f),
+                                                                Offset(size.width, size.height),
+                                                                2f
+                                                        )
+                                                        drawLine(
+                                                                Color.Black.copy(alpha = 0.2f),
+                                                                Offset(0f, size.height),
+                                                                Offset(size.width, size.height),
+                                                                2f
+                                                        )
                                                 }
                                                 "HEAVY_MECHANICAL" -> {
                                                         // 1. Chamfered Corners for the frame
                                                         val chamferSize = 24f
-                                                        val framePath = androidx.compose.ui.graphics.Path().apply {
-                                                                // Outer Frame
-                                                                moveTo(chamferSize, 0f)
-                                                                lineTo(size.width - chamferSize, 0f)
-                                                                lineTo(size.width, chamferSize)
-                                                                lineTo(size.width, size.height - chamferSize)
-                                                                lineTo(size.width - chamferSize, size.height)
-                                                                lineTo(chamferSize, size.height)
-                                                                lineTo(0f, size.height - chamferSize)
-                                                                lineTo(0f, chamferSize)
-                                                                close()
-                                                                // Subtract Inner Map Area
-                                                                addRect(androidx.compose.ui.geometry.Rect(mapLeft, mapTop, mapRight, mapBottom))
-                                                                fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd
-                                                        }
+                                                        val framePath =
+                                                                androidx.compose.ui.graphics.Path()
+                                                                        .apply {
+                                                                                // Outer Frame
+                                                                                moveTo(
+                                                                                        chamferSize,
+                                                                                        0f
+                                                                                )
+                                                                                lineTo(
+                                                                                        size.width -
+                                                                                                chamferSize,
+                                                                                        0f
+                                                                                )
+                                                                                lineTo(
+                                                                                        size.width,
+                                                                                        chamferSize
+                                                                                )
+                                                                                lineTo(
+                                                                                        size.width,
+                                                                                        size.height -
+                                                                                                chamferSize
+                                                                                )
+                                                                                lineTo(
+                                                                                        size.width -
+                                                                                                chamferSize,
+                                                                                        size.height
+                                                                                )
+                                                                                lineTo(
+                                                                                        chamferSize,
+                                                                                        size.height
+                                                                                )
+                                                                                lineTo(
+                                                                                        0f,
+                                                                                        size.height -
+                                                                                                chamferSize
+                                                                                )
+                                                                                lineTo(
+                                                                                        0f,
+                                                                                        chamferSize
+                                                                                )
+                                                                                close()
+                                                                                // Subtract Inner
+                                                                                // Map Area
+                                                                                addRect(
+                                                                                        androidx.compose
+                                                                                                .ui
+                                                                                                .geometry
+                                                                                                .Rect(
+                                                                                                        mapLeft,
+                                                                                                        mapTop,
+                                                                                                        mapRight,
+                                                                                                        mapBottom
+                                                                                                )
+                                                                                )
+                                                                                fillType =
+                                                                                        androidx.compose
+                                                                                                .ui
+                                                                                                .graphics
+                                                                                                .PathFillType
+                                                                                                .EvenOdd
+                                                                        }
                                                         drawPath(framePath, frameColor)
 
                                                         // 2. Armor Texture (Noise/Brushed)
                                                         val noiseAlpha = 0.1f * canvasGrain
                                                         drawRect(
-                                                                color = Color.Black.copy(alpha = noiseAlpha),
-                                                                blendMode = androidx.compose.ui.graphics.BlendMode.Overlay
+                                                                color =
+                                                                        Color.Black.copy(
+                                                                                alpha = noiseAlpha
+                                                                        ),
+                                                                blendMode =
+                                                                        androidx.compose.ui.graphics
+                                                                                .BlendMode.Overlay
                                                         )
 
                                                         // 3. Rivets along the seams
-                                                        val rivetColor = Color.Black.copy(alpha = 0.4f)
-                                                        val rivetHighlight = Color.White.copy(alpha = 0.2f)
-                                                        val rivetRadius = 3f + (mechanicalSeams * 2f)
-                                                        val rivetSpacing = 60f + (1.0f - mechanicalSeams) * 100f
+                                                        val rivetColor =
+                                                                Color.Black.copy(alpha = 0.4f)
+                                                        val rivetHighlight =
+                                                                Color.White.copy(alpha = 0.2f)
+                                                        val rivetRadius =
+                                                                3f + (mechanicalSeams * 2f)
+                                                        val rivetSpacing =
+                                                                60f +
+                                                                        (1.0f - mechanicalSeams) *
+                                                                                100f
 
                                                         fun drawRivet(x: Float, y: Float) {
-                                                                drawCircle(rivetColor, radius = rivetRadius, center = Offset(x, y))
-                                                                drawCircle(rivetHighlight, radius = rivetRadius * 0.5f, center = Offset(x - 1f, y - 1f))
+                                                                drawCircle(
+                                                                        rivetColor,
+                                                                        radius = rivetRadius,
+                                                                        center = Offset(x, y)
+                                                                )
+                                                                drawCircle(
+                                                                        rivetHighlight,
+                                                                        radius = rivetRadius * 0.5f,
+                                                                        center =
+                                                                                Offset(
+                                                                                        x - 1f,
+                                                                                        y - 1f
+                                                                                )
+                                                                )
                                                         }
 
                                                         // Draw rivets at frame corners
                                                         drawRivet(mapLeft / 2, mapTop / 2)
-                                                        drawRivet(size.width - mapLeft / 2, mapTop / 2)
+                                                        drawRivet(
+                                                                size.width - mapLeft / 2,
+                                                                mapTop / 2
+                                                        )
                                                         drawRivet(mapLeft / 2, size.height - 30f)
-                                                        drawRivet(size.width - mapLeft / 2, size.height - 30f)
+                                                        drawRivet(
+                                                                size.width - mapLeft / 2,
+                                                                size.height - 30f
+                                                        )
 
                                                         // Draw rivets along the edges
                                                         var currentX = mapLeft + rivetSpacing
                                                         while (currentX < mapRight - rivetSpacing) {
                                                                 drawRivet(currentX, mapTop / 2)
-                                                                drawRivet(currentX, size.height - 30f)
+                                                                drawRivet(
+                                                                        currentX,
+                                                                        size.height - 30f
+                                                                )
                                                                 currentX += rivetSpacing
                                                         }
 
@@ -1574,50 +1801,161 @@ fun ArtLayoutOverlay(
                                                                 val stripeWidth = 15f
                                                                 val stripeHeight = 25f
                                                                 val stripeSpacing = 30f
-                                                                val stripeColor = Color(0xFFFBC02D).copy(alpha = 0.8f) // Industrial Yellow
-                                                                
+                                                                val stripeColor =
+                                                                        Color(0xFFFBC02D)
+                                                                                .copy(
+                                                                                        alpha = 0.8f
+                                                                                ) // Industrial
+                                                                // Yellow
+
                                                                 // Bottom Right Corner
                                                                 val stripeStartX = mapRight - 120f
                                                                 val stripeY = mapBottom + 15f
-                                                                
+
                                                                 for (i in 0 until 6) {
-                                                                        val path = androidx.compose.ui.graphics.Path().apply {
-                                                                                val x = stripeStartX + (i * stripeSpacing)
-                                                                                moveTo(x, stripeY)
-                                                                                lineTo(x + stripeWidth, stripeY)
-                                                                                lineTo(x + stripeWidth - 10f, stripeY + stripeHeight)
-                                                                                lineTo(x - 10f, stripeY + stripeHeight)
-                                                                                close()
-                                                                        }
+                                                                        val path =
+                                                                                androidx.compose.ui
+                                                                                        .graphics
+                                                                                        .Path()
+                                                                                        .apply {
+                                                                                                val x =
+                                                                                                        stripeStartX +
+                                                                                                                (i *
+                                                                                                                        stripeSpacing)
+                                                                                                moveTo(
+                                                                                                        x,
+                                                                                                        stripeY
+                                                                                                )
+                                                                                                lineTo(
+                                                                                                        x +
+                                                                                                                stripeWidth,
+                                                                                                        stripeY
+                                                                                                )
+                                                                                                lineTo(
+                                                                                                        x +
+                                                                                                                stripeWidth -
+                                                                                                                10f,
+                                                                                                        stripeY +
+                                                                                                                stripeHeight
+                                                                                                )
+                                                                                                lineTo(
+                                                                                                        x -
+                                                                                                                10f,
+                                                                                                        stripeY +
+                                                                                                                stripeHeight
+                                                                                                )
+                                                                                                close()
+                                                                                        }
                                                                         drawPath(path, stripeColor)
-                                                                        drawPath(path, Color.Black.copy(alpha = 0.3f), style = Stroke(width = 1f))
+                                                                        drawPath(
+                                                                                path,
+                                                                                Color.Black.copy(
+                                                                                        alpha = 0.3f
+                                                                                ),
+                                                                                style =
+                                                                                        Stroke(
+                                                                                                width =
+                                                                                                        1f
+                                                                                        )
+                                                                        )
                                                                 }
                                                         }
 
                                                         // 5. Tactical HUD (On top of map area)
-                                                        clipRect(mapLeft, mapTop, mapRight, mapBottom) {
+                                                        clipRect(
+                                                                mapLeft,
+                                                                mapTop,
+                                                                mapRight,
+                                                                mapBottom
+                                                        ) {
                                                                 // Grid lines
                                                                 val gridCount = 8
-                                                                val gridColor = artColor.copy(alpha = 0.15f)
+                                                                val gridColor =
+                                                                        artColor.copy(alpha = 0.15f)
                                                                 for (i in 1 until gridCount) {
-                                                                        val gx = mapLeft + (mapWidth / gridCount) * i
-                                                                        val gy = mapTop + (mapHeight / gridCount) * i
-                                                                        drawLine(gridColor, Offset(gx, mapTop), Offset(gx, mapBottom), 0.5f)
-                                                                        drawLine(gridColor, Offset(mapLeft, gy), Offset(mapRight, gy), 0.5f)
+                                                                        val gx =
+                                                                                mapLeft +
+                                                                                        (mapWidth /
+                                                                                                gridCount) *
+                                                                                                i
+                                                                        val gy =
+                                                                                mapTop +
+                                                                                        (mapHeight /
+                                                                                                gridCount) *
+                                                                                                i
+                                                                        drawLine(
+                                                                                gridColor,
+                                                                                Offset(gx, mapTop),
+                                                                                Offset(
+                                                                                        gx,
+                                                                                        mapBottom
+                                                                                ),
+                                                                                0.5f
+                                                                        )
+                                                                        drawLine(
+                                                                                gridColor,
+                                                                                Offset(mapLeft, gy),
+                                                                                Offset(
+                                                                                        mapRight,
+                                                                                        gy
+                                                                                ),
+                                                                                0.5f
+                                                                        )
                                                                 }
-                                                                
+
                                                                 // Border highlight
-                                                                drawRect(artColor.copy(alpha = 0.2f), Offset(mapLeft, mapTop), androidx.compose.ui.geometry.Size(mapWidth, mapHeight), style = Stroke(width = 1f))
-                                                                
+                                                                drawRect(
+                                                                        artColor.copy(alpha = 0.2f),
+                                                                        Offset(mapLeft, mapTop),
+                                                                        androidx.compose.ui.geometry
+                                                                                .Size(
+                                                                                        mapWidth,
+                                                                                        mapHeight
+                                                                                ),
+                                                                        style = Stroke(width = 1f)
+                                                                )
+
                                                                 // Corner Reticles
                                                                 val retSize = 20f
                                                                 val retThickness = 2f
                                                                 // Top-Left
-                                                                drawLine(artColor, Offset(mapLeft, mapTop), Offset(mapLeft + retSize, mapTop), retThickness)
-                                                                drawLine(artColor, Offset(mapLeft, mapTop), Offset(mapLeft, mapTop + retSize), retThickness)
+                                                                drawLine(
+                                                                        artColor,
+                                                                        Offset(mapLeft, mapTop),
+                                                                        Offset(
+                                                                                mapLeft + retSize,
+                                                                                mapTop
+                                                                        ),
+                                                                        retThickness
+                                                                )
+                                                                drawLine(
+                                                                        artColor,
+                                                                        Offset(mapLeft, mapTop),
+                                                                        Offset(
+                                                                                mapLeft,
+                                                                                mapTop + retSize
+                                                                        ),
+                                                                        retThickness
+                                                                )
                                                                 // Bottom-Right
-                                                                drawLine(artColor, Offset(mapRight, mapBottom), Offset(mapRight - retSize, mapBottom), retThickness)
-                                                                drawLine(artColor, Offset(mapRight, mapBottom), Offset(mapRight, mapBottom - retSize), retThickness)
+                                                                drawLine(
+                                                                        artColor,
+                                                                        Offset(mapRight, mapBottom),
+                                                                        Offset(
+                                                                                mapRight - retSize,
+                                                                                mapBottom
+                                                                        ),
+                                                                        retThickness
+                                                                )
+                                                                drawLine(
+                                                                        artColor,
+                                                                        Offset(mapRight, mapBottom),
+                                                                        Offset(
+                                                                                mapRight,
+                                                                                mapBottom - retSize
+                                                                        ),
+                                                                        retThickness
+                                                                )
                                                         }
                                                 }
                                                 "CYBER_GLITCH" -> {
@@ -1726,10 +2064,19 @@ fun ArtLayoutOverlay(
                                         if (canvasGrain > 0f) {
                                                 val grainAlpha = 0.15f * canvasGrain
                                                 drawRect(
-                                                        color = Color.Black.copy(alpha = grainAlpha),
+                                                        color =
+                                                                Color.Black.copy(
+                                                                        alpha = grainAlpha
+                                                                ),
                                                         topLeft = Offset(mapLeft, mapTop),
-                                                        size = androidx.compose.ui.geometry.Size(mapWidth, mapHeight),
-                                                        blendMode = androidx.compose.ui.graphics.BlendMode.Softlight
+                                                        size =
+                                                                androidx.compose.ui.geometry.Size(
+                                                                        mapWidth,
+                                                                        mapHeight
+                                                                ),
+                                                        blendMode =
+                                                                androidx.compose.ui.graphics
+                                                                        .BlendMode.Softlight
                                                 )
                                         }
                                 }
@@ -1768,13 +2115,32 @@ fun ArtLayoutOverlay(
                                                         fontStyle = fontStyle
                                                 )
                                         Text(
-                                                artName.ifBlank { "时光足迹" }.let { if (polaroidFrameStyle == "HEAVY_MECHANICAL") "[ $it ]" else it },
+                                                artName.ifBlank { "时光足迹" }.let {
+                                                        if (polaroidFrameStyle == "HEAVY_MECHANICAL"
+                                                        )
+                                                                "[ $it ]"
+                                                        else it
+                                                },
                                                 style = titleStyle,
                                                 modifier =
                                                         if (polaroidFrameStyle == "ACOUSTIC_WOOD")
-                                                                Modifier.graphicsLayer(alpha = 0.95f)
-                                                        else if (polaroidFrameStyle == "HEAVY_MECHANICAL")
-                                                                Modifier.border(1.dp, titleColor.copy(alpha = 0.3f), CircleShape).padding(horizontal = 16.dp, vertical = 4.dp)
+                                                                Modifier.graphicsLayer(
+                                                                        alpha = 0.95f
+                                                                )
+                                                        else if (polaroidFrameStyle ==
+                                                                        "HEAVY_MECHANICAL"
+                                                        )
+                                                                Modifier.border(
+                                                                                1.dp,
+                                                                                titleColor.copy(
+                                                                                        alpha = 0.3f
+                                                                                ),
+                                                                                CircleShape
+                                                                        )
+                                                                        .padding(
+                                                                                horizontal = 16.dp,
+                                                                                vertical = 4.dp
+                                                                        )
                                                         else Modifier
                                         )
 
@@ -1810,12 +2176,27 @@ fun ArtLayoutOverlay(
                                                 // Left Side: Meta Data
                                                 Column(modifier = Modifier.weight(1f)) {
                                                         Text(
-                                                                if (polaroidFrameStyle == "HEAVY_MECHANICAL") dateRange.replace(".", "-") else dateRange,
+                                                                if (polaroidFrameStyle ==
+                                                                                "HEAVY_MECHANICAL"
+                                                                )
+                                                                        dateRange.replace(".", "-")
+                                                                else dateRange,
                                                                 style =
                                                                         MaterialTheme.typography
                                                                                 .labelSmall.copy(
-                                                                                        fontFamily = if (polaroidFrameStyle == "HEAVY_MECHANICAL") androidx.compose.ui.text.font.FontFamily.Monospace else fontFamily
-                                                                                ),
+                                                                                fontFamily =
+                                                                                        if (polaroidFrameStyle ==
+                                                                                                        "HEAVY_MECHANICAL"
+                                                                                        )
+                                                                                                androidx.compose
+                                                                                                        .ui
+                                                                                                        .text
+                                                                                                        .font
+                                                                                                        .FontFamily
+                                                                                                        .Monospace
+                                                                                        else
+                                                                                                fontFamily
+                                                                        ),
                                                                 color = Color.Gray,
                                                         )
                                                         Text(

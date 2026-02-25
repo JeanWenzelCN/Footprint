@@ -123,7 +123,11 @@ class PreferenceManager(context: Context) {
 
     var armorType: com.footprint.ui.screens.art.ArmorType
         get() {
-            val name = prefs.getString("armor_type", com.footprint.ui.screens.art.ArmorType.GUNMETAL.name)
+            val name =
+                    prefs.getString(
+                            "armor_type",
+                            com.footprint.ui.screens.art.ArmorType.GUNMETAL.name
+                    )
             return try {
                 com.footprint.ui.screens.art.ArmorType.valueOf(
                         name ?: com.footprint.ui.screens.art.ArmorType.GUNMETAL.name
@@ -141,4 +145,16 @@ class PreferenceManager(context: Context) {
     var hasHazardStriping: Boolean
         get() = prefs.getBoolean("has_hazard_striping", false)
         set(value) = prefs.edit().putBoolean("has_hazard_striping", value).apply()
+
+    var frostRadius: Float
+        get() = prefs.getFloat("frost_radius", 20f)
+        set(value) = prefs.edit().putFloat("frost_radius", value).apply()
+
+    var chromaticAberration: Float
+        get() = prefs.getFloat("chromatic_aberration", 0.5f)
+        set(value) = prefs.edit().putFloat("chromatic_aberration", value).apply()
+
+    var glassTint: String
+        get() = prefs.getString("glass_tint", "Clear") ?: "Clear"
+        set(value) = prefs.edit().putString("glass_tint", value).apply()
 }

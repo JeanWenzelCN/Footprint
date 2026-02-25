@@ -101,23 +101,65 @@ object ArtLayoutOverlayUtils {
                 val frameColor =
                         when (uiState.polaroidFrameStyle) {
                             "CLASSIC_BLACK" -> android.graphics.Color.parseColor("#1A1A1A")
-                            "LIQUID_GLASS" ->
-                                    android.graphics.Color.argb(
-                                            100,
-                                            255,
-                                            255,
-                                            255
-                                    ) // Semi-transparent white
+                            "LIQUID_GLASS" -> {
+                                when (uiState.glassTint) {
+                                    "Cyan" -> android.graphics.Color.argb(40, 0, 255, 255)
+                                    "Gold" -> android.graphics.Color.argb(40, 255, 215, 0)
+                                    "Rose" -> android.graphics.Color.argb(40, 255, 182, 193)
+                                    else -> android.graphics.Color.argb(30, 255, 255, 255)
+                                }
+                            }
                             else -> android.graphics.Color.parseColor("#FAFAFA")
                         }
 
                 val paperPaint = Paint().apply { color = frameColor }
 
                 // 2. Draw Frame
-                canvas.drawRect(0f, 0f, width, mapTop, paperPaint) // Top
-                canvas.drawRect(0f, mapBottom, width, height, paperPaint) // Bottom
-                canvas.drawRect(0f, mapTop, mapLeft, mapBottom, paperPaint) // Left
-                canvas.drawRect(mapRight, mapTop, width, mapBottom, paperPaint) // Right
+                if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
+                    val blurR = (uiState.frostRadius * scale).toInt().coerceIn(1, 100)
+                    val blurredMap = blurBitmap(bitmap, blurR)
+
+                    // Draw blurred map in the frame area (Top, Bottom, Left, Right)
+                    // We use the same RectF for both src and dst (relative to coordinate system)
+                    // since blurredMap is same size as original map bitmap.
+
+                    // Top segment
+                    canvas.drawBitmap(
+                            blurredMap,
+                            Rect(0, 0, bitmap.width, mapTop.toInt()),
+                            RectF(0f, 0f, width, mapTop),
+                            null
+                    )
+
+                    // Bottom segment
+                    canvas.drawBitmap(
+                            blurredMap,
+                            Rect(0, mapBottom.toInt(), bitmap.width, bitmap.height),
+                            RectF(0f, mapBottom, width, height),
+                            null
+                    )
+
+                    // Left segment (middle part)
+                    canvas.drawBitmap(
+                            blurredMap,
+                            Rect(0, mapTop.toInt(), mapLeft.toInt(), mapBottom.toInt()),
+                            RectF(0f, mapTop, mapLeft, mapBottom),
+                            null
+                    )
+
+                    // Right segment (middle part)
+                    canvas.drawBitmap(
+                            blurredMap,
+                            Rect(mapRight.toInt(), mapTop.toInt(), bitmap.width, mapBottom.toInt()),
+                            RectF(mapRight, mapTop, width, mapBottom),
+                            null
+                    )
+                }
+
+                canvas.drawRect(0f, 0f, width, mapTop, paperPaint) // Top Tint
+                canvas.drawRect(0f, mapBottom, width, height, paperPaint) // Bottom Tint
+                canvas.drawRect(0f, mapTop, mapLeft, mapBottom, paperPaint) // Left Tint
+                canvas.drawRect(mapRight, mapTop, width, mapBottom, paperPaint) // Right Tint
 
                 // 3. Inner Border
                 if (uiState.polaroidInnerBorder > 0) {
@@ -129,7 +171,38 @@ object ArtLayoutOverlayUtils {
                                         if (uiState.polaroidFrameStyle == "CLASSIC_BLACK") {
                                             Color.White.copy(alpha = 0.2f).toArgb()
                                         } else if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                                            Color.White.copy(alpha = 0.5f).toArgb()
+                                            val tintColor =
+                                                    when (uiState.glassTint) {
+                                                        "Cyan" ->
+                                                                android.graphics.Color.argb(
+                                                                        180,
+                                                                        0,
+                                                                        255,
+                                                                        255
+                                                                )
+                                                        "Gold" ->
+                                                                android.graphics.Color.argb(
+                                                                        180,
+                                                                        255,
+                                                                        215,
+                                                                        0
+                                                                )
+                                                        "Rose" ->
+                                                                android.graphics.Color.argb(
+                                                                        180,
+                                                                        255,
+                                                                        182,
+                                                                        193
+                                                                )
+                                                        else ->
+                                                                android.graphics.Color.argb(
+                                                                        150,
+                                                                        255,
+                                                                        255,
+                                                                        255
+                                                                )
+                                                    }
+                                            tintColor
                                         } else {
                                             Color.Black.copy(alpha = 0.15f).toArgb()
                                         }
@@ -177,20 +250,44 @@ object ArtLayoutOverlayUtils {
                 val metaPaint =
                         Paint(Paint.ANTI_ALIAS_FLAG).apply {
                             textSize = (11f * scale).toFloat()
-                            color = secondaryTextColor
+                            color =
+                                    if (uiState.polaroidFrameStyle == "LIQUID_GLASS")
+                                            android.graphics.Color.BLACK
+                                    else secondaryTextColor
+                            alpha = if (uiState.polaroidFrameStyle == "LIQUID_GLASS") 150 else 255
                             textAlign = Paint.Align.LEFT
                             typeface = customTypeface
                         }
                 canvas.drawText(dateRange, mapLeft, metaY, metaPaint)
+
+                if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
+                    val now = java.time.LocalTime.now()
+                    val timeStr =
+                            now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+                    metaPaint.apply {
+                        textSize = (8f * scale).toFloat()
+                        typeface = Typeface.MONOSPACE
+                        alpha = 100
+                    }
+                    canvas.drawText(
+                            "TIMESTAMP: $timeStr",
+                            mapLeft,
+                            metaY + (12f * scale).toFloat(),
+                            metaPaint
+                    )
+                }
+
                 metaPaint.apply {
                     textSize = (8f * scale).toFloat()
                     typeface = Typeface.MONOSPACE
-                    alpha = 150
+                    alpha = if (uiState.polaroidFrameStyle == "LIQUID_GLASS") 180 else 150
                 }
                 canvas.drawText(
                         "TOTAL DISTANCE: %.2f KM".format(totalDistanceKm),
                         mapLeft,
-                        metaY + (15f * scale).toFloat(),
+                        metaY +
+                                (if (uiState.polaroidFrameStyle == "LIQUID_GLASS") 24f else 15f) *
+                                        scale.toFloat(),
                         metaPaint
                 )
 
@@ -301,5 +398,208 @@ object ArtLayoutOverlayUtils {
                 canvas.drawLine(width, height, width, height - len, bracketPaint)
             }
         }
+    }
+
+    private fun blurBitmap(bitmap: Bitmap, radius: Int): Bitmap {
+        if (radius < 1) return bitmap
+        val result = bitmap.copy(bitmap.config, true)
+        val w = result.width
+        val h = result.height
+        val pix = IntArray(w * h)
+        result.getPixels(pix, 0, w, 0, 0, w, h)
+
+        val wm = w - 1
+        val hm = h - 1
+        val wh = w * h
+        val div = radius + radius + 1
+
+        val r = IntArray(wh)
+        val g = IntArray(wh)
+        val b = IntArray(wh)
+        var rsum: Int
+        var gsum: Int
+        var bsum: Int
+        var x: Int
+        var y: Int
+        var i: Int
+        var p: Int
+        var yp: Int
+        var yi: Int
+        var yw: Int
+        val vmin = IntArray(Math.max(w, h))
+        val divsum = (div + 1) shr 1 * ((div + 1) shr 1)
+        val dv = IntArray(256 * divsum)
+        for (i in 0 until 256 * divsum) dv[i] = i / divsum
+
+        yw = 0
+        yi = 0
+
+        val stack = Array(div) { IntArray(3) }
+        var stackpointer: Int
+        var stackstart: Int
+        var sir: IntArray
+        var rbs: Int
+        val r1 = radius + 1
+        var routsum: Int
+        var goutsum: Int
+        var boutsum: Int
+        var rinsum: Int
+        var ginsum: Int
+        var binsum: Int
+
+        for (y in 0 until h) {
+            rinsum = 0
+            ginsum = 0
+            binsum = 0
+            routsum = 0
+            goutsum = 0
+            boutsum = 0
+            rsum = 0
+            gsum = 0
+            bsum = 0
+            for (i in -radius..radius) {
+                p = pix[yi + Math.min(wm, Math.max(i, 0))]
+                sir = stack[i + radius]
+                sir[0] = (p and 0xff0000) shr 16
+                sir[1] = (p and 0x00ff00) shr 8
+                sir[2] = (p and 0x0000ff)
+                rbs = r1 - Math.abs(i)
+                rsum += sir[0] * rbs
+                gsum += sir[1] * rbs
+                bsum += sir[2] * rbs
+                if (i > 0) {
+                    rinsum += sir[0]
+                    ginsum += sir[1]
+                    binsum += sir[2]
+                } else {
+                    routsum += sir[0]
+                    goutsum += sir[1]
+                    boutsum += sir[2]
+                }
+            }
+            stackpointer = radius
+
+            for (x in 0 until w) {
+
+                r[yi] = dv[rsum]
+                g[yi] = dv[gsum]
+                b[yi] = dv[bsum]
+
+                rsum -= routsum
+                gsum -= goutsum
+                bsum -= boutsum
+
+                stackstart = stackpointer - radius + div
+                sir = stack[stackstart % div]
+
+                routsum -= sir[0]
+                goutsum -= sir[1]
+                boutsum -= sir[2]
+
+                if (y == 0) {
+                    vmin[x] = Math.min(x + radius + 1, wm)
+                }
+                p = pix[yw + vmin[x]]
+
+                sir[0] = (p and 0xff0000) shr 16
+                sir[1] = (p and 0x00ff00) shr 8
+                sir[2] = (p and 0x0000ff)
+
+                rinsum += sir[0]
+                ginsum += sir[1]
+                binsum += sir[2]
+
+                rsum += rinsum
+                gsum += ginsum
+                bsum += binsum
+
+                stackpointer = (stackpointer + 1) % div
+                sir = stack[stackpointer % div]
+
+                routsum += sir[0]
+                goutsum += sir[1]
+                boutsum += sir[2]
+
+                rinsum -= sir[0]
+                ginsum -= sir[1]
+                binsum -= sir[2]
+
+                yi++
+            }
+            yw += w
+        }
+        for (x in 0 until w) {
+            rinsum = 0
+            ginsum = 0
+            binsum = 0
+            routsum = 0
+            goutsum = 0
+            boutsum = 0
+            rsum = 0
+            gsum = 0
+            bsum = 0
+            yp = -radius * w
+            for (i in -radius..radius) {
+                yi = Math.max(0, yp) + x
+                sir = stack[i + radius]
+                sir[0] = r[yi]
+                sir[1] = g[yi]
+                sir[2] = b[yi]
+                rbs = r1 - Math.abs(i)
+                rsum += r[yi] * rbs
+                gsum += g[yi] * rbs
+                bsum += b[yi] * rbs
+                if (i > 0) {
+                    rinsum += sir[0]
+                    ginsum += sir[1]
+                    binsum += sir[2]
+                } else {
+                    routsum += sir[0]
+                    goutsum += sir[1]
+                    boutsum += sir[2]
+                }
+                if (i < hm) {
+                    yp += w
+                }
+            }
+            yi = x
+            stackpointer = radius
+            for (y in 0 until h) {
+                // Preserve original alpha if possible, or force opaque
+                pix[yi] = (-0x1000000 or (dv[rsum] shl 16) or (dv[gsum] shl 8) or dv[bsum])
+                rsum -= routsum
+                gsum -= goutsum
+                bsum -= boutsum
+                stackstart = stackpointer - radius + div
+                sir = stack[stackstart % div]
+                routsum -= sir[0]
+                goutsum -= sir[1]
+                boutsum -= sir[2]
+                if (x == 0) {
+                    vmin[y] = Math.min(y + r1, hm) * w
+                }
+                p = x + vmin[y]
+                sir[0] = r[p]
+                sir[1] = g[p]
+                sir[2] = b[p]
+                rinsum += sir[0]
+                ginsum += sir[1]
+                binsum += sir[2]
+                rsum += rinsum
+                gsum += ginsum
+                bsum += binsum
+                stackpointer = (stackpointer + 1) % div
+                sir = stack[stackpointer]
+                routsum += sir[0]
+                goutsum += sir[1]
+                boutsum += sir[2]
+                rinsum -= sir[0]
+                ginsum -= sir[1]
+                binsum -= sir[2]
+                yi += w
+            }
+        }
+        result.setPixels(pix, 0, w, 0, 0, w, h)
+        return result
     }
 }

@@ -62,7 +62,13 @@ fun ArtStyleControls(
         mechanicalSeams: Float = 0.5f,
         onMechanicalSeamsChange: (Float) -> Unit = {},
         hasHazardStriping: Boolean = false,
-        onHasHazardStripingChange: (Boolean) -> Unit = {}
+        onHasHazardStripingChange: (Boolean) -> Unit = {},
+        frostRadius: Float = 20f,
+        onFrostRadiusChange: (Float) -> Unit = {},
+        chromaticAberration: Float = 0.5f,
+        onChromaticAberrationChange: (Float) -> Unit = {},
+        glassTint: String = "Clear",
+        onGlassTintChange: (String) -> Unit = {}
 ) {
         val scrollState = rememberScrollState()
         Column(
@@ -415,23 +421,36 @@ fun ArtStyleControls(
                                                         style = MaterialTheme.typography.labelSmall
                                                 )
                                                 Spacer(Modifier.height(8.dp))
-                                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                Row(
+                                                        horizontalArrangement =
+                                                                Arrangement.spacedBy(12.dp)
+                                                ) {
                                                         val armorTypes =
                                                                 listOf(
                                                                         ArmorType.GUNMETAL to
-                                                                                Color(0xFF2C2C2E), // 拉丝黑钛
+                                                                                Color(
+                                                                                        0xFF2C2C2E
+                                                                                ), // 拉丝黑钛
                                                                         ArmorType.CARBON_FIBER to
-                                                                                Color(0xFF1C1C1E), // 碳纤维
+                                                                                Color(
+                                                                                        0xFF1C1C1E
+                                                                                ), // 碳纤维
                                                                         ArmorType.WORN_OLIVE to
-                                                                                Color(0xFF4B5320) // 战损绿
+                                                                                Color(
+                                                                                        0xFF4B5320
+                                                                                ) // 战损绿
                                                                 )
                                                         armorTypes.forEach { (aType, color) ->
                                                                 val selected = armorType == aType
                                                                 Box(
                                                                         modifier =
                                                                                 Modifier.size(32.dp)
-                                                                                        .clip(CircleShape)
-                                                                                        .background(color)
+                                                                                        .clip(
+                                                                                                CircleShape
+                                                                                        )
+                                                                                        .background(
+                                                                                                color
+                                                                                        )
                                                                                         .border(
                                                                                                 width =
                                                                                                         if (selected
@@ -468,12 +487,16 @@ fun ArtStyleControls(
                                                         Text(
                                                                 "铆钉与接缝 (Rivets & Seams)",
                                                                 color = Color.Gray,
-                                                                style = MaterialTheme.typography.labelSmall
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
                                                         )
                                                         Text(
                                                                 "${(mechanicalSeams * 100).toInt()}%",
                                                                 color = accentColor,
-                                                                style = MaterialTheme.typography.labelSmall
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
                                                         )
                                                 }
                                                 Slider(
@@ -482,37 +505,206 @@ fun ArtStyleControls(
                                                         colors =
                                                                 SliderDefaults.colors(
                                                                         thumbColor = accentColor,
-                                                                        activeTrackColor = accentColor
+                                                                        activeTrackColor =
+                                                                                accentColor
                                                                 )
                                                 )
                                         }
 
                                         // Hazard Striping Toggle
                                         Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                modifier =
+                                                        Modifier.fillMaxWidth()
+                                                                .padding(vertical = 4.dp),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                                verticalAlignment =
+                                                        androidx.compose.ui.Alignment
+                                                                .CenterVertically
                                         ) {
                                                 Column {
                                                         Text(
                                                                 "警戒涂装 (Hazard)",
                                                                 color = Color.Gray,
-                                                                style = MaterialTheme.typography.labelSmall
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
                                                         )
                                                         Text(
                                                                 "黄黑斜纹警告线",
                                                                 color = Color.DarkGray,
-                                                                style = MaterialTheme.typography.labelSmall
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
                                                         )
                                                 }
                                                 Switch(
                                                         checked = hasHazardStriping,
                                                         onCheckedChange = onHasHazardStripingChange,
-                                                        colors = SwitchDefaults.colors(
-                                                                checkedThumbColor = accentColor,
-                                                                checkedTrackColor = accentColor.copy(alpha = 0.5f)
-                                                        )
+                                                        colors =
+                                                                SwitchDefaults.colors(
+                                                                        checkedThumbColor =
+                                                                                accentColor,
+                                                                        checkedTrackColor =
+                                                                                accentColor.copy(
+                                                                                        alpha = 0.5f
+                                                                                )
+                                                                )
                                                 )
+                                        }
+
+                                        HorizontalDivider(
+                                                color = Color.White.copy(alpha = 0.1f),
+                                                modifier = Modifier.padding(vertical = 8.dp)
+                                        )
+                                }
+                        }
+
+                        // Liquid Glass Tweaks
+                        if (polaroidFrameStyle == "LIQUID_GLASS") {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        // Frost Radius Slider
+                                        Column {
+                                                Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement =
+                                                                Arrangement.SpaceBetween
+                                                ) {
+                                                        Text(
+                                                                "雾化半径 (Frost Radius)",
+                                                                color = Color.Gray,
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
+                                                        )
+                                                        Text(
+                                                                "${frostRadius.toInt()}px",
+                                                                color = accentColor,
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
+                                                        )
+                                                }
+                                                Slider(
+                                                        value = frostRadius,
+                                                        onValueChange = onFrostRadiusChange,
+                                                        valueRange = 0f..100f,
+                                                        colors =
+                                                                SliderDefaults.colors(
+                                                                        thumbColor = accentColor,
+                                                                        activeTrackColor =
+                                                                                accentColor
+                                                                )
+                                                )
+                                        }
+
+                                        // Chromatic Aberration Slider
+                                        Column {
+                                                Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement =
+                                                                Arrangement.SpaceBetween
+                                                ) {
+                                                        Text(
+                                                                "色彩弥散 (Dispersion)",
+                                                                color = Color.Gray,
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
+                                                        )
+                                                        Text(
+                                                                String.format(
+                                                                        "%.1f",
+                                                                        chromaticAberration
+                                                                ),
+                                                                color = accentColor,
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall
+                                                        )
+                                                }
+                                                Slider(
+                                                        value = chromaticAberration,
+                                                        onValueChange = onChromaticAberrationChange,
+                                                        valueRange = 0f..5f,
+                                                        colors =
+                                                                SliderDefaults.colors(
+                                                                        thumbColor = accentColor,
+                                                                        activeTrackColor =
+                                                                                accentColor
+                                                                )
+                                                )
+                                        }
+
+                                        // Glass Tint Selector
+                                        Column {
+                                                Text(
+                                                        "玻璃色调 (Glass Tint)",
+                                                        color = Color.Gray,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                )
+                                                Spacer(Modifier.height(8.dp))
+                                                Row(
+                                                        horizontalArrangement =
+                                                                Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                        val tints =
+                                                                listOf(
+                                                                        "Clear" to
+                                                                                Color.White.copy(
+                                                                                        alpha = 0.1f
+                                                                                ),
+                                                                        "Cyan" to
+                                                                                Color.Cyan.copy(
+                                                                                        alpha = 0.2f
+                                                                                ),
+                                                                        "Gold" to
+                                                                                Color(0xFFFFD700)
+                                                                                        .copy(
+                                                                                                alpha =
+                                                                                                        0.2f
+                                                                                        ),
+                                                                        "Rose" to
+                                                                                Color(0xFFFFB6C1)
+                                                                                        .copy(
+                                                                                                alpha =
+                                                                                                        0.2f
+                                                                                        )
+                                                                )
+                                                        tints.forEach { (tName, color) ->
+                                                                val selected = glassTint == tName
+                                                                Box(
+                                                                        modifier =
+                                                                                Modifier.size(32.dp)
+                                                                                        .clip(
+                                                                                                CircleShape
+                                                                                        )
+                                                                                        .background(
+                                                                                                color
+                                                                                        )
+                                                                                        .border(
+                                                                                                width =
+                                                                                                        if (selected
+                                                                                                        )
+                                                                                                                2.dp
+                                                                                                        else
+                                                                                                                0.dp,
+                                                                                                color =
+                                                                                                        if (selected
+                                                                                                        )
+                                                                                                                accentColor
+                                                                                                        else
+                                                                                                                Color.Transparent,
+                                                                                                shape =
+                                                                                                        CircleShape
+                                                                                        )
+                                                                                        .clickable {
+                                                                                                onGlassTintChange(
+                                                                                                        tName
+                                                                                                )
+                                                                                        }
+                                                                )
+                                                        }
+                                                }
                                         }
 
                                         HorizontalDivider(
