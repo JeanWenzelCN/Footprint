@@ -33,12 +33,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.footprint.data.model.Mood
 import com.footprint.service.LocationTrackingService
 import com.footprint.ui.components.weather.HolographicWeatherIcon
-import com.footprint.ui.components.weather.WeatherType
 import com.footprint.ui.components.weather.WeatherCategory
+import com.footprint.ui.components.weather.WeatherType
 import com.footprint.utils.AIStoryGenerator
 import com.footprint.utils.ImageUtils
 import java.time.Instant
@@ -405,81 +406,127 @@ fun AddFootprintDialog(
 
                                 // Stat Controls: Distance, Energy, Mood
                                 Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.Top
+                                ) {
                                         // Distance
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            HolographicMileageIcon(
-                                                distanceKm = distance.toDoubleOrNull() ?: 0.0,
-                                                size = 48.dp
-                                            )
-                                            Spacer(Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = distance,
-                                                onValueChange = { distance = it },
-                                                label = { Text("里程 (KM)") },
-                                                modifier = Modifier.width(100.dp),
-                                                shape = RoundedCornerShape(12.dp),
-                                                singleLine = true
-                                            )
+                                        Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                                HolographicMileageIcon(
+                                                        distanceKm = distance.toDoubleOrNull()
+                                                                        ?: 0.0,
+                                                        size = 40.dp
+                                                )
+                                                OutlinedTextField(
+                                                        value = distance,
+                                                        onValueChange = { distance = it },
+                                                        label = { Text("里程", fontSize = 10.sp) },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        singleLine = true,
+                                                        textStyle =
+                                                                MaterialTheme.typography.bodySmall,
+                                                        suffix = { Text("KM", fontSize = 10.sp) }
+                                                )
                                         }
 
                                         // Energy
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            HolographicEnergyIcon(
-                                                energyLevel = energy.toInt(),
-                                                size = 48.dp
-                                            )
-                                            Spacer(Modifier.height(8.dp))
-                                            Text(
-                                                "能量: ${energy.toInt()}",
-                                                style = MaterialTheme.typography.labelSmall
-                                            )
-                                            Slider(
-                                                value = energy,
-                                                onValueChange = { energy = it },
-                                                valueRange = 1f..10f,
-                                                steps = 8,
-                                                modifier = Modifier.width(100.dp)
-                                            )
+                                        Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                                HolographicEnergyIcon(
+                                                        energyLevel = energy.toInt(),
+                                                        size = 40.dp
+                                                )
+                                                Column(
+                                                        horizontalAlignment =
+                                                                Alignment.CenterHorizontally
+                                                ) {
+                                                        Text(
+                                                                "能量: ${energy.toInt()}",
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall,
+                                                                color =
+                                                                        MaterialTheme.colorScheme
+                                                                                .primary
+                                                        )
+                                                        Slider(
+                                                                value = energy,
+                                                                onValueChange = { energy = it },
+                                                                valueRange = 1f..10f,
+                                                                steps = 8,
+                                                                modifier = Modifier.fillMaxWidth()
+                                                        )
+                                                }
                                         }
 
                                         // Mood
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            HolographicMoodIcon(
-                                                mood = mood,
-                                                size = 48.dp
-                                            )
-                                            Spacer(Modifier.height(8.dp))
-                                            var expandedMood by remember { mutableStateOf(false) }
-                                            ExposedDropdownMenuBox(
-                                                expanded = expandedMood,
-                                                onExpandedChange = { expandedMood = !expandedMood }
-                                            ) {
-                                                OutlinedTextField(
-                                                    value = mood.label,
-                                                    onValueChange = {},
-                                                    readOnly = true,
-                                                    label = { Text("心情") },
-                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMood) },
-                                                    modifier = Modifier.menuAnchor().width(100.dp)
-                                                )
-                                                ExposedDropdownMenu(
-                                                    expanded = expandedMood,
-                                                    onDismissRequest = { expandedMood = false }
-                                                ) {
-                                                    Mood.values().forEach { m ->
-                                                        DropdownMenuItem(
-                                                            text = { Text(m.label) },
-                                                            onClick = {
-                                                                mood = m
-                                                                expandedMood = false
-                                                            }
-                                                        )
-                                                    }
+                                        Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                                HolographicMoodIcon(mood = mood, size = 40.dp)
+                                                var expandedMood by remember {
+                                                        mutableStateOf(false)
                                                 }
-                                            }
+                                                ExposedDropdownMenuBox(
+                                                        expanded = expandedMood,
+                                                        onExpandedChange = {
+                                                                expandedMood = !expandedMood
+                                                        }
+                                                ) {
+                                                        OutlinedTextField(
+                                                                value = mood.label,
+                                                                onValueChange = {},
+                                                                readOnly = true,
+                                                                label = {
+                                                                        Text("心情", fontSize = 10.sp)
+                                                                },
+                                                                trailingIcon = {
+                                                                        ExposedDropdownMenuDefaults
+                                                                                .TrailingIcon(
+                                                                                        expanded =
+                                                                                                expandedMood
+                                                                                )
+                                                                },
+                                                                modifier =
+                                                                        Modifier.menuAnchor()
+                                                                                .fillMaxWidth(),
+                                                                shape = RoundedCornerShape(12.dp),
+                                                                textStyle =
+                                                                        MaterialTheme.typography
+                                                                                .bodySmall
+                                                        )
+                                                        ExposedDropdownMenu(
+                                                                expanded = expandedMood,
+                                                                onDismissRequest = {
+                                                                        expandedMood = false
+                                                                }
+                                                        ) {
+                                                                Mood.values().forEach { m ->
+                                                                        DropdownMenuItem(
+                                                                                text = {
+                                                                                        Text(
+                                                                                                m.label
+                                                                                        )
+                                                                                },
+                                                                                onClick = {
+                                                                                        mood = m
+                                                                                        expandedMood =
+                                                                                                false
+                                                                                }
+                                                                        )
+                                                                }
+                                                        }
+                                                }
                                         }
                                 }
 
@@ -579,7 +626,10 @@ data class FootprintDraft(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.ui.components.weather.WeatherType) -> Unit) {
+fun WeatherCarousel(
+        selectedWeather: String?,
+        onWeatherSelected: (com.footprint.ui.components.weather.WeatherType) -> Unit
+) {
         val listState = rememberLazyListState()
         val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
         val context = LocalContext.current
@@ -597,32 +647,42 @@ fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.
 
         val allWeathers = remember { com.footprint.ui.components.weather.WeatherType.values() }
         val categories = remember { com.footprint.ui.components.weather.WeatherCategory.values() }
-        
-        var selectedCategory by remember { 
-            mutableStateOf(
-                selectedWeather?.let { wName -> allWeathers.find { it.name == wName }?.category } 
-                ?: categories.first()
-            ) 
+
+        var selectedCategory by remember {
+                mutableStateOf(
+                        selectedWeather?.let { wName ->
+                                allWeathers.find { it.name == wName }?.category
+                        }
+                                ?: categories.first()
+                )
         }
 
-        val weathersInCategory = remember(selectedCategory) {
-            allWeathers.filter { it.category == selectedCategory }
-        }
+        val weathersInCategory =
+                remember(selectedCategory) {
+                        allWeathers.filter { it.category == selectedCategory }
+                }
 
         // Setup initial scroll position based on selection or middle
-        val initialIndex = remember(selectedCategory) {
-                selectedWeather
-                        ?.let { weatherName -> weathersInCategory.indexOfFirst { it.name == weatherName } }
-                        ?.takeIf { it >= 0 }
-                        ?: (Int.MAX_VALUE / 2) // Middle of infinitely scrolling list
-        }
+        val initialIndex =
+                remember(selectedCategory) {
+                        selectedWeather
+                                ?.let { weatherName ->
+                                        weathersInCategory.indexOfFirst { it.name == weatherName }
+                                }
+                                ?.takeIf { it >= 0 }
+                                ?: (Int.MAX_VALUE / 2) // Middle of infinitely scrolling list
+                }
 
         LaunchedEffect(selectedCategory) {
-                if (selectedWeather == null || allWeathers.find { it.name == selectedWeather }?.category != selectedCategory) {
-                        // Pre-select first item in new category if the current weather doesn't match
+                if (selectedWeather == null ||
+                                allWeathers.find { it.name == selectedWeather }?.category !=
+                                        selectedCategory
+                ) {
+                        // Pre-select first item in new category if the current weather doesn't
+                        // match
                         val first = weathersInCategory.firstOrNull()
                         if (first != null) {
-                            onWeatherSelected(first)
+                                onWeatherSelected(first)
                         }
                         listState.scrollToItem(Int.MAX_VALUE / 2)
                 } else {
@@ -652,16 +712,51 @@ fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.
                                                 onWeatherSelected(activatedWeather)
 
                                                 // Haptic Sync custom vibrations
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                                                ) {
                                                         when (activatedWeather.category) {
-                                                                com.footprint.ui.components.weather.WeatherCategory.EXTREME -> {
-                                                                        vibrator.vibrate(VibrationEffect.createOneShot(50, 255))
+                                                                com.footprint.ui.components.weather
+                                                                        .WeatherCategory
+                                                                        .EXTREME -> {
+                                                                        vibrator.vibrate(
+                                                                                VibrationEffect
+                                                                                        .createOneShot(
+                                                                                                50,
+                                                                                                255
+                                                                                        )
+                                                                        )
                                                                 }
-                                                                com.footprint.ui.components.weather.WeatherCategory.SNOW_ICE -> {
-                                                                        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 80, 0, 80), -1))
+                                                                com.footprint.ui.components.weather
+                                                                        .WeatherCategory
+                                                                        .SNOW_ICE -> {
+                                                                        vibrator.vibrate(
+                                                                                VibrationEffect
+                                                                                        .createWaveform(
+                                                                                                longArrayOf(
+                                                                                                        0,
+                                                                                                        50,
+                                                                                                        50,
+                                                                                                        50
+                                                                                                ),
+                                                                                                intArrayOf(
+                                                                                                        0,
+                                                                                                        80,
+                                                                                                        0,
+                                                                                                        80
+                                                                                                ),
+                                                                                                -1
+                                                                                        )
+                                                                        )
                                                                 }
                                                                 else -> {
-                                                                        vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+                                                                        vibrator.vibrate(
+                                                                                VibrationEffect
+                                                                                        .createOneShot(
+                                                                                                20,
+                                                                                                VibrationEffect
+                                                                                                        .DEFAULT_AMPLITUDE
+                                                                                        )
+                                                                        )
                                                                 }
                                                         }
                                                 } else {
@@ -690,8 +785,16 @@ fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.
                                         text = {
                                                 Text(
                                                         text = category.title,
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        color = if (selectedCategory == category) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                        style =
+                                                                MaterialTheme.typography
+                                                                        .labelMedium,
+                                                        color =
+                                                                if (selectedCategory == category)
+                                                                        MaterialTheme.colorScheme
+                                                                                .primary
+                                                                else
+                                                                        MaterialTheme.colorScheme
+                                                                                .onSurfaceVariant
                                                 )
                                         }
                                 )
@@ -699,24 +802,28 @@ fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.
                 }
 
                 // Tier 2: Weather Carousel
-                Box(
+                BoxWithConstraints(
                         modifier =
                                 Modifier.fillMaxWidth()
-                                        .height(100.dp)
+                                        .height(110.dp)
                                         .background(
                                                 Color.Black.copy(alpha = 0.05f),
                                                 RoundedCornerShape(16.dp)
                                         ),
                         contentAlignment = Alignment.Center
                 ) {
+                        val screenWidth = maxWidth
+                        val itemWidth = 80.dp
+                        val horizontalPadding = (screenWidth - itemWidth) / 2
+
                         // Focus indicator bracket
                         Box(
                                 modifier =
                                         Modifier.size(80.dp)
                                                 .border(
-                                                        1.dp,
+                                                        2.dp,
                                                         MaterialTheme.colorScheme.primary.copy(
-                                                                alpha = 0.5f
+                                                                alpha = 0.6f
                                                         ),
                                                         RoundedCornerShape(20.dp)
                                                 )
@@ -726,11 +833,8 @@ fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.
                                 state = listState,
                                 flingBehavior = flingBehavior,
                                 modifier = Modifier.fillMaxWidth(),
-                                contentPadding =
-                                        PaddingValues(
-                                                horizontal = 140.dp
-                                        ), // Adjust based on exact screen size for perfect centering
-                                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                                contentPadding = PaddingValues(horizontal = horizontalPadding),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                         ) {
                                 if (weathersInCategory.isNotEmpty()) {
@@ -738,31 +842,45 @@ fun WeatherCarousel(selectedWeather: String?, onWeatherSelected: (com.footprint.
                                                 val actualIndex = index % weathersInCategory.size
                                                 val weather = weathersInCategory[actualIndex]
                                                 val isSelected = weather.name == selectedWeather
-        
+
                                                 Column(
-                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        horizontalAlignment =
+                                                                Alignment.CenterHorizontally,
                                                         modifier =
-                                                                Modifier.clickable {
-                                                                        onWeatherSelected(weather)
-                                                                }
+                                                                Modifier.width(itemWidth)
+                                                                        .clickable {
+                                                                                onWeatherSelected(
+                                                                                        weather
+                                                                                )
+                                                                        }
                                                 ) {
                                                         HolographicWeatherIcon(
                                                                 type = weather,
                                                                 isActive = isSelected,
-                                                                size = if (isSelected) 64.dp else 48.dp
+                                                                size =
+                                                                        if (isSelected) 56.dp
+                                                                        else 44.dp
                                                         )
-                                                        Spacer(Modifier.height(8.dp))
+                                                        Spacer(Modifier.height(4.dp))
                                                         Text(
                                                                 weather.label,
-                                                                style = MaterialTheme.typography.labelSmall,
+                                                                style =
+                                                                        MaterialTheme.typography
+                                                                                .labelSmall,
+                                                                maxLines = 1,
                                                                 color =
                                                                         if (isSelected)
-                                                                                MaterialTheme.colorScheme.onSurface
+                                                                                MaterialTheme
+                                                                                        .colorScheme
+                                                                                        .onSurface
                                                                         else
-                                                                                MaterialTheme.colorScheme
-                                                                                        .onSurfaceVariant.copy(
-                                                                                        alpha = 0.5f
-                                                                                )
+                                                                                MaterialTheme
+                                                                                        .colorScheme
+                                                                                        .onSurfaceVariant
+                                                                                        .copy(
+                                                                                                alpha =
+                                                                                                        0.6f
+                                                                                        )
                                                         )
                                                 }
                                         }
