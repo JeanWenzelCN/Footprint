@@ -726,7 +726,10 @@ class FootprintViewModel(
             latitude: Double? = null,
             longitude: Double? = null,
             icon: String = "LocationOn",
-            weather: String? = null
+            weather: String? = null,
+            temperature: Double? = null,
+            transportType: com.footprint.data.model.TransportType = com.footprint.data.model.TransportType.UNKNOWN,
+            altitude: Double? = null
     ) {
         viewModelScope.launch {
             val entry =
@@ -743,7 +746,10 @@ class FootprintViewModel(
                             latitude = latitude,
                             longitude = longitude,
                             icon = icon,
-                            weather = weather
+                            weather = weather,
+                            temperature = temperature,
+                            transportType = transportType,
+                            altitude = altitude
                     )
             repository.saveEntry(entry)
         }

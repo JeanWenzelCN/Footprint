@@ -397,7 +397,10 @@ fun FootprintApp() {
                                             longitude = payload.longitude,
                                             icon = payload.icon,
                                             weather = payload.weather,
-                                            photos = payload.photos
+                                            photos = payload.photos,
+                                            temperature = payload.temperature,
+                                            altitude = payload.altitude,
+                                            transportType = payload.transportType
                                     )
                             viewModel.updateFootprint(updatedEntry)
                             if (detailEntry?.id == updatedEntry.id) {
@@ -417,7 +420,10 @@ fun FootprintApp() {
                                     latitude = payload.latitude,
                                     longitude = payload.longitude,
                                     icon = payload.icon,
-                                    weather = payload.weather
+                                    weather = payload.weather,
+                                    temperature = payload.temperature,
+                                    altitude = payload.altitude,
+                                    transportType = payload.transportType
                             )
                         }
                         showEntryDialog = false

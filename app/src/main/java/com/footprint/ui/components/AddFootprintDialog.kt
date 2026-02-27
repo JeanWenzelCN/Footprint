@@ -67,6 +67,9 @@ fun AddFootprintDialog(
         var energy by remember { mutableStateOf(initialEntry?.energyLevel?.toFloat() ?: 6f) }
         var mood by remember { mutableStateOf(initialEntry?.mood ?: Mood.EXCITED) }
         var selectedWeather by remember { mutableStateOf<String?>(initialEntry?.weather) }
+        var temperature by remember { mutableStateOf(initialEntry?.temperature?.toString() ?: "") }
+        var altitude by remember { mutableStateOf(initialEntry?.altitude?.toString() ?: "") }
+        var transportType by remember { mutableStateOf(initialEntry?.transportType ?: com.footprint.data.model.TransportType.UNKNOWN) }
         var selectedIcon by remember { mutableStateOf(initialEntry?.icon ?: "LocationOn") }
         var photoPaths by remember { mutableStateOf(initialEntry?.photos ?: emptyList<String>()) }
 
@@ -246,6 +249,17 @@ fun AddFootprintDialog(
                                         WeatherCarousel(
                                                 selectedWeather = selectedWeather,
                                                 onWeatherSelected = { selectedWeather = it.name }
+                                        )
+                                        Spacer(Modifier.height(8.dp))
+                                        OutlinedTextField(
+                                                value = temperature,
+                                                onValueChange = { temperature = it },
+                                                label = { Text("气温 (°C)", fontSize = 10.sp) },
+                                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                singleLine = true,
+                                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
                                         )
                                 }
 
@@ -535,8 +549,7 @@ fun AddFootprintDialog(
                                                                                 },
                                                                                 onClick = {
                                                                                         mood = m
-                                                                                        expandedMood =
-                                                                                                false
+                                                                                        expandedMood = false
                                                                                 }
                                                                         )
                                                                 }
@@ -545,13 +558,57 @@ fun AddFootprintDialog(
                                         }
                                 }
 
-                                OutlinedTextField(
-                                        value = location,
-                                        onValueChange = { location = it },
-                                        label = { Text("地点") },
+                                // Transport Type Picker (Horizontal Scroll Chips)
+                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text(
+                                        "出行方式",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
+                                    )
+                                    LazyRow(
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
-                                )
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 4.dp)
+                                    ) {
+                                        items(com.footprint.data.model.TransportType.values()) { type ->
+                                            val isSelected = transportType == type
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = { transportType = type },
+                                                label = { Text(type.label, fontSize = 11.sp) },
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                        OutlinedTextField(
+                                                value = location,
+                                                onValueChange = { location = it },
+                                                label = { Text("地点") },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(12.dp)
+                                        )
+                                        OutlinedTextField(
+                                                value = altitude,
+                                                onValueChange = { altitude = it },
+                                                label = { Text("海拔 (m)", fontSize = 10.sp) },
+                                                modifier = Modifier.width(100.dp).height(52.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                singleLine = true,
+                                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                                        )
+                                }
 
                                 OutlinedTextField(
                                         value = detail,
@@ -595,23 +652,18 @@ fun AddFootprintDialog(
                                                                 location = location,
                                                                 detail = detail,
                                                                 mood = mood,
-                                                                tags =
-                                                                        tags.split(",").filter {
-                                                                                it.isNotBlank()
-                                                                        },
-                                                                distance = distance.toDoubleOrNull()
-                                                                                ?: 0.0,
+                                                                tags = tags.split(",").filter { it.isNotBlank() },
+                                                                distance = distance.toDoubleOrNull() ?: 0.0,
                                                                 photos = photoPaths,
                                                                 date = selectedDate,
                                                                 energy = energy.toInt(),
                                                                 icon = selectedIcon,
                                                                 weather = selectedWeather,
-                                                                latitude = initialEntry?.latitude
-                                                                                ?: currentLocation
-                                                                                        ?.latitude,
-                                                                longitude = initialEntry?.longitude
-                                                                                ?: currentLocation
-                                                                                        ?.longitude
+                                                                latitude = initialEntry?.latitude ?: currentLocation?.latitude,
+                                                                longitude = initialEntry?.longitude ?: currentLocation?.longitude,
+                                                                temperature = temperature.toDoubleOrNull(),
+                                                                altitude = altitude.toDoubleOrNull(),
+                                                                transportType = transportType
                                                         )
                                                 )
                                         },
@@ -636,7 +688,10 @@ data class FootprintDraft(
         val icon: String,
         val weather: String? = null,
         val latitude: Double? = null,
-        val longitude: Double? = null
+        val longitude: Double? = null,
+        val temperature: Double? = null,
+        val altitude: Double? = null,
+        val transportType: com.footprint.data.model.TransportType = com.footprint.data.model.TransportType.UNKNOWN
 )
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
