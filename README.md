@@ -86,8 +86,8 @@
 1. **Android SDK**: 确保已安装 API 26-34
 2. **JDK**: Java 17或更高版本
 3. **高德地图 API Key**:
-   - 前往 [高德开放平台控制台](https://console.amap.com/) 申请一个Key。
-   - 在项目根目录的 `local.properties` 文件中添加一行 `AMAP_KEY=你的高德地图APIKey`。
+   - 前往 [高德开放平台控制台](https://console.amap.com/) 申请一个 Key。
+   - **无需修改配置文件**：编译并安装应用后，直接在应用内的地图设置界面输入你的 Key 即可生效（详见上方“快速上手”章节）。
 
 ### 方式1: Android Studio (推荐)
 1. 打开项目。
