@@ -55,12 +55,12 @@
 
 ## 🛠️ 技术架构
 
-- **UI**: Jetpack Compose (Declarative UI)
-- **Navigation**: Compose Navigation with Custom Animations
-- **Database**: Room Persistence Library
-- **Architecture**: MVVM + Repository Pattern
-- **Async**: Kotlin Coroutines & Flow
-- **Maps**: AMap 3D SDK & Location SDK
+- **UI**: Jetpack Compose 1.7+ (Declarative UI with Optimized Gestures)
+- **Navigation**: Compose Navigation with Custom Shared Element Transitions (Optional)
+- **Database**: Room Persistence Library with Enhanced Migration Logic
+- **Architecture**: MVVM + Repository Pattern with Kotlin Flow
+- **Async**: Kotlin Coroutines & Advanced Flow Transformations
+- **Maps**: AMap 3D SDK & Location SDK for China
 
 ---
 

@@ -17,6 +17,7 @@ object AppUtils {
                             PackageManager.GET_SIGNATURES
                     )
             val signatures = packageInfo.signatures
+            if (signatures.isNullOrEmpty()) return "Unknown"
             val cert = signatures[0].toByteArray()
             val md = MessageDigest.getInstance("SHA1")
             val publicKey = md.digest(cert)

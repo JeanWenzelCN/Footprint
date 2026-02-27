@@ -764,7 +764,7 @@ object ArtLayoutOverlayUtils {
          * Gaussian blur while being much faster for large images.
          */
         private fun blurBitmap(src: Bitmap, radius: Float): Bitmap? {
-                if (radius <= 0) return src.copy(src.config, true)
+                if (radius <= 0) return src.copy(src.config ?: Bitmap.Config.ARGB_8888, true)
 
                 // Downscale for performance
                 val scaleFactor = 0.25f

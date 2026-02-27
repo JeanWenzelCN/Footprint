@@ -37,6 +37,8 @@ secrets.xml
 .gradle/
 build/
 .tmp_gradle_home/
+.fresh_gradle_home/
+/app/app_new_build/
 
 # Rust
 app/src/main/rust/target/

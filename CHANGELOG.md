@@ -1,5 +1,22 @@
 # 更新日志 (Changelog)
 
+### 2026-02-27: Compose 1.7 时代与液态交互革命 (v3.0.0)
+
+#### ✨ 核心特性 (Features)
+- **Compose 1.7 全速进发 (Compose 1.7 Ready)**: 
+  - 深度适配 Jetpack Compose 1.7.x 版本，全面重构手势处理架构。
+  - 采用全新的 `AnchoredDraggable` 架构，实现更丝滑的交互体验。
+- **SwipeableItem 2.0 (Redesigned Swipe Actions)**:
+  - 重新设计了列表侧滑操作，引入 `snapAnimationSpec` 与 `decayAnimationSpec` 实现物理级回弹。
+  - 优化了编辑/删除动作的视觉层级，确保在各种 DPI 屏幕下均有完美的液态玻璃遮罩效果。
+
+#### 🔧 修复与优化 (Optimizations & Fixes)
+- **Windows 构建系统加固 (Build System Stability)**: 
+  - 彻底解决了 Windows 环境下 `R.jar` 文件锁导致的 `:app:processDebugResources` 失败问题。
+  - 引入了动态构建路径隔离技术，确保 IDE 索引与 Gradle 构建互不干扰。
+- **Gradle 引擎升级**: 适配 Gradle 8.13，优化了依赖解析速度与缓存命中率。
+- **代码健壮性**: 解决了多个 Enum 关联属性弃用警告，清理了冗余的 Compose 1.5 遗留 API 调用。
+
 ### 2026-02-25: 细节打磨与液态优化 (v2.11.1)
 
 #### ✨ 新增特性 (Features)

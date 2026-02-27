@@ -402,7 +402,7 @@ object ArtLayoutOverlayUtils {
 
     private fun blurBitmap(bitmap: Bitmap, radius: Int): Bitmap {
         if (radius < 1) return bitmap
-        val result = bitmap.copy(bitmap.config, true)
+        val result = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, true)
         val w = result.width
         val h = result.height
         val pix = IntArray(w * h)

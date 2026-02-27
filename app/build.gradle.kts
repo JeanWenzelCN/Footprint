@@ -9,7 +9,8 @@ plugins {
 
 android {
     namespace = "com.footprint"
-    compileSdk = 34
+    compileSdk = 36
+    layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("app_new_build"))
 
     val localProperties = Properties().apply {
         val file = rootProject.file("local.properties")
@@ -21,9 +22,9 @@ android {
     defaultConfig {
         applicationId = "com.footprint"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 23
-        versionName = "2.11.1"
+        targetSdk = 36
+        versionCode = 30
+        versionName = "3.0.0"
 
         manifestPlaceholders["AMAP_KEY"] = localProperties.getProperty("AMAP_KEY") ?: "YOUR_AMAP_API_KEY"
 

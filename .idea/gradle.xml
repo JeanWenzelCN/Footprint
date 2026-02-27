@@ -20,6 +20,8 @@
         <option name="gradleJvm" value="jbr-21" />
         <option name="modules">
           <set>
+            <option value="$PROJECT_DIR$/../../../../.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.33/android" />
+            <option value="$PROJECT_DIR$/../../../../.pub-cache/hosted/pub.dev/image_picker_android-0.8.13+14/android" />
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/flutter_ui/.android/Flutter" />
