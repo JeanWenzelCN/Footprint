@@ -31,6 +31,9 @@ class FootprintRepository(
         fun observeGoals(): Flow<List<TravelGoal>> =
                 travelGoalDao.observeGoals().map { list -> list.map { it.toModel() } }
 
+        suspend fun getAllEntries(): List<FootprintEntry> =
+                footprintDao.getAll().map { it.toModel() }
+
         // --- Tracking ---
         suspend fun saveTrackPoint(location: com.amap.api.location.AMapLocation) {
                 val entity =

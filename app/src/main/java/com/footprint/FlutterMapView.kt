@@ -1,0 +1,161 @@
+package com.footprint
+
+import android.content.Context
+import android.graphics.*
+import android.os.Bundle
+import android.view.View
+import android.widget.FrameLayout
+import com.amap.api.maps.AMap
+import com.amap.api.maps.MapView
+import com.amap.api.maps.model.LatLng
+import com.footprint.service.LocationTrackingService
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
+import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.platform.PlatformView
+
+class FlutterMapView(
+    private val context: Context,
+    id: Int,
+    messenger: BinaryMessenger,
+    creationParams: Map<String?, Any?>?
+) : PlatformView, MethodChannel.MethodCallHandler {
+
+    private val container = FrameLayout(context)
+    private val mapView = MapView(context)
+    private var aMap: AMap? = null
+    private val channel = MethodChannel(messenger, "com.footprint/amap_$id")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    
+    // 迷雾覆盖层
+    private val fogOverlay = FogOverlayView(context)
+    
+    // 数据引用
+    private var currentPathPoints: List<LatLng> = emptyList()
+    private var historyPoints: List<LatLng> = emptyList()
+
+    init {
+        channel.setMethodCallHandler(this)
+        mapView.onCreate(Bundle())
+        aMap = mapView.map
+        
+        // 基础地图配置
+        aMap?.apply {
+            uiSettings.isMyLocationButtonEnabled = false
+            isMyLocationEnabled = true
+            // 默认设置为夜间模式以配合液态玻璃风格
+            mapType = AMap.MAP_TYPE_NIGHT 
+        }
+        
+        container.addView(mapView)
+        container.addView(fogOverlay)
+        
+        // 1. 监听实时轨迹流 (来自 Kotlin Service)
+        scope.launch {
+            LocationTrackingService.trackingPath.collectLatest { locations ->
+                currentPathPoints = locations.map { LatLng(it.latitude, it.longitude) }
+                fogOverlay.invalidate()
+            }
+        }
+
+        // 2. 监听地图相机变化
+        aMap?.setOnCameraChangeListener(object : AMap.OnCameraChangeListener {
+            override fun onCameraChange(pos: com.amap.api.maps.model.CameraPosition?) {
+                fogOverlay.invalidate() // 地图移动时，必须重新计算投影
+            }
+            override fun onCameraChangeFinish(pos: com.amap.api.maps.model.CameraPosition?) {
+                fogOverlay.invalidate()
+            }
+        })
+    }
+
+    override fun getView(): View = container
+
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "setFogEnabled" -> {
+                val enabled = call.arguments as? Boolean ?: false
+                fogOverlay.visibility = if (enabled) View.VISIBLE else View.GONE
+                result.success(true)
+            }
+            "setHistoryPoints" -> {
+                // 用于加载历史数据的接口
+                val points = call.arguments as? List<Map<String, Double>>
+                historyPoints = points?.map { LatLng(it["lat"]!!, it["lng"]!!) } ?: emptyList()
+                fogOverlay.invalidate()
+                result.success(true)
+            }
+            else -> result.notImplemented()
+        }
+    }
+
+    override fun dispose() {
+        scope.cancel()
+        channel.setMethodCallHandler(null)
+        mapView.onPause()
+        mapView.onDestroy()
+    }
+
+    // --- 高性能迷雾渲染类 ---
+    inner class FogOverlayView(context: Context) : View(context) {
+        private val fogPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E60F172A") // 90% 透明度的深蓝色迷雾
+        }
+        
+        private val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        private val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+            style = Paint.Style.FILL
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val map = aMap ?: return
+            val projection = map.projection ?: return
+            
+            // 使用离屏缓冲实现 DstOut 混合效果
+            val sc = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
+
+            // 1. 画背景迷雾
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fogPaint)
+
+            // 2. 计算动态挖洞半径 (根据缩放等级调整)
+            val zoom = map.cameraPosition.zoom
+            val radius = (zoom * 2.0).coerceIn(20.0, 150.0).toFloat()
+            
+            holePaint.strokeWidth = radius * 1.5f
+
+            // 3. 绘制实时轨迹路径
+            if (currentPathPoints.isNotEmpty()) {
+                val path = Path()
+                var first = true
+                currentPathPoints.forEach { latLng ->
+                    val screenPos = projection.toScreenLocation(latLng)
+                    if (first) {
+                        path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                        first = false
+                    } else {
+                        path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                    }
+                }
+                canvas.drawPath(path, holePaint)
+            }
+
+            // 4. 绘制历史点（使用圆点打孔）
+            historyPoints.forEach { latLng ->
+                val screenPos = projection.toScreenLocation(latLng)
+                canvas.drawCircle(screenPos.x.toFloat(), screenPos.y.toFloat(), radius * 2.0f, circlePaint)
+            }
+
+            canvas.restoreToCount(sc)
+        }
+    }
+}

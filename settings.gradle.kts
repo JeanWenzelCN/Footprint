@@ -10,10 +10,11 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
         maven { url = uri("https://maven.aliyun.com/repository/public") }
         maven { url = uri("https://maven.aliyun.com/repository/google") }
     }
@@ -21,3 +22,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "Footprint"
 include(":app")
+
+// Kotlin DSL 引入 Flutter 模块的兼容写法
+val flutterProjectRoot = file("flutter_ui")
+apply(from = flutterProjectRoot.resolve(".android/include_flutter.groovy"))
+project(":flutter").projectDir = flutterProjectRoot.resolve(".android/Flutter")

@@ -130,6 +130,9 @@ dependencies {
 
     // Haze (Glassmorphism)
     implementation("dev.chrisbanes.haze:haze-jetpack-compose:0.5.2")
+
+    // Flutter Module
+    implementation(project(":flutter"))
 }
 
 val buildRustTask = tasks.register<Exec>("buildRust") {
