@@ -1,14 +1,15 @@
 # 更新日志 (Changelog)
 
-### 2026-02-27: Compose 1.7 时代与液态交互革命 (v3.0.0)
+### 2026-02-27: Compose 1.7 时代与现代 UI 进化 (v3.0.0)
 
 #### ✨ 核心特性 (Features)
 - **Compose 1.7 全速进发 (Compose 1.7 Ready)**: 
   - 深度适配 Jetpack Compose 1.7.x 版本，全面重构手势处理架构。
   - 采用全新的 `AnchoredDraggable` 架构，实现更丝滑的交互体验。
 - **SwipeableItem 2.0 (Redesigned Swipe Actions)**:
-  - 重新设计了列表侧滑操作，引入 `snapAnimationSpec` 与 `decayAnimationSpec` 实现物理级回弹。
-  - 优化了编辑/删除动作的视觉层级，确保在各种 DPI 屏幕下均有完美的液态玻璃遮罩效果。
+  - 重新构筑侧滑交互，移除旧版液态玻璃特效，转向更简洁、高性能的现代风格。
+  - 引入 `snapAnimationSpec` 与 `decayAnimationSpec` 实现物理级回弹效果。
+  - 优化了编辑/删除动作的视觉层级，确保在各种 DPI 屏幕下均有完美的布局表现。
 
 #### 🔧 修复与优化 (Optimizations & Fixes)
 - **Windows 构建系统加固 (Build System Stability)**: 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**一款基于 Jetpack Compose 构建，拥有极致液态玻璃 (Glassmorphism) 视觉效果的足迹追踪应用**
+**一款基于 Jetpack Compose 构建，拥有现代 Material 3 视觉效果的足迹追踪应用**
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://www.android.com)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
@@ -14,7 +14,7 @@
 
 ## ✨ 核心特性
 
-- 🧪 **液态玻璃 UI**：深度定制的 Material 3 界面，模拟 iOS/macOS 的背景模糊与毛玻璃质感。
+- 🧪 **现代 Material 3 UI**：深度定制的 Material 3 界面，提供极致流畅且直观的用户体验。
 - 🌃 **赛博朋克配色**：内置高饱和度霓虹配色方案，让旅行记录极具科技感。
 - 📍 **高德定位集成**：针对国内环境优化的 AMap 定位引擎，支持实时轨迹绘制。
 - 🛡️ **智能隐私围栏**：独创“幽灵模式”，自动隐藏敏感区域（如家、公司）的精准坐标。
@@ -25,12 +25,12 @@
 
 ---
 
-## 🎨 最新视觉更新 (New!)
+## 🎨 最新视觉更新 (v3.0.0)
 
-- **全域液态玻璃**: 所有页面（概览、足迹海、目标页、弹窗）均已升级为高通透的液态玻璃风格。
+- **全新组件架构**: 移除旧版液态玻璃效果，采用更轻量、更高性能的现代 Material 3 布局。
+- **Compose 1.7 适配**: 利用最新的 API 提升列表滑动与手势交互的响应速度。
 - **云雾探索模式**: 新增“迷雾”地图模式，让探索感倍增，路径穿透动效让每一步都有迹可循。
-- **动态渐变背景**: 新增 `AppBackground`，提供淡雅且富有层次的全局背景，增强沉浸感。
-- **高分屏优化**: 摒弃传统模糊滤镜，采用高精度矢量渐变与光影模拟，确保在高分辨率屏幕上字体与图标锐利清晰，无锯齿。
+- **高分屏渲染优化**: 优化了矢量渐变与光影模拟，确保在高分辨率屏幕上字体与图标锐利清晰。
 
 ---
 
@@ -48,7 +48,7 @@
 无需修改代码或配置文件！
 1. 编译并安装应用。
 2. 打开地图界面，点击右上角的 **设置 (⚙️)** 按钮。
-3. 在弹出的玻璃风格对话框中输入你的 Key 并保存。
+3. 在弹出的设置对话框中输入你的 Key 并保存。
 4. 重启应用即可生效。
 
 ---
@@ -66,8 +66,8 @@
 
 ## 📂 项目结构
 
-- `app/src/main/java/com/footprint/ui/theme`：定制的液态玻璃主题与赛博朋克调色板。
-- `app/src/main/java/com/footprint/ui/components`：核心 UI 组件库，包含 `LiquidGlassCard` 和 `AppBackground`。
+- `app/src/main/java/com/footprint/ui/theme`：定制的 Material 3 主题与高对比度配色方案。
+- `app/src/main/java/com/footprint/ui/components`：核心 UI 组件库，包含重构后的交互元素与动画效果。
 - `app/src/main/java/com/footprint/service`：高性能后台定位追踪服务。
 - `app/src/main/java/com/footprint/utils`：API Key 安全管理工具。
 - `app/src/main/java/com/footprint/ui/screens/MapScreen`：核心地图交互逻辑。
