@@ -1376,12 +1376,15 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
       if (call.method == 'onMarkerClick') {
         int entryId = call.arguments;
         if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FootprintDetailPage(entryId: entryId),
-          ),
-        );
+        final entry = _allEntries.firstWhere((e) => e['id'] == entryId, orElse: () => null);
+        if (entry != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FootprintDetailPage(entry: entry),
+            ),
+          );
+        }
       }
     });
     _updateNativeMap();
