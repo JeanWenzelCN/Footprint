@@ -1434,7 +1434,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
           top: 56,
           right: 16,
           child: FloatingActionButton.small(
-            onPressed: () {},
+            onPressed: () => _showApiKeyDialog(),
             backgroundColor: cs.surface,
             child: const Icon(Icons.settings_outlined),
           ),
@@ -1500,6 +1500,90 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showApiKeyDialog() async {
+    try {
+      final String jsonStr = await dataChannel.invokeMethod('getAppCredentials');
+      final creds = jsonDecode(jsonStr);
+      final String pkgName = creds['packageName'] ?? "";
+      final String sha1 = creds['sha1'] ?? "";
+      final String currentKey = creds['amapKey'] ?? "";
+      
+      if (!mounted) return;
+      
+      final TextEditingController keyCtrl = TextEditingController(text: currentKey);
+      
+      await showDialog(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text("API Key 设置"),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Package Name:"),
+                  Row(
+                    children: [
+                      Expanded(child: Text(pkgName, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 20),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: pkgName));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("已复制包名")));
+                        }
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text("SHA1:"),
+                  Row(
+                    children: [
+                      Expanded(child: Text(sha1, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 20),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: sha1));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("已复制 SHA1")));
+                        }
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: keyCtrl,
+                    decoration: const InputDecoration(
+                      labelText: "AMAP Key",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("取消"),
+              ),
+              FilledButton(
+                onPressed: () {
+                  dataChannel.invokeMethod('saveAmapKey', keyCtrl.text);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("API Key 已保存，请重启应用生效"))
+                  );
+                },
+                child: const Text("保存"),
+              ),
+            ],
+          );
+        }
+      );
+    } catch (e) {
+      debugPrint("获取凭证失败: \$e");
+    }
   }
 }
 

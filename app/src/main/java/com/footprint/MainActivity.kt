@@ -85,6 +85,19 @@ class MainActivity : FlutterActivity() {
                 "updateThemeMode" -> { com.footprint.utils.PreferenceManager(this).themeMode = com.footprint.ui.theme.ThemeMode.valueOf(call.arguments as String); result.success(true) }
                 "updateThemeStyle" -> { com.footprint.utils.PreferenceManager(this).themeStyle = com.footprint.ui.theme.AppThemeStyle.valueOf(call.arguments as String); result.success(true) }
                 "updateHaptic" -> { com.footprint.utils.PreferenceManager(this).hapticFeedbackEnabled = call.arguments as Boolean; result.success(true) }
+                "getAppCredentials" -> {
+                    val map = mapOf(
+                        "packageName" to packageName,
+                        "sha1" to com.footprint.utils.AppUtils.getAppSignature(this@MainActivity),
+                        "amapKey" to (com.footprint.utils.ApiKeyManager.getApiKey(this@MainActivity) ?: "")
+                    )
+                    result.success(gson.toJson(map))
+                }
+                "saveAmapKey" -> {
+                    val key = call.arguments as String
+                    com.footprint.utils.ApiKeyManager.setApiKey(this@MainActivity, key)
+                    result.success(true)
+                }
                 
                 // --- 1:1 实现备份与导入 ---
                 "exportData" -> {
