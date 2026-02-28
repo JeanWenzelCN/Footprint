@@ -594,6 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int currentYear = DateTime.now().year;
   List<dynamic> allEntries = [];
   List<dynamic> onThisDayEntries = [];
+  List<dynamic> yearlyGoals = [];
   double totalDistance = 0.0;
   int uniquePlacesLength = 0;
   double avgEnergy = 0.0;
@@ -632,6 +633,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     const channel = MethodChannel('com.footprint/data');
     try {
       final jsonStr = await channel.invokeMethod<String>('getAllEntries');
+      final goalsJsonStr = await channel.invokeMethod<String>('getAllGoals');
+      
+      List<dynamic> yGoals = [];
+      if (goalsJsonStr != null) {
+        final List<dynamic> allGoals = jsonDecode(goalsJsonStr);
+        yGoals = allGoals.where((g) {
+          final dateStr = g['targetDate'] as String?;
+          if (dateStr != null && dateStr.length >= 4) {
+             final y = int.tryParse(dateStr.substring(0,4));
+             return y == currentYear;
+          }
+          return false;
+        }).toList();
+        yGoals.sort((a,b) => (a['targetDate'] ?? '').compareTo(b['targetDate'] ?? ''));
+      }
+
       if (jsonStr != null) {
         final List<dynamic> entries = jsonDecode(jsonStr);
         final today = DateTime.now();
@@ -681,6 +698,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           allEntries = yearEntries;
           onThisDayEntries = onThisDay;
+          yearlyGoals = yGoals;
           totalDistance = dist;
           uniquePlacesLength = places.length;
           avgEnergy = yearEntries.isNotEmpty ? energySum / yearEntries.length : 0.0;
@@ -882,7 +900,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                            Icon(Icons.auto_awesome, color: cs.primary, size: 18),
                            const SizedBox(width: 8),
                            Text(
-                             "那年今日 / 时光碎片",
+                             "时光碎片",
                              style: TextStyle(
                                color: cs.primary,
                                fontWeight: FontWeight.bold,
@@ -958,6 +976,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
                      ],
                    ),
                  ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: BorderSide(color: cs.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.flag, color: cs.secondary, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            "年度旅行目标",
+                            style: TextStyle(
+                              color: cs.secondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (yearlyGoals.isEmpty)
+                        Text(
+                          "暂无年度计划，去添加一个吧！",
+                          style: TextStyle(color: cs.outline, fontSize: 13),
+                        ),
+                      ...yearlyGoals.map((g) {
+                        final isCompleted = g['isCompleted'] == true;
+                        final dateStr = g['targetDate'] ?? '';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const GoalPlannerPage()));
+                            },
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isCompleted ? cs.secondary : cs.secondaryContainer.withValues(alpha: 0.4),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    isCompleted ? Icons.check : Icons.flag,
+                                    color: isCompleted ? Colors.white : cs.secondary,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        g['title'] ?? '未命名目标',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: cs.onSurface,
+                                        ),
+                                      ),
+                                      Text(
+                                        "${g['targetLocation'] ?? '未知位置'} · $dateStr",
+                                        style: TextStyle(
+                                          color: cs.onSurfaceVariant,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               Card(

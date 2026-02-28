@@ -52,6 +52,12 @@ class MainActivity : FlutterActivity() {
                         result.success(gson.toJson(entries))
                     }
                 }
+                "getAllGoals" -> {
+                    lifecycleScope.launch {
+                        val goals = repository.getAllGoals()
+                        result.success(gson.toJson(goals))
+                    }
+                }
                 "getStats" -> {
                     lifecycleScope.launch {
                         val entries = repository.getAllEntries()
