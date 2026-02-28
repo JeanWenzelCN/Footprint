@@ -7,7 +7,12 @@ import android.view.View
 import android.widget.FrameLayout
 import com.amap.api.maps.AMap
 import com.amap.api.maps.MapView
+import com.amap.api.maps.model.BitmapDescriptorFactory
 import com.amap.api.maps.model.LatLng
+import com.amap.api.maps.model.Marker
+import com.amap.api.maps.model.MarkerOptions
+import com.amap.api.maps.model.Polyline
+import com.amap.api.maps.model.PolylineOptions
 import com.footprint.service.LocationTrackingService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -36,6 +41,9 @@ class FlutterMapView(
     private var currentPathPoints: List<LatLng> = emptyList()
     private var historyPoints: List<LatLng> = emptyList()
 
+    private var livePolyline: Polyline? = null
+    private val markerList = mutableListOf<Marker>()
+
     init {
         channel.setMethodCallHandler(this)
         mapView.onCreate(Bundle())
@@ -47,15 +55,26 @@ class FlutterMapView(
             isMyLocationEnabled = true
             // 默认设置为夜间模式以配合液态玻璃风格
             mapType = AMap.MAP_TYPE_NIGHT 
+            
+            setOnMarkerClickListener { marker ->
+                val entryId = marker.snippet?.toLongOrNull()
+                if (entryId != null) {
+                    channel.invokeMethod("onMarkerClick", entryId)
+                }
+                true
+            }
         }
         
         container.addView(mapView)
         container.addView(fogOverlay)
         
+        fogOverlay.visibility = View.GONE
+
         // 1. 监听实时轨迹流 (来自 Kotlin Service)
         scope.launch {
             LocationTrackingService.trackingPath.collectLatest { locations ->
                 currentPathPoints = locations.map { LatLng(it.latitude, it.longitude) }
+                updateLivePolyline()
                 fogOverlay.invalidate()
             }
         }
@@ -63,12 +82,29 @@ class FlutterMapView(
         // 2. 监听地图相机变化
         aMap?.setOnCameraChangeListener(object : AMap.OnCameraChangeListener {
             override fun onCameraChange(pos: com.amap.api.maps.model.CameraPosition?) {
-                fogOverlay.invalidate() // 地图移动时，必须重新计算投影
+                fogOverlay.invalidate()
             }
             override fun onCameraChangeFinish(pos: com.amap.api.maps.model.CameraPosition?) {
                 fogOverlay.invalidate()
             }
         })
+    }
+
+    private fun updateLivePolyline() {
+        val map = aMap ?: return
+        livePolyline?.remove()
+        livePolyline = null
+        if (currentPathPoints.isNotEmpty()) {
+            livePolyline = map.addPolyline(
+                PolylineOptions()
+                    .addAll(currentPathPoints)
+                    .width(18f)
+                    .color(Color.parseColor("#00FF9F"))
+                    .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                    .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                    .zIndex(100f)
+            )
+        }
     }
 
     override fun getView(): View = container
@@ -80,11 +116,53 @@ class FlutterMapView(
                 fogOverlay.visibility = if (enabled) View.VISIBLE else View.GONE
                 result.success(true)
             }
+            "setMapMode" -> {
+                val mode = call.arguments as? String ?: "STANDARD"
+                aMap?.mapType = if (mode == "STANDARD" || mode == "CAPSULE") AMap.MAP_TYPE_NORMAL else AMap.MAP_TYPE_NIGHT
+                fogOverlay.visibility = if (mode == "FOG") View.VISIBLE else View.GONE
+                result.success(true)
+            }
+            "setEntries" -> {
+                val entries = call.arguments as? List<Map<String, Any>>
+                markerList.forEach { it.remove() }
+                markerList.clear()
+                
+                entries?.forEach { entry ->
+                    val lat = entry["latitude"] as? Double
+                    val lng = entry["longitude"] as? Double
+                    val id = (entry["id"] as? Number)?.toLong()
+                    val title = entry["title"] as? String ?: "足迹"
+                    
+                    if (lat != null && lng != null && id != null) {
+                        val marker = aMap?.addMarker(
+                            MarkerOptions()
+                                .position(LatLng(lat, lng))
+                                .title(title)
+                                .snippet(id.toString())
+                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+                        )
+                        marker?.let { markerList.add(it) }
+                    }
+                }
+                result.success(true)
+            }
             "setHistoryPoints" -> {
-                // 用于加载历史数据的接口
+                // 用于加载历史数据的接口 (迷雾挖洞)
                 val points = call.arguments as? List<Map<String, Double>>
                 historyPoints = points?.map { LatLng(it["lat"]!!, it["lng"]!!) } ?: emptyList()
                 fogOverlay.invalidate()
+                result.success(true)
+            }
+            "centerLocation" -> {
+                val loc = aMap?.myLocation
+                if (loc != null) {
+                    aMap?.animateCamera(com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 17f))
+                } else {
+                    val trackingLoc = LocationTrackingService.currentLocation.value
+                    if (trackingLoc != null) {
+                        aMap?.animateCamera(com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(LatLng(trackingLoc.latitude, trackingLoc.longitude), 17f))
+                    }
+                }
                 result.success(true)
             }
             else -> result.notImplemented()
@@ -133,7 +211,7 @@ class FlutterMapView(
             
             holePaint.strokeWidth = radius * 1.5f
 
-            // 3. 绘制实时轨迹路径
+            // 3. 绘制实时轨迹路径挖洞
             if (currentPathPoints.isNotEmpty()) {
                 val path = Path()
                 var first = true
@@ -149,7 +227,7 @@ class FlutterMapView(
                 canvas.drawPath(path, holePaint)
             }
 
-            // 4. 绘制历史点（使用圆点打孔）
+            // 4. 绘制历史点（使用圆点打洞）
             historyPoints.forEach { latLng ->
                 val screenPos = projection.toScreenLocation(latLng)
                 canvas.drawCircle(screenPos.x.toFloat(), screenPos.y.toFloat(), radius * 2.0f, circlePaint)

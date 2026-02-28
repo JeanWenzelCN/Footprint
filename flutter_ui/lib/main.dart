@@ -1339,24 +1339,58 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   String mapMode = 'STANDARD';
   bool isTracking = false;
   MethodChannel? _mapChannel;
+  List<dynamic> _allEntries = [];
 
   @override
   void initState() {
     super.initState();
+    _loadEntries();
     streamChannel.receiveBroadcastStream().listen((eventJson) {
       final event = jsonDecode(eventJson);
-      if (mounted && event['type'] == 'status')
-        setState(() => isTracking = event['isTracking']);
+      if (mounted && event['type'] == 'status') {
+        final newStatus = event['isTracking'];
+        if (isTracking && !newStatus) {
+          // If tracking was running and now stopped, reload to reflect the newly saved tracking footprint
+          _loadEntries();
+        }
+        setState(() => isTracking = newStatus);
+      }
     });
+  }
+
+  Future<void> _loadEntries() async {
+    try {
+      final String jsonStr = await dataChannel.invokeMethod('getAllEntries');
+      setState(() {
+        _allEntries = jsonDecode(jsonStr);
+      });
+      _updateNativeMap();
+    } catch (e) {
+      debugPrint("Failed to load map entries: $e");
+    }
   }
 
   void _onMapCreated(int id) {
     _mapChannel = MethodChannel('com.footprint/amap_$id');
+    _mapChannel?.setMethodCallHandler((call) async {
+      if (call.method == 'onMarkerClick') {
+        int entryId = call.arguments;
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FootprintDetailPage(entryId: entryId),
+          ),
+        );
+      }
+    });
     _updateNativeMap();
   }
 
   void _updateNativeMap() {
+    _mapChannel?.invokeMethod('setMapMode', mapMode);
     _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
+    _mapChannel?.invokeMethod('setEntries', _allEntries);
   }
 
   @override
@@ -1410,7 +1444,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               FloatingActionButton.small(
-                onPressed: () {},
+                onPressed: () => _mapChannel?.invokeMethod('centerLocation'),
                 backgroundColor: cs.surfaceContainerHighest,
                 child: const Icon(Icons.my_location),
               ),
