@@ -4,14 +4,22 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,17 +47,20 @@ fun SwipeableItem(
     val actionWidthPx = with(density) { actionWidth.toPx() }
 
     val state = remember {
-        AnchoredDraggableState(
+        androidx.compose.foundation.gestures.AnchoredDraggableState(
             initialValue = SwipeState.Settled,
-            anchors = DraggableAnchors {
-                SwipeState.Settled at 0f
-                SwipeState.Revealed at -actionWidthPx
-            },
             positionalThreshold = { distance: Float -> distance * 0.5f },
             velocityThreshold = { with(density) { 100.dp.toPx() } },
             snapAnimationSpec = tween(),
             decayAnimationSpec = androidx.compose.animation.splineBasedDecay(density)
-        )
+        ).apply {
+            updateAnchors(
+                DraggableAnchors {
+                    SwipeState.Settled at 0f
+                    SwipeState.Revealed at -actionWidthPx
+                }
+            )
+        }
     }
 
     Box(
@@ -110,7 +121,7 @@ fun SwipeableItem(
                 .fillMaxWidth()
                 .offset {
                     IntOffset(
-                        x = state.requireOffset().roundToInt(),
+                        x = state.offset.roundToInt(),
                         y = 0
                     )
                 }
