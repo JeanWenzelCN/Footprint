@@ -661,7 +661,6 @@ class FootprintViewModel(
                     com.footprint.utils.FileUtils.deleteRecursively(tempDir)
                 }
                 onSuccess()
-                onSuccess()
             } catch (e: Exception) {
                 e.printStackTrace()
                 val errorMsg =
@@ -731,6 +730,12 @@ class FootprintViewModel(
             transportType: com.footprint.data.model.TransportType = com.footprint.data.model.TransportType.UNKNOWN,
             altitude: Double? = null
     ) {
+        val carbonSaved = when (transportType) {
+            com.footprint.data.model.TransportType.WALK -> distanceKm * 0.16
+            com.footprint.data.model.TransportType.BIKE -> distanceKm * 0.12
+            com.footprint.data.model.TransportType.TRAIN -> distanceKm * 0.04
+            else -> 0.0
+        }
         viewModelScope.launch {
             val entry =
                     FootprintEntry(
@@ -749,7 +754,8 @@ class FootprintViewModel(
                             weather = weather,
                             temperature = temperature,
                             transportType = transportType,
-                            altitude = altitude
+                            altitude = altitude,
+                            carbonSavedKg = carbonSaved
                     )
             repository.saveEntry(entry)
         }

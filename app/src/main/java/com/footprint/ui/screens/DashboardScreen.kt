@@ -583,6 +583,19 @@ fun DashboardScreen(
 
                 // Bottom Sheet
                 if (showBottomSheet && selectedStatType != null) {
+                        val statType = selectedStatType
+                        val filteredEntries = remember(state.visibleEntries, statType, state.summary.yearly.dominantMood) {
+                            when (statType) {
+                                StatType.TRACK_POINTS -> state.visibleEntries
+                                StatType.MILEAGE -> state.visibleEntries.sortedByDescending { it.distanceKm }
+                                StatType.PLACES -> state.visibleEntries.distinctBy { it.location }
+                                StatType.RECORDS -> state.visibleEntries
+                                StatType.ENERGY -> state.visibleEntries.sortedByDescending { it.energyLevel }
+                                StatType.MOOD -> state.visibleEntries.filter { it.mood == state.summary.yearly.dominantMood }
+                                else -> state.visibleEntries
+                            }
+                        }
+
                         ModalBottomSheet(
                                 onDismissRequest = { showBottomSheet = false },
                                 sheetState = sheetState,
@@ -590,8 +603,28 @@ fun DashboardScreen(
                                 dragHandle = { BottomSheetDefaults.DragHandle() }
                         ) {
                                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                                        item {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                         statType?.icon ?: Icons.Default.Info,
+                                                         contentDescription = null,
+                                                         tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                            text = "年度明细：${statType?.label}",
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                        }
                                         recentFootprintsSection(
-                                                entries = state.visibleEntries,
+                                                entries = filteredEntries,
                                                 onCreateGoal = onCreateGoal,
                                                 onEditEntry = { entry ->
                                                         onEditEntry(entry)
@@ -603,6 +636,7 @@ fun DashboardScreen(
                                                         showBottomSheet = false
                                                 }
                                         )
+                                        item { Spacer(modifier = Modifier.height(32.dp)) }
                                 }
                         }
                 }

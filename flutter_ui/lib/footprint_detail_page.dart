@@ -1,26 +1,77 @@
 import 'package:flutter/material.dart';
 
 class FootprintDetailPage extends StatefulWidget {
-  const FootprintDetailPage({super.key});
+  final dynamic entry;
+  const FootprintDetailPage({super.key, this.entry});
 
   @override
   State<FootprintDetailPage> createState() => _FootprintDetailPageState();
 }
 
 class _FootprintDetailPageState extends State<FootprintDetailPage> {
-  final String title = "川西彩林穿越";
-  final String location = "四姑娘山";
-  final String date = "2022年10月24日";
-  final String mood = "愉快";
-  final Color moodColor = Colors.orange;
-  final String weather = "晴朗";
-  final String detail = "一次难忘的川西自驾，秋天的四姑娘山被五彩斑斓的树叶装点得格外美丽。\n我们在双桥沟徒步了将近10公里，这里有雪山、草甸、森林、湖泊，是一步一景。空气十分清新，仿佛能洗净心中的烦恼。晚上的星空更是震撼，仿佛触手可及的银河。";
-  final double distance = 18.5;
-  final int energy = 120;
-  final List<String> photos = [
-    "https://example.com/photo1.jpg", 
-    "https://example.com/photo2.jpg",
-  ]; // Mock image URLs or local assets not fully implemented in Flutter without network loading
+  late String title;
+  late String location;
+  late String date;
+  late String mood;
+  late Color moodColor;
+  late String weather;
+  late String detail;
+  late double distance;
+  late int energy;
+  late List<String> photos;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.entry;
+    title = e?['title'] ?? "未命名足迹";
+    location = e?['location'] ?? "未知地点";
+    date = e?['happenedOn'] ?? "未知日期";
+    
+    String rawMood = e?['mood'] ?? "";
+    mood = _mapMoodToChinese(rawMood);
+    moodColor = _getMoodColor(rawMood);
+    
+    weather = e?['weather'] ?? "-";
+    detail = e?['notes'] ?? "没有记录详细内容。";
+    distance = (e?['distanceKm'] as num?)?.toDouble() ?? 0.0;
+    energy = (e?['energyLevel'] as num?)?.toInt() ?? 0;
+    
+    // Parse photos if it's a list or comma-separated string
+    final rawPhotos = e?['photos'];
+    if (rawPhotos is List) {
+      photos = rawPhotos.map((e) => e.toString()).toList();
+    } else if (rawPhotos is String && rawPhotos.isNotEmpty) {
+      photos = rawPhotos.split(',').map((s) => s.trim()).toList();
+    } else {
+      photos = [];
+    }
+  }
+
+  String _mapMoodToChinese(String englishMood) {
+    if (englishMood.contains(RegExp(r'[\u4e00-\u9fa5]'))) return englishMood;
+    switch (englishMood.toUpperCase()) {
+      case "EXCITED": return "激情";
+      case "CURIOUS": return "探索";
+      case "RELAXED": return "放松";
+      case "REFLECTIVE": return "思考";
+      case "HAPPY": return "愉快";
+      case "CALM": return "平静";
+      default: return englishMood.isEmpty ? "平静" : englishMood;
+    }
+  }
+
+  Color _getMoodColor(String englishMood) {
+    switch (englishMood.toUpperCase()) {
+      case "EXCITED": return Colors.orange;
+      case "CURIOUS": return Colors.teal;
+      case "RELAXED": return Colors.blue;
+      case "REFLECTIVE": return Colors.purple;
+      case "HAPPY": return Colors.orange;
+      case "CALM": return Colors.blue;
+      default: return Colors.blueGrey;
+    }
+  }
 
   int? selectedPhotoIndex;
 

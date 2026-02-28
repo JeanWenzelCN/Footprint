@@ -50,33 +50,42 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _detailController = TextEditingController();
-  final TextEditingController _distanceController = TextEditingController(
-    text: "5.0",
-  );
+  final TextEditingController _distanceController = TextEditingController(text: "5.0");
+  final TextEditingController _tagsController = TextEditingController();
+  final TextEditingController _tempController = TextEditingController();
+  final TextEditingController _altController = TextEditingController();
+
   String selectedIcon = "LocationOn";
   double energyLevel = 6.0;
   String selectedMood = "愉快";
+  String selectedWeather = "晴朗";
+  String selectedTransport = "步行";
+  List<File> photos = [];
+
   final List<String> availableIcons = [
-    "LocationOn",
-    "Restaurant",
-    "LocalCafe",
-    "Park",
-    "Flight",
-    "Train",
-    "DirectionsBike",
-    "ShoppingBag",
-    "CameraAlt",
+    "LocationOn", "Restaurant", "LocalCafe", "Park", "Flight",
+    "Train", "DirectionsBike", "ShoppingBag", "CameraAlt",
   ];
+
+  final List<String> weathers = ["晴朗", "多云", "阴天", "雨", "雪", "风", "雾"];
+  final List<String> transports = ["步行", "骑行", "自驾", "铁路", "航空", "未知"];
+  final List<String> moods = ["愉快", "平静", "兴奋", "疲惫", "失落", "惊喜"];
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage();
+    if (images.isNotEmpty) {
+      setState(() => photos.addAll(images.map((img) => File(img.path))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          '记录新的足迹',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('记录新的足迹', style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
@@ -89,9 +98,15 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             controller: _titleController,
             decoration: InputDecoration(
               labelText: '标题',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _tagsController,
+            decoration: InputDecoration(
+              labelText: '标签 (用逗号分隔)',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 24),
@@ -106,18 +121,11 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
               itemBuilder: (context, index) {
                 bool isSelected = selectedIcon == availableIcons[index];
                 return GestureDetector(
-                  onTap: () =>
-                      setState(() => selectedIcon = availableIcons[index]),
+                  onTap: () => setState(() => selectedIcon = availableIcons[index]),
                   child: CircleAvatar(
                     radius: 22,
-                    backgroundColor: isSelected
-                        ? cs.primary
-                        : cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                    child: Icon(
-                      _getIconData(availableIcons[index]),
-                      color: isSelected ? Colors.white : cs.onSurfaceVariant,
-                      size: 20,
-                    ),
+                    backgroundColor: isSelected ? cs.primary : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                    child: Icon(_getIconData(availableIcons[index]), color: isSelected ? Colors.white : cs.onSurfaceVariant, size: 20),
                   ),
                 );
               },
@@ -126,34 +134,38 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
           const SizedBox(height: 24),
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    const Icon(Icons.straighten, color: Colors.blue),
-                    TextField(
-                      controller: _distanceController,
-                      textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                        labelText: '里程',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: DropdownButtonFormField<String>(
+                value: selectedMood,
+                decoration: InputDecoration(labelText: '心情', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                items: moods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                onChanged: (v) => setState(() => selectedMood = v!),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: DropdownButtonFormField<String>(
+                value: selectedWeather,
+                decoration: InputDecoration(labelText: '天气', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                items: weathers.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
+                onChanged: (v) => setState(() => selectedWeather = v!),
+              )),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: DropdownButtonFormField<String>(
+                value: selectedTransport,
+                decoration: InputDecoration(labelText: '出行方式', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                items: transports.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                onChanged: (v) => setState(() => selectedTransport = v!),
+              )),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.bolt, color: Colors.orange),
+                    Text("活力指数 ${energyLevel.toInt()}", style: tt.bodySmall),
                     Slider(
-                      value: energyLevel,
-                      min: 1,
-                      max: 10,
-                      divisions: 9,
+                      value: energyLevel, min: 1, max: 10, divisions: 9,
                       onChanged: (v) => setState(() => energyLevel = v),
                     ),
                   ],
@@ -161,41 +173,78 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: TextField(
+                controller: _distanceController,
+                decoration: InputDecoration(labelText: '里程(km)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                keyboardType: TextInputType.number,
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(
+                controller: _tempController,
+                decoration: InputDecoration(labelText: '气温(℃)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                keyboardType: TextInputType.number,
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(
+                controller: _altController,
+                decoration: InputDecoration(labelText: '海拔(m)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                keyboardType: TextInputType.number,
+              )),
+            ],
+          ),
+          const SizedBox(height: 16),
           TextField(
             controller: _locationController,
-            decoration: InputDecoration(
-              labelText: '地点',
-              prefixIcon: const Icon(Icons.place_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+            decoration: InputDecoration(labelText: '地点', prefixIcon: const Icon(Icons.place_outlined), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _detailController,
             maxLines: 4,
-            decoration: InputDecoration(
-              labelText: '故事',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+            decoration: InputDecoration(labelText: '故事', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+          ),
+          const SizedBox(height: 16),
+          Text("照片记录", style: tt.labelMedium),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(color: cs.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.add_a_photo, size: 32),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ...photos.map((f) => Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Stack(
+                    children: [
+                      ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(f, width: 80, height: 80, fit: BoxFit.cover)),
+                      Positioned(
+                        right: 0, top: 0,
+                        child: GestureDetector(
+                          onTap: () => setState(() => photos.remove(f)),
+                          child: Container(decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), padding: const EdgeInsets.all(4), child: const Icon(Icons.close, color: Colors.white, size: 16)),
+                        ),
+                      )
+                    ],
+                  ),
+                )),
+              ],
             ),
           ),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: const Text(
-              "记录足迹",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+            child: const Text("记录足迹", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
@@ -543,6 +592,106 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int currentYear = DateTime.now().year;
+  List<dynamic> allEntries = [];
+  List<dynamic> onThisDayEntries = [];
+  double totalDistance = 0.0;
+  int uniquePlacesLength = 0;
+  double avgEnergy = 0.0;
+  String dominantMoodStr = "愉快";
+
+  final List<String> dailyQuotes = [
+    "每一次相遇都是久别重逢，每一步足迹都是人生印记。",
+    "走过的路，看过的风景，最终都会成为更好的自己。",
+    "时间沉淀了情绪，留下了故事的余温。",
+    "心之所向，步履以往，世界在脚下延展。",
+    "这世界的辽阔，由你的脚步去丈量。",
+    "记忆是一张地图，每个坐标都写着从前。",
+    "风带来的气息，是我们曾经路过的证明。"
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEntries();
+  }
+
+  String _mapMoodToChinese(String englishMood) {
+    if (englishMood.contains(RegExp(r'[\u4e00-\u9fa5]'))) return englishMood;
+    switch (englishMood.toUpperCase()) {
+      case "EXCITED": return "激情";
+      case "CURIOUS": return "探索";
+      case "RELAXED": return "放松";
+      case "REFLECTIVE": return "思考";
+      case "HAPPY": return "愉快";
+      case "CALM": return "平静";
+      default: return englishMood;
+    }
+  }
+
+  Future<void> _loadEntries() async {
+    const channel = MethodChannel('com.footprint/data');
+    try {
+      final jsonStr = await channel.invokeMethod<String>('getAllEntries');
+      if (jsonStr != null) {
+        final List<dynamic> entries = jsonDecode(jsonStr);
+        final today = DateTime.now();
+        List<dynamic> onThisDay = [];
+
+        final yearEntries = entries.where((e) {
+          final dateStr = e['happenedOn'] as String?;
+          if (dateStr != null && dateStr.length >= 10) {
+            final parts = dateStr.split('-');
+            final y = int.tryParse(parts[0]);
+            final m = int.tryParse(parts[1]);
+            final d = int.tryParse(parts[2].substring(0, 2));
+            if (y != null && y < today.year && m == today.month && d == today.day) {
+              onThisDay.add(e);
+            }
+            return y == currentYear;
+          }
+          return false;
+        }).toList();
+        
+        // Sort chronologically (newest first)
+        yearEntries.sort((a,b) => (b['happenedOn'] ?? '').compareTo(a['happenedOn'] ?? ''));
+
+        double dist = 0.0;
+        double energySum = 0.0;
+        final places = <String>{};
+        final moodCounts = <String, int>{};
+
+        for (var e in yearEntries) {
+          dist += (e['distanceKm'] as num?)?.toDouble() ?? 0.0;
+          final String? loc = e['location'];
+          if (loc != null && loc.isNotEmpty) places.add(loc);
+          energySum += (e['energyLevel'] as num?)?.toDouble() ?? 0.0;
+          final String? mood = e['mood'];
+          if (mood != null && mood.isNotEmpty) moodCounts[mood] = (moodCounts[mood] ?? 0) + 1;
+        }
+
+        String topMood = "未知";
+        int topMoodCount = -1;
+        moodCounts.forEach((k, v) {
+          if (v > topMoodCount) {
+             topMoodCount = v;
+             topMood = k;
+          }
+        });
+
+        setState(() {
+          allEntries = yearEntries;
+          onThisDayEntries = onThisDay;
+          totalDistance = dist;
+          uniquePlacesLength = places.length;
+          avgEnergy = yearEntries.isNotEmpty ? energySum / yearEntries.length : 0.0;
+          if (topMoodCount > 0) dominantMoodStr = _mapMoodToChinese(topMood);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading entries: $e");
+    }
+  }
+
   IconData _getAvatarIcon(String id) {
     switch (id) {
       case "avatar_2":
@@ -556,10 +705,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showDetail(String t, String l, String d) {
+  void _showDetail(dynamic entryData) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const FootprintDetailPage()),
+      MaterialPageRoute(builder: (context) => FootprintDetailPage(entry: entryData)),
+    );
+  }
+
+  void _showStatDetail(BuildContext context, String title, String subtitle, List<dynamic> entriesToList) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (_, controller) {
+            return Container(
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                   Padding(
+                     padding: const EdgeInsets.all(16.0),
+                     child: Text(title, style: TextStyle(color: cs.primary, fontSize: 18, fontWeight: FontWeight.bold)),
+                   ),
+                   const Divider(),
+                   Expanded(
+                     child: entriesToList.isEmpty ? 
+                       Center(child: Text("暂无记录", style: TextStyle(color: cs.outline))) :
+                       ListView.builder(
+                       controller: controller,
+                       itemCount: entriesToList.length,
+                       itemBuilder: (context, index) {
+                         final entry = entriesToList[index];
+                         final eTitle = entry['title'] ?? '未知足迹';
+                         final eLoc = entry['location'] ?? '未知地点';
+                         final eDist = entry['distanceKm']?.toString() ?? '0';
+                         final eDate = entry['happenedOn'] ?? '';
+                         return ListTile(
+                           leading: Icon(Icons.place, color: cs.primary),
+                           title: Text(eTitle),
+                           subtitle: Text("$eDate · $eLoc"),
+                           trailing: Text("${eDist}km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
+                         );
+                       },
+                     ),
+                   ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -584,7 +787,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () {
-                      setState(() => currentYear--);
+                      setState(() { currentYear--; _loadEntries(); });
                     },
                   ),
                   Text(
@@ -594,7 +797,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () {
-                      setState(() => currentYear++);
+                      setState(() { currentYear++; _loadEntries(); });
                     },
                   ),
                 ],
@@ -613,21 +816,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Row(
                     children: [
-                      _sBox(cs, tt, "足迹", "42"),
+                      _sBox(cs, tt, "足迹", "${allEntries.length}", onTap: () => _showStatDetail(context, "所有足迹 (${allEntries.length})", "年度足迹概览", allEntries)),
                       const SizedBox(width: 8),
-                      _sBox(cs, tt, "里程", "128.5", u: "km"),
+                      _sBox(cs, tt, "里程", totalDistance.toStringAsFixed(1), u: "km", onTap: () {
+                        final sorted = List.of(allEntries)..sort((a,b) => ((b['distanceKm'] as num?)?.toDouble() ?? 0.0).compareTo((a['distanceKm'] as num?)?.toDouble() ?? 0.0));
+                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(1)} km)", "按距离降序排序", sorted);
+                      }),
                       const SizedBox(width: 8),
-                      _sBox(cs, tt, "地点", "12"),
+                      _sBox(cs, tt, "地点", "$uniquePlacesLength", onTap: () {
+                        final seen = <String>{};
+                        final unique = allEntries.where((e) {
+                          final loc = e['location'] as String? ?? '';
+                          if (seen.contains(loc) || loc.isEmpty) return false;
+                          seen.add(loc);
+                          return true;
+                        }).toList();
+                        _showStatDetail(context, "探索地点 ($uniquePlacesLength)", "不重复地点列表", unique);
+                      }),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      _sBox(cs, tt, "记录", "28"),
+                      _sBox(cs, tt, "记录", "${allEntries.length}", onTap: () => _showStatDetail(context, "记录条数 (${allEntries.length})", "今年所有打卡记录", allEntries)),
                       const SizedBox(width: 8),
-                      _sBox(cs, tt, "活力", "8.5", u: "指数"),
+                      _sBox(cs, tt, "活力", avgEnergy.toStringAsFixed(1), u: "指数", onTap: () {
+                        final sorted = List.of(allEntries)..sort((a,b) => ((b['energyLevel'] as num?)?.toDouble() ?? 0.0).compareTo((a['energyLevel'] as num?)?.toDouble() ?? 0.0));
+                        _showStatDetail(context, "平均活力指数 (${avgEnergy.toStringAsFixed(1)})", "按活力等级排序", sorted);
+                      }),
                       const SizedBox(width: 8),
-                      _sBox(cs, tt, "主情绪", "愉快"),
+                      _sBox(cs, tt, "主情绪", dominantMoodStr, onTap: () {
+                         final filtered = allEntries.where((e) => e['mood'] == dominantMoodStr).toList();
+                         _showStatDetail(context, "主导心情 ($dominantMoodStr)", "心情统计明细", filtered);
+                      }),
                     ],
                   ),
                 ],
@@ -645,79 +866,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  side: BorderSide(color: cs.outlineVariant),
+              if (onThisDayEntries.isNotEmpty) ...[
+                Card(
+                  elevation: 0,
+                   shape: RoundedRectangleBorder(
+                     borderRadius: BorderRadius.circular(24),
+                     side: BorderSide(color: cs.outlineVariant),
+                   ),
+                   child: Padding(
+                     padding: const EdgeInsets.all(16),
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+                         Row(
+                           children: [
+                             Icon(Icons.auto_awesome, color: cs.primary, size: 18),
+                             const SizedBox(width: 8),
+                             Text(
+                               "那年今日 / 时光碎片",
+                               style: TextStyle(
+                                 color: cs.primary,
+                                 fontWeight: FontWeight.bold,
+                                 fontSize: 13,
+                               ),
+                             ),
+                           ],
+                         ),
+                         const SizedBox(height: 8),
+                         Text(
+                           dailyQuotes[DateTime.now().day % dailyQuotes.length],
+                           style: TextStyle(
+                             color: cs.outline,
+                             fontStyle: FontStyle.italic,
+                             fontSize: 12,
+                           ),
+                         ),
+                         const SizedBox(height: 16),
+                         ...onThisDayEntries.map((e) {
+                           int pastYear = int.tryParse(e['happenedOn']?.toString().split('-')[0] ?? '0') ?? 0;
+                           String yearDiff = (DateTime.now().year - pastYear).toString();
+                           return Padding(
+                             padding: const EdgeInsets.only(bottom: 12),
+                             child: InkWell(
+                               onTap: () => _showDetail(e),
+                               child: Row(
+                                 children: [
+                                   Container(
+                                     width: 56,
+                                     height: 56,
+                                     decoration: BoxDecoration(
+                                       color: Colors.orange.withValues(alpha: 0.2),
+                                       borderRadius: BorderRadius.circular(12),
+                                     ),
+                                     child: const Icon(
+                                       Icons.landscape,
+                                       color: Colors.orange,
+                                       size: 32,
+                                     ),
+                                   ),
+                                   const SizedBox(width: 16),
+                                   Expanded(
+                                     child: Column(
+                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                       children: [
+                                         Text(
+                                           e['title'] ?? '未知足迹',
+                                           style: const TextStyle(
+                                             fontWeight: FontWeight.bold,
+                                             fontSize: 16,
+                                           ),
+                                         ),
+                                         Text(
+                                           '${yearDiff}年前 · ${_mapMoodToChinese(e['mood'] ?? '')}',
+                                           style: TextStyle(
+                                             color: cs.outline,
+                                             fontSize: 12,
+                                           ),
+                                         ),
+                                       ],
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                             ),
+                           );
+                         }),
+                       ],
+                     ),
+                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.auto_awesome, color: cs.primary, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            "那年今日 / 时光碎片",
-                            style: TextStyle(
-                              color: cs.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: () => _showDetail("川西穿越", "四姑娘山", "2年前"),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.landscape,
-                                color: Colors.orange,
-                                size: 32,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    '川西彩林穿越',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  Text(
-                                    '记录于 2022-10-24 · 愉快',
-                                    style: TextStyle(
-                                      color: cs.outline,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
               Card(
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -735,6 +974,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(fontSize: 12),
                   ),
                   trailing: const Icon(Icons.keyboard_arrow_right),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TimeFootprintPlaybackPage()));
+                  },
                 ),
               ),
               const SizedBox(height: 24),
@@ -786,54 +1028,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Text(
-                    "11月",
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+              if (allEntries.isEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text(
+                      "此年份暂无足迹记录",
+                      style: TextStyle(color: cs.outline),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Divider(color: cs.outlineVariant)),
-                  const SizedBox(width: 8),
-                  Icon(Icons.expand_less, color: cs.primary),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: cs.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: cs.primaryContainer,
-                    child: Icon(Icons.place, color: cs.onPrimaryContainer),
-                  ),
-                  title: const Text(
-                    '周末城市漫步',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    '11-12 · 城市公园',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: Text(
-                    '5.2 km',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
+                )
+              ] else ...[
+                // Render the list of footprints chronologically
+                ...allEntries.map((entry) {
+                   final String dateStr = entry['happenedOn'] ?? '';
+                   final fragments = dateStr.split('-');
+                   final String displayDate = fragments.length >= 3 ? "${fragments[1]}-${fragments[2].substring(0,2)}" : dateStr;
+                   return Padding(
+                     padding: const EdgeInsets.only(bottom: 12),
+                     child: InkWell(
+                       onTap: () => _showDetail(entry),
+                       borderRadius: BorderRadius.circular(16),
+                       child: Card(
+                         elevation: 0,
+                         margin: EdgeInsets.zero,
+                         shape: RoundedRectangleBorder(
+                           borderRadius: BorderRadius.circular(16),
+                           side: BorderSide(
+                             color: cs.outlineVariant.withValues(alpha: 0.5),
+                           ),
+                         ),
+                         child: ListTile(
+                           leading: CircleAvatar(
+                             backgroundColor: cs.primaryContainer,
+                             child: Icon(Icons.place, color: cs.onPrimaryContainer),
+                           ),
+                           title: Text(
+                             entry['title'] ?? '未知足迹',
+                             style: const TextStyle(fontWeight: FontWeight.bold),
+                             maxLines: 1,
+                             overflow: TextOverflow.ellipsis,
+                           ),
+                           subtitle: Text(
+                             '$displayDate · ${entry['location'] ?? '未知地点'}',
+                             style: const TextStyle(fontSize: 12),
+                           ),
+                           trailing: Text(
+                             '${entry['distanceKm']?.toString() ?? '0'} km',
+                             style: TextStyle(
+                               color: cs.primary,
+                               fontWeight: FontWeight.bold,
+                               fontSize: 12,
+                             ),
+                           ),
+                         ),
+                       ),
+                     ),
+                   );
+                }).toList(),
+              ],
             ],
           ),
           _fixedTop(cs, tt),
@@ -853,39 +1106,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _sBox(ColorScheme cs, TextTheme tt, String l, String v, {String? u}) =>
+  Widget _sBox(ColorScheme cs, TextTheme tt, String l, String v, {String? u, VoidCallback? onTap}) =>
       Expanded(
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      v,
-                      style: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        v,
+                        style: tt.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                    if (u != null)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 2),
-                        child: Text(u, style: tt.labelSmall),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(l, style: tt.labelSmall?.copyWith(color: cs.outline)),
-              ],
+                      if (u != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 2),
+                          child: Text(u, style: tt.labelSmall),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(l, style: tt.labelSmall?.copyWith(color: cs.outline)),
+                ],
+              ),
             ),
           ),
         ),
@@ -1357,6 +1614,32 @@ class NativeMapView extends StatelessWidget {
       creationParams: {"zoom": 15.0},
       onPlatformViewCreated: onCreated,
       creationParamsCodec: const StandardMessageCodec(),
+    );
+  }
+}
+
+class TimeFootprintPlaybackPage extends StatelessWidget {
+  const TimeFootprintPlaybackPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('时光足迹回放', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map, size: 80, color: cs.primary.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+             Text("轨迹回放地图加载中...", style: TextStyle(color: cs.primary)),
+            const SizedBox(height: 8),
+             Text("这里将展示您的年度轨迹绿线动态回放", style: TextStyle(color: cs.outline)),
+          ],
+        ),
+      ),
     );
   }
 }

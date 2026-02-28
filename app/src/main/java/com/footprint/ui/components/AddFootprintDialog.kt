@@ -168,9 +168,20 @@ fun AddFootprintDialog(
                                 OutlinedTextField(
                                         value = title,
                                         onValueChange = { title = it },
-                                        label = { Text("标题") },
+                                        label = { Text("标题 (如：拉萨朝圣之旅)") },
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = RoundedCornerShape(12.dp),
+                                        singleLine = true
+                                )
+
+                                OutlinedTextField(
+                                        value = tags,
+                                        onValueChange = { tags = it },
+                                        label = { Text("标签 (用逗号分隔，如：徒步, 摄影)") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        placeholder = { Text("添加探索标签...") },
+                                        singleLine = true
                                 )
 
                                 // Icon Picker
