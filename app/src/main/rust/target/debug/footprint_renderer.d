@@ -1,1 +1,0 @@
-E:\Code\IDE\AndroidStudio\Footprint\app\src\main\rust\target\debug\footprint_renderer.dll: E:\Code\IDE\AndroidStudio\Footprint\app\src\main\rust\src\lib.rs E:\Code\IDE\AndroidStudio\Footprint\app\src\main\rust\src\renderer.rs
