@@ -23,8 +23,8 @@ android {
         applicationId = "com.footprint"
         minSdk = 24
         targetSdk = 36
-        versionCode = 30
-        versionName = "3.0.0"
+        versionCode = 31
+        versionName = "3.1.0"
 
         manifestPlaceholders["AMAP_KEY"] = localProperties.getProperty("AMAP_KEY") ?: "YOUR_AMAP_API_KEY"
 
