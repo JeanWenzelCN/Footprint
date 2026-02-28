@@ -31,15 +31,23 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        ndk {
+            // 仅保留主流手机架构，移除 x86 架构能显著减小体积
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true  // 启用混淆和代码压缩
+            isShrinkResources = true // 启用资源缩减
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 关键：确保子项目（如 Flutter 模块）也使用 Release 模式
+            matchingFallbacks += listOf("release")
         }
         debug {
             // 移除后缀，确保包名与高德后台配置 ("com.footprint") 一致
@@ -135,7 +143,8 @@ dependencies {
     implementation("dev.chrisbanes.haze:haze-jetpack-compose:0.5.2")
 
     // Flutter Module
-    implementation(project(":flutter"))
+    "debugImplementation"(project(path = ":flutter", configuration = "debugRuntimeElements"))
+    "releaseImplementation"(project(path = ":flutter", configuration = "releaseRuntimeElements"))
 }
 
 val buildRustTask = tasks.register<Exec>("buildRust") {
@@ -144,8 +153,6 @@ val buildRustTask = tasks.register<Exec>("buildRust") {
         "cargo", "ndk",
         "-t", "armeabi-v7a",
         "-t", "arm64-v8a",
-        "-t", "x86",
-        "-t", "x86_64",
         "-o", "../jniLibs",
         "build", "--release"
     )
