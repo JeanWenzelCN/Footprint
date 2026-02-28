@@ -52,3 +52,6 @@ app/src/main/rust/target/
 # IDE
 .idea/deploymentTargetSelector.xml
 .idea/markdown.xml
+
+# Backups
+footprint_backup_*.json
