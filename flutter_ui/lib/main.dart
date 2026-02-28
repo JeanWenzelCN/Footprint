@@ -1517,6 +1517,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
       await showDialog(
         context: context,
         builder: (ctx) {
+          final colorScheme = Theme.of(context).colorScheme;
           return AlertDialog(
             title: const Text("API Key 设置"),
             content: SingleChildScrollView(
@@ -1524,39 +1525,36 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Package Name:"),
-                  Row(
-                    children: [
-                      Expanded(child: Text(pkgName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                      IconButton(
-                        icon: const Icon(Icons.copy, size: 20),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: pkgName));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("已复制包名")));
-                        }
-                      )
-                    ],
+                  Text(
+                    "Package Name:",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text("SHA1:"),
-                  Row(
-                    children: [
-                      Expanded(child: Text(sha1, style: const TextStyle(fontWeight: FontWeight.bold))),
-                      IconButton(
-                        icon: const Icon(Icons.copy, size: 20),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: sha1));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("已复制 SHA1")));
-                        }
-                      )
-                    ],
+                  const SizedBox(height: 4),
+                  _buildCopyableRow(context, pkgName, "已复制包名"),
+                  const SizedBox(height: 12),
+                  Text(
+                    "SHA1:",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
+                  _buildCopyableRow(context, sha1, "已复制 SHA1"),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: keyCtrl,
+                    style: const TextStyle(fontSize: 14),
                     decoration: const InputDecoration(
                       labelText: "AMAP Key",
-                      border: OutlineInputBorder(),
+                      hintText: "请输入您的高德地图 API Key",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                   ),
                 ],
@@ -1565,7 +1563,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text("取消"),
+                child: Text("取消", style: TextStyle(color: colorScheme.outline)),
               ),
               FilledButton(
                 onPressed: () {
@@ -1575,6 +1573,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
                     const SnackBar(content: Text("API Key 已保存，请重启应用生效"))
                   );
                 },
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
                 child: const Text("保存"),
               ),
             ],
@@ -1582,8 +1583,45 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         }
       );
     } catch (e) {
-      debugPrint("获取凭证失败: \$e");
+      debugPrint("获取凭证失败: $e");
     }
+  }
+
+  Widget _buildCopyableRow(BuildContext context, String text, String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 1)));
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: colorScheme.onSurface.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontFamily: "monospace",
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.content_copy,
+              size: 14,
+              color: colorScheme.primary,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

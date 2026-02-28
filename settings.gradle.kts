@@ -27,3 +27,18 @@ include(":app")
 val flutterProjectRoot = file("flutter_ui")
 apply(from = flutterProjectRoot.resolve(".android/include_flutter.groovy"))
 project(":flutter").projectDir = flutterProjectRoot.resolve(".android/Flutter")
+
+// 全局强制禁用 includeAndroidResources 修复 Windows 跨盘符路径 roots 错误
+gradle.allprojects {
+    afterEvaluate {
+        extensions.findByName("android")?.let { android ->
+            try {
+                val testOptions = android.javaClass.getMethod("getTestOptions").invoke(android)
+                val unitTests = testOptions.javaClass.getMethod("getUnitTests").invoke(testOptions)
+                unitTests.javaClass.getMethod("setIncludeAndroidResources", Boolean::class.javaPrimitiveType).invoke(unitTests, false)
+            } catch (e: Exception) {
+                // Ignore if not a standard Android project
+            }
+        }
+    }
+}
