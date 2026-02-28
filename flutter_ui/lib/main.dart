@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
+import 'dart:async';
 import 'package:image_picker/image_picker.dart';
 import 'footprint_detail_page.dart';
 import 'goal_planner_page.dart';
@@ -598,6 +599,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double totalDistance = 0.0;
   int uniquePlacesLength = 0;
   double avgEnergy = 0.0;
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 9) return "早安";
+    if (hour >= 9 && hour < 12) return "上午好";
+    if (hour >= 12 && hour < 14) return "午安";
+    if (hour >= 14 && hour < 18) return "下午好";
+    if (hour >= 18 && hour < 23) return "晚安";
+    return "深夜了";
+  }
   String dominantMoodStr = "愉快";
 
   final List<String> dailyQuotes = [
@@ -1275,7 +1286,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '早安, ${widget.nickname}',
+                      '${_getGreeting()}, ${widget.nickname}',
                       style: tt.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: cs.primary,
@@ -1648,9 +1659,41 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   static const channel = MethodChannel('com.footprint/data');
+  late TextEditingController _nicknameController;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _nicknameController = TextEditingController(text: widget.nickname);
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.nickname != widget.nickname &&
+        _nicknameController.text != widget.nickname) {
+      _nicknameController.text = widget.nickname;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
   void _up(String m, dynamic v) async {
     await channel.invokeMethod(m, v);
     widget.onUpdate();
+  }
+
+  void _onNicknameChanged(String v) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 600), () {
+      _up('updateNickname', v);
+    });
   }
 
   @override
@@ -1671,12 +1714,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: TextField(
-                    controller: TextEditingController(text: widget.nickname),
+                    controller: _nicknameController,
                     decoration: const InputDecoration(
                       labelText: '代号 (Nickname)',
                       border: OutlineInputBorder(),
                     ),
-                    onSubmitted: (v) => _up('updateNickname', v),
+                    onChanged: _onNicknameChanged,
                   ),
                 ),
                 const Text(

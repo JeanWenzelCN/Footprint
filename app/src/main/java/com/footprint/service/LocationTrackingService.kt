@@ -30,6 +30,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var repository: com.footprint.data.repository.FootprintRepository
     private var wakeLock: PowerManager.WakeLock? = null
+    private lateinit var notificationManager: NotificationManager
 
     private var _totalDistanceTraveled = MutableStateFlow(0.0f)
     private var _lastLocation: AMapLocation? = null
@@ -86,16 +87,29 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onCreate() {
         super.onCreate()
         repository = (application as com.footprint.FootprintApplication).repository
+        notificationManager = getSystemService(NotificationManager::class.java)
+        createNotificationChannel()
         initLocationClient()
 
         // points are now loaded per-session or on demand, not all-at-once in onCreate
     }
 
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel =
+                    NotificationChannel(CHANNEL_ID, "足迹记录", NotificationManager.IMPORTANCE_LOW)
+                            .apply {
+                                description = "实时显示步数、距离和位置"
+                                setShowBadge(false)
+                                enableVibration(false)
+                                setSound(null, null)
+                            }
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
     private fun initLocationClient() {
         try {
-            AMapLocationClient.updatePrivacyShow(applicationContext, true, true)
-            AMapLocationClient.updatePrivacyAgree(applicationContext, true)
-
             locationClient = AMapLocationClient(applicationContext)
             locationClient?.setLocationListener(this)
 
@@ -245,14 +259,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             // Adaptive Interval
                             updateAdaptiveInterval(location.speed)
 
-                            // Update Notification
-                            val notification = buildNotification(
+                            // 实时位置更新时，尝试更新一次通知（如果是追踪模式）
+                            updateNotificationImmediately(
                                 _totalDistanceTraveled.value.toInt(),
                                 location.speed,
                                 location.address ?: ""
                             )
-                            val manager = getSystemService(NotificationManager::class.java)
-                            manager.notify(NOTIFICATION_ID, notification)
                         }
                     }
                     Log.d("FootprintLoc", "Location update success: ${location.latitude}, ${location.longitude}, acc: ${location.accuracy}")
@@ -276,16 +288,6 @@ class LocationTrackingService : Service(), AMapLocationListener {
             speedMs: Float,
             address: String
     ): Notification {
-        val manager = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel =
-                    NotificationChannel(CHANNEL_ID, "足迹记录", NotificationManager.IMPORTANCE_DEFAULT)
-                            .apply {
-                                description = "实时显示步数、距离和位置"
-                                setShowBadge(false)
-                            }
-            manager.createNotificationChannel(channel)
-        }
 
         val remoteViews =
                 android.widget.RemoteViews(
@@ -379,17 +381,26 @@ class LocationTrackingService : Service(), AMapLocationListener {
         _notificationUpdateJob =
                 serviceScope.launch {
                     while (isActive && _sharedIsTracking.value) {
-                        delay(1000) // 每秒更新一次时间
-                        val notification =
-                                buildNotification(
-                                        _totalDistanceTraveled.value.toInt(),
-                                        _sharedCurrentLocation.value?.speed ?: 0f,
-                                        _sharedCurrentLocation.value?.address ?: ""
-                                )
-                        val manager = getSystemService(NotificationManager::class.java)
-                        manager.notify(NOTIFICATION_ID, notification)
+                        delay(2000) // 每2秒更新一次时间，降低负载
+                        updateNotificationImmediately(
+                            _totalDistanceTraveled.value.toInt(),
+                            _sharedCurrentLocation.value?.speed ?: 0f,
+                            _sharedCurrentLocation.value?.address ?: ""
+                        )
                     }
                 }
+    }
+
+    private fun updateNotificationImmediately(dist: Int, speed: Float, addr: String) {
+        if (!_sharedIsTracking.value) return
+        serviceScope.launch {
+            try {
+                val notification = buildNotification(dist, speed, addr)
+                notificationManager.notify(NOTIFICATION_ID, notification)
+            } catch (e: Exception) {
+                Log.e("FootprintLoc", "Update notification failed: ${e.message}")
+            }
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

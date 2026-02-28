@@ -48,20 +48,24 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "getAllEntries" -> {
                     lifecycleScope.launch {
-                        val entries = repository.getAllEntries()
-                        result.success(gson.toJson(entries))
+                        val entries = withContext(Dispatchers.IO) { repository.getAllEntries() }
+                        val json = withContext(Dispatchers.Default) { gson.toJson(entries) }
+                        result.success(json)
                     }
                 }
                 "getAllGoals" -> {
                     lifecycleScope.launch {
-                        val goals = repository.getAllGoals()
-                        result.success(gson.toJson(goals))
+                        val goals = withContext(Dispatchers.IO) { repository.getAllGoals() }
+                        val json = withContext(Dispatchers.Default) { gson.toJson(goals) }
+                        result.success(json)
                     }
                 }
                 "getStats" -> {
                     lifecycleScope.launch {
-                        val entries = repository.getAllEntries()
-                        val stats = mapOf("totalDistance" to entries.sumOf { it.distanceKm }, "totalCount" to entries.size)
+                        val entries = withContext(Dispatchers.IO) { repository.getAllEntries() }
+                        val stats = withContext(Dispatchers.Default) {
+                            mapOf("totalDistance" to entries.sumOf { it.distanceKm }, "totalCount" to entries.size)
+                        }
                         result.success(gson.toJson(stats))
                     }
                 }
