@@ -866,97 +866,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              if (onThisDayEntries.isNotEmpty) ...[
-                Card(
-                  elevation: 0,
-                   shape: RoundedRectangleBorder(
-                     borderRadius: BorderRadius.circular(24),
-                     side: BorderSide(color: cs.outlineVariant),
-                   ),
-                   child: Padding(
-                     padding: const EdgeInsets.all(16),
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                         Row(
-                           children: [
-                             Icon(Icons.auto_awesome, color: cs.primary, size: 18),
-                             const SizedBox(width: 8),
-                             Text(
-                               "那年今日 / 时光碎片",
-                               style: TextStyle(
-                                 color: cs.primary,
-                                 fontWeight: FontWeight.bold,
-                                 fontSize: 13,
-                               ),
+              Card(
+                elevation: 0,
+                 shape: RoundedRectangleBorder(
+                   borderRadius: BorderRadius.circular(24),
+                   side: BorderSide(color: cs.outlineVariant),
+                 ),
+                 child: Padding(
+                   padding: const EdgeInsets.all(16),
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Row(
+                         children: [
+                           Icon(Icons.auto_awesome, color: cs.primary, size: 18),
+                           const SizedBox(width: 8),
+                           Text(
+                             "那年今日 / 时光碎片",
+                             style: TextStyle(
+                               color: cs.primary,
+                               fontWeight: FontWeight.bold,
+                               fontSize: 13,
                              ),
-                           ],
-                         ),
-                         const SizedBox(height: 8),
-                         Text(
-                           dailyQuotes[DateTime.now().day % dailyQuotes.length],
-                           style: TextStyle(
-                             color: cs.outline,
-                             fontStyle: FontStyle.italic,
-                             fontSize: 12,
                            ),
+                         ],
+                       ),
+                       const SizedBox(height: 8),
+                       Text(
+                         dailyQuotes[DateTime.now().day % dailyQuotes.length],
+                         style: TextStyle(
+                           color: cs.outline,
+                           fontStyle: FontStyle.italic,
+                           fontSize: 12,
                          ),
-                         const SizedBox(height: 16),
-                         ...onThisDayEntries.map((e) {
-                           int pastYear = int.tryParse(e['happenedOn']?.toString().split('-')[0] ?? '0') ?? 0;
-                           String yearDiff = (DateTime.now().year - pastYear).toString();
-                           return Padding(
-                             padding: const EdgeInsets.only(bottom: 12),
-                             child: InkWell(
-                               onTap: () => _showDetail(e),
-                               child: Row(
-                                 children: [
-                                   Container(
-                                     width: 56,
-                                     height: 56,
-                                     decoration: BoxDecoration(
-                                       color: Colors.orange.withValues(alpha: 0.2),
-                                       borderRadius: BorderRadius.circular(12),
-                                     ),
-                                     child: const Icon(
-                                       Icons.landscape,
-                                       color: Colors.orange,
-                                       size: 32,
-                                     ),
+                       ),
+                       const SizedBox(height: 16),
+                       if (onThisDayEntries.isEmpty)
+                         Text(
+                           "往年的今天暂时没有足迹记录。",
+                           style: TextStyle(color: cs.outline, fontSize: 13),
+                         ),
+                       ...onThisDayEntries.map((e) {
+                         int pastYear = int.tryParse(e['happenedOn']?.toString().split('-')[0] ?? '0') ?? 0;
+                         String yearDiff = (DateTime.now().year - pastYear).toString();
+                         return Padding(
+                           padding: const EdgeInsets.only(bottom: 12),
+                           child: InkWell(
+                             onTap: () => _showDetail(e),
+                             child: Row(
+                               children: [
+                                 Container(
+                                   width: 56,
+                                   height: 56,
+                                   decoration: BoxDecoration(
+                                     color: Colors.orange.withValues(alpha: 0.2),
+                                     borderRadius: BorderRadius.circular(12),
                                    ),
-                                   const SizedBox(width: 16),
-                                   Expanded(
-                                     child: Column(
-                                       crossAxisAlignment: CrossAxisAlignment.start,
-                                       children: [
-                                         Text(
-                                           e['title'] ?? '未知足迹',
-                                           style: const TextStyle(
-                                             fontWeight: FontWeight.bold,
-                                             fontSize: 16,
-                                           ),
-                                         ),
-                                         Text(
-                                           '${yearDiff}年前 · ${_mapMoodToChinese(e['mood'] ?? '')}',
-                                           style: TextStyle(
-                                             color: cs.outline,
-                                             fontSize: 12,
-                                           ),
-                                         ),
-                                       ],
-                                     ),
+                                   child: const Icon(
+                                     Icons.landscape,
+                                     color: Colors.orange,
+                                     size: 32,
                                    ),
-                                 ],
-                               ),
+                                 ),
+                                 const SizedBox(width: 16),
+                                 Expanded(
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                     children: [
+                                       Text(
+                                         e['title'] ?? '未知足迹',
+                                         style: const TextStyle(
+                                           fontWeight: FontWeight.bold,
+                                           fontSize: 16,
+                                         ),
+                                       ),
+                                       Text(
+                                         '${yearDiff}年前 · ${_mapMoodToChinese(e['mood'] ?? '')}',
+                                         style: TextStyle(
+                                           color: cs.outline,
+                                           fontSize: 12,
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ],
                              ),
-                           );
-                         }),
-                       ],
-                     ),
+                           ),
+                         );
+                       }),
+                     ],
                    ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                 ),
+              ),
+              const SizedBox(height: 16),
               Card(
                 elevation: 0,
                 shape: RoundedRectangleBorder(
