@@ -38,6 +38,7 @@ secrets.xml
 build/
 .tmp_gradle_home/
 .fresh_gradle_home/
+.v2_gradle_home/
 /app/app_new_build/
 
 # Rust
