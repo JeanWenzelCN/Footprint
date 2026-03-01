@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class FootprintDetailPage extends StatefulWidget {
   final dynamic entry;
@@ -10,6 +12,10 @@ class FootprintDetailPage extends StatefulWidget {
 }
 
 class _FootprintDetailPageState extends State<FootprintDetailPage> {
+  late Map<String, dynamic> entry;
+  List<Map<String, double>> trackPoints = [];
+  MethodChannel? _mapChannel;
+
   late String title;
   late String location;
   late String date;
@@ -24,28 +30,64 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
   @override
   void initState() {
     super.initState();
-    final e = widget.entry;
-    title = e?['title'] ?? "未命名足迹";
-    location = e?['location'] ?? "未知地点";
-    date = e?['happenedOn'] ?? "未知日期";
+    entry = widget.entry != null ? Map<String, dynamic>.from(widget.entry!) : {};
+
+    if (entry['happenedOn'] != null) {
+      _loadTrackPoints(entry['happenedOn']);
+    }
+
+    title = entry['title'] ?? "未命名足迹";
+    location = entry['location'] ?? "未知地点";
+    date = entry['happenedOn'] ?? "未知日期";
     
-    String rawMood = e?['mood'] ?? "";
+    String rawMood = entry['mood'] ?? "";
     mood = _mapMoodToChinese(rawMood);
     moodColor = _getMoodColor(rawMood);
     
-    weather = e?['weather'] ?? "-";
-    detail = e?['detail'] ?? e?['notes'] ?? "没有记录详细内容。";
-    distance = (e?['distanceKm'] as num?)?.toDouble() ?? 0.0;
-    energy = (e?['energyLevel'] as num?)?.toInt() ?? 0;
+    weather = entry['weather'] ?? "-";
+    detail = entry['detail'] ?? entry['notes'] ?? "没有记录详细内容。";
+    distance = (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
+    energy = (entry['energyLevel'] as num?)?.toInt() ?? 0;
     
     // Parse photos if it's a list or comma-separated string
-    final rawPhotos = e?['photos'];
+    final rawPhotos = entry['photos'];
     if (rawPhotos is List) {
       photos = rawPhotos.map((e) => e.toString()).toList();
     } else if (rawPhotos is String && rawPhotos.isNotEmpty) {
       photos = rawPhotos.split(',').map((s) => s.trim()).toList();
     } else {
       photos = [];
+    }
+  }
+
+  Future<void> _loadTrackPoints(String dateStr) async {
+    try {
+      final date = DateTime.parse(dateStr);
+      final startTime = DateTime.utc(date.year, date.month, date.day).millisecondsSinceEpoch;
+      final endTime = startTime + 86400000;
+      final result = await const MethodChannel('com.footprint/data')
+          .invokeMethod('getTrackPoints', {'startTime': startTime, 'endTime': endTime});
+      if (result != null) {
+        final List<dynamic> list = jsonDecode(result);
+        if (mounted) {
+          setState(() {
+            trackPoints = list.map((p) => {
+              'lat': p['latitude'] as double,
+              'lng': p['longitude'] as double
+            }).toList();
+          });
+          if (_mapChannel != null && trackPoints.isNotEmpty) {
+             _mapChannel?.invokeMethod('setTrackingPath', trackPoints);
+             _mapChannel?.invokeMethod('centerLocation', {
+               'lat': trackPoints.first['lat'],
+               'lng': trackPoints.first['lng'],
+               'zoom': 15.0
+             });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Load track points fail: $e");
     }
   }
 
@@ -90,7 +132,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
               SliverAppBar(
                 expandedHeight: 300,
                 pinned: true,
-                backgroundColor: cs.surface.withValues(alpha: 0.8),
+                backgroundColor: cs.surface.withOpacity(0.8),
                 iconTheme: IconThemeData(color: cs.onSurface),
                 actions: [
                   IconButton(
@@ -109,8 +151,8 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              moodColor.withValues(alpha: 0.6),
-                              moodColor.withValues(alpha: 0.2),
+                              moodColor.withOpacity(0.6),
+                              moodColor.withOpacity(0.2),
                             ],
                           ),
                         ),
@@ -139,7 +181,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: moodColor.withValues(alpha: 0.2),
+                                color: moodColor.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(mood, style: tt.labelMedium?.copyWith(color: moodColor)),
@@ -162,7 +204,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: cs.primaryContainer.withValues(alpha: 0.15),
+                                color: cs.primaryContainer.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
@@ -255,8 +297,22 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                         color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Center(
-                        child: Text("AMap Placeholder"),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: AndroidView(
+                          viewType: 'com.footprint/amap',
+                          onPlatformViewCreated: (id) {
+                            _mapChannel = MethodChannel('com.footprint/amap_$id');
+                            if (trackPoints.isNotEmpty) {
+                               _mapChannel?.invokeMethod('setTrackingPath', trackPoints);
+                               _mapChannel?.invokeMethod('centerLocation', {
+                                  'lat': trackPoints.first['lat'],
+                                  'lng': trackPoints.first['lng'],
+                                  'zoom': 15.0
+                               });
+                            }
+                          },
+                        ),
                       ),
                     ),
                   ),

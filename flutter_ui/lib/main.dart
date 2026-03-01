@@ -1339,13 +1339,15 @@ class ExploreMapScreen extends StatefulWidget {
 class _ExploreMapScreenState extends State<ExploreMapScreen>
     with WidgetsBindingObserver {
   static const dataChannel = MethodChannel('com.footprint/data');
+  static const streamChannel = EventChannel('com.footprint/stream');
   String mapMode = 'STANDARD';
   MethodChannel? _mapChannel;
   List<dynamic> _allEntries = [];
 
-  // Flutter 高德定位客户端
+  // Flutter 高德定位客户端 (仅供单击定位使用)
   final AMapFlutterLocation _locationClient = AMapFlutterLocation();
   StreamSubscription<Map<String, Object>>? _locationSubscription;
+  StreamSubscription? _streamSubscription;
 
   // === 定位状态管理 ===
   bool _isLocating = false;    // 是否正在执行单次定位
@@ -1379,12 +1381,40 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     // 初始化高德隐私合规（不自动开启定位）
     AMapFlutterLocation.updatePrivacyShow(true, true);
     AMapFlutterLocation.updatePrivacyAgree(true);
+
+    _streamSubscription = streamChannel.receiveBroadcastStream().listen((event) {
+      if (!mounted) return;
+      try {
+        final data = jsonDecode(event as String);
+        if (data['type'] == 'status') {
+          setState(() {
+            _isTracking = data['isTracking'];
+            if (!_isTracking) {
+              _durationStr = '00:00:00';
+            }
+          });
+        } else if (data['type'] == 'location') {
+          if (_isTracking && data['data'] != null) {
+            final lat = data['data']['latitude'] as double;
+            final lng = data['data']['longitude'] as double;
+            setState(() {
+              _trackingPath.add({'latitude': lat, 'longitude': lng});
+            });
+            _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
+            // 这里我们不需要本地计算距离，因为后台 Kotlin 服务已经在计算并保存
+          }
+        }
+      } catch (e) {
+        debugPrint('Stream Error: $e');
+      }
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _locationSubscription?.cancel();
+    _streamSubscription?.cancel();
     _locationClient.destroy();
     _durationTimer?.cancel();
     super.dispose();
@@ -1556,120 +1586,60 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     }
   }
 
-  // === 开始追踪：自动定位并放大到当前位置 ===
+  // === 开始追踪：启动原生前台服务 ===
   Future<void> _startTracking() async {
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("需要位置权限才能记录足迹"), backgroundColor: Colors.orange));
       return;
     }
-    bool _hasInitialZoom = false;
     setState(() {
-      _isTracking = true; _trackingPath.clear(); _totalDistance = 0.0;
+      _trackingPath.clear();
+      _totalDistance = 0.0;
       _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
-      _lastLat = null; _lastLng = null; _lastPointTime = null;
-      _lastSaveTime = 0; _lastAddress = ''; _lastAltitude = null; _durationStr = '00:00:00';
+      _durationStr = '00:00:00';
     });
 
-    // === 立即尝试居中到原生地图已知的位置 ===
     try {
-      final nativeResult = await _mapChannel?.invokeMethod('centerLocation', {'zoom': 18.0});
-      if (nativeResult == true) _hasInitialZoom = true;
+      await _mapChannel?.invokeMethod('centerLocation', {'zoom': 18.0});
     } catch (_) {}
 
-    _locationClient.setLocationOption(AMapLocationOption(
-      onceLocation: false, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true, locationInterval: 2000,
-    ));
-    _locationSubscription?.cancel();
-    _locationSubscription = _locationClient.onLocationChanged().listen((result) {
-      // 如果原生居中失败，首次收到有效位置时用 Flutter SDK 坐标居中
-      if (!_hasInitialZoom) {
-        final double? lat = result['latitude'] as double?;
-        final double? lng = result['longitude'] as double?;
-        final errorCode = result['errorCode'];
-        if (errorCode == null || errorCode == 0) {
-          if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
-            _hasInitialZoom = true;
-            _mapChannel?.invokeMethod('centerLocation', {'latitude': lat, 'longitude': lng, 'zoom': 18.0});
-          }
-        }
-      }
-      _onTrackingLocationUpdate(result);
-    });
-    _locationClient.startLocation();
-    _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_isTracking) return;
-      setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
-    });
+    try {
+      // 通过通道启动后台定位服务，产生系统通知栏并持久化
+      await dataChannel.invokeMethod('startTracking');
+      setState(() => _isTracking = true);
+
+      _durationTimer?.cancel();
+      _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || !_isTracking) return;
+        setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("启动追踪失败: $e"), backgroundColor: Colors.orange));
+    }
   }
 
   // === 停止追踪 ===
   Future<void> _stopTracking() async {
-    _locationSubscription?.cancel(); _locationClient.stopLocation(); _durationTimer?.cancel();
-    if (_trackingPath.length >= 2) {
-      final endTime = DateTime.now().millisecondsSinceEpoch;
-      final durationMin = ((endTime - _sessionStartTime) / 60000).round();
-      try {
-        await dataChannel.invokeMethod('saveTrackingSession', {
-          'totalDistanceM': _totalDistance, 'startTime': _sessionStartTime, 'endTime': endTime,
-          'pointCount': _trackingPath.length, 'address': _lastAddress,
-          'latitude': _lastLat, 'longitude': _lastLng, 'altitude': _lastAltitude, 'durationMinutes': durationMin,
-        });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("足迹已保存：${(_totalDistance / 1000).toStringAsFixed(2)} km，$durationMin 分钟"), backgroundColor: Colors.green,
-        ));
-      } catch (e) { debugPrint('Failed to save tracking session: $e'); }
-    } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("轨迹点太少，未保存"), backgroundColor: Colors.orange));
+    _durationTimer?.cancel();
+    
+    try {
+      await dataChannel.invokeMethod('stopTracking');
+    } catch (e) {
+      debugPrint('Error stopping tracking: $e');
     }
+
     setState(() { _isTracking = false; _trackingPath.clear(); _totalDistance = 0.0; _durationStr = '00:00:00'; });
     _mapChannel?.invokeMethod('setTrackingPath', <Map<String, double>>[]);
-    _loadEntries();
+    
+    // 延迟重新加载，给 Kotlin 保存 DB 留一点时间
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _loadEntries();
+    });
   }
 
-  // === 位置回调处理（匹配原 Kotlin onLocationChanged 逻辑）===
-  void _onTrackingLocationUpdate(Map<String, Object> result) {
-    if (!mounted || !_isTracking) return;
-    final errorCode = result['errorCode'];
-    if (errorCode != null && errorCode != 0) return;
-    final double? lat = result['latitude'] as double?;
-    final double? lng = result['longitude'] as double?;
-    final double? accuracy = result['accuracy'] as double?;
-    final double? speed = result['speed'] as double?;
-    final String? address = result['address'] as String?;
-    final double? altitude = result['altitude'] as double?;
-    if (lat == null || lng == null) return;
-    if (lat.abs() < _minValidLatLng || lng.abs() < _minValidLatLng) return;
-    if (accuracy != null && accuracy > 500) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    bool isValidPoint = false;
-    if (_lastLat != null && _lastLng != null && _lastPointTime != null) {
-      final distance = _haversineDistance(_lastLat!, _lastLng!, lat, lng);
-      final timeSec = (now - _lastPointTime!) / 1000.0;
-      if (timeSec > 0) {
-        final calcSpeed = distance / timeSec;
-        if (calcSpeed > _maxSpeedMs) { /* glitch */ }
-        else if (distance < _minDistanceM) { /* too close */ }
-        else { isValidPoint = true; _totalDistance += distance; }
-      }
-    } else { isValidPoint = true; }
-    if (isValidPoint) {
-      setState(() {
-        _trackingPath.add({'lat': lat, 'lng': lng});
-        _lastLat = lat; _lastLng = lng; _lastPointTime = now; _lastAltitude = altitude;
-        if (address != null && address.isNotEmpty) _lastAddress = address;
-      });
-      _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
-      if (now - _lastSaveTime > _saveIntervalMs) {
-        _lastSaveTime = now;
-        dataChannel.invokeMethod('saveTrackPoint', {
-          'latitude': lat, 'longitude': lng, 'altitude': altitude ?? 0.0,
-          'accuracy': accuracy ?? 0.0, 'speed': speed ?? 0.0, 'timestamp': now,
-        });
-      }
-    }
-  }
-
+  // === 位置回调处理被删除，因为使用原生服务了 ===
+  // === UI 组装 (仅用于 Track Drawer 显示) ===
   double _haversineDistance(double lat1, double lng1, double lat2, double lng2) {
     const R = 6371000.0;
     final dLat = (lat2 - lat1) * math.pi / 180;
