@@ -36,6 +36,10 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private var _lastLocation: AMapLocation? = null
     private var _sessionStartTime: Long = 0
     private var _notificationUpdateJob: Job? = null
+    
+    // Rate limiting for IO / UI updates
+    private var _lastSaveTime: Long = 0
+    private var _lastNotifyTime: Long = 0
 
     companion object {
         const val NOTIFICATION_ID = 1001
@@ -86,12 +90,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d("FootprintLoc", "Service onCreate")
         repository = (application as com.footprint.FootprintApplication).repository
         notificationManager = getSystemService(NotificationManager::class.java)
         createNotificationChannel()
-        initLocationClient()
 
-        // points are now loaded per-session or on demand, not all-at-once in onCreate
+        // SDK initialization is now deferred to onStartCommand for better stability
     }
 
     private fun createNotificationChannel() {
@@ -109,25 +113,22 @@ class LocationTrackingService : Service(), AMapLocationListener {
     }
 
     private fun initLocationClient() {
+        if (locationClient != null) return
         try {
+            Log.d("FootprintLoc", "Initializing AMap SDK")
             locationClient = AMapLocationClient(applicationContext)
             locationClient?.setLocationListener(this)
 
             locationOption =
                     AMapLocationClientOption().apply {
                         locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                        interval = 5000L // 初始间隔 5秒
+                        interval = 2000L // 2s一次
                         isNeedAddress = true
                         isMockEnable = false
-                        isLocationCacheEnable = false
+                        isLocationCacheEnable = true
                         isOnceLocation = false
                         isSensorEnable = true
                         isGpsFirst = true
-                        // 开启高德 SDK 自带的后台定位能力
-                        locationClient?.enableBackgroundLocation(
-                                NOTIFICATION_ID,
-                                buildNotification(0, 0f, "")
-                        )
                     }
             locationClient?.setLocationOption(locationOption)
         } catch (e: Exception) {
@@ -180,6 +181,9 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 } else {
                     startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
                 }
+                
+                // Initialize AMap after promoting to foreground
+                initLocationClient()
                 locationClient?.startLocation()
                 _sharedIsTracking.value = true
                 startNotificationUpdates()
@@ -219,6 +223,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
                     if (_sharedIsTracking.value) {
                         var isValidPoint = false
+                        val now = System.currentTimeMillis()
                         
                         _lastLocation?.let { lastLoc ->
                             val distance = location.distanceTo(lastLoc)
@@ -233,7 +238,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                     // Too close
                                 } else {
                                     isValidPoint = true
-                                    _totalDistanceTraveled.value += distance
+                                    _totalDistanceTraveled.value += distance.toFloat()
                                 }
                             }
                         } ?: run {
@@ -242,13 +247,16 @@ class LocationTrackingService : Service(), AMapLocationListener {
                         }
 
                         if (isValidPoint) {
-                            // Persist to DB
-                            serviceScope.launch {
-                                try {
-                                    val app = applicationContext as com.footprint.FootprintApplication
-                                    app.repository.saveTrackPoint(clonedLocation)
-                                } catch (e: Exception) {
-                                    Log.e("FootprintLoc", "Failed to save point: ${e.message}")
+                            // Rate limit DB saves to once per 2 seconds
+                            if (now - _lastSaveTime > 2000) {
+                                _lastSaveTime = now
+                                serviceScope.launch {
+                                    try {
+                                        val app = applicationContext as com.footprint.FootprintApplication
+                                        app.repository.saveTrackPoint(clonedLocation)
+                                    } catch (e: Exception) {
+                                        Log.e("FootprintLoc", "Failed to save point: ${e.message}")
+                                    }
                                 }
                             }
 
@@ -259,12 +267,15 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             // Adaptive Interval
                             updateAdaptiveInterval(location.speed)
 
-                            // 实时位置更新时，尝试更新一次通知（如果是追踪模式）
-                            updateNotificationImmediately(
-                                _totalDistanceTraveled.value.toInt(),
-                                location.speed,
-                                location.address ?: ""
-                            )
+                            // Rate limit notification updates to 5s (the background timer also handles this)
+                            if (now - _lastNotifyTime > 5000) {
+                                _lastNotifyTime = now
+                                updateNotificationImmediately(
+                                    _totalDistanceTraveled.value.toInt(),
+                                    location.speed,
+                                    location.address ?: ""
+                                )
+                            }
                         }
                     }
                     Log.d("FootprintLoc", "Location update success: ${location.latitude}, ${location.longitude}, acc: ${location.accuracy}")

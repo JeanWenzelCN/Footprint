@@ -7,6 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'dart:async';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:amap_flutter_location/amap_flutter_location.dart';
+import 'package:amap_flutter_location/amap_location_option.dart';
 import 'footprint_detail_page.dart';
 import 'goal_planner_page.dart';
 
@@ -1351,22 +1354,43 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   bool isTracking = false;
   MethodChannel? _mapChannel;
   List<dynamic> _allEntries = [];
+  
+  // Flutter Location Client
+  final AMapFlutterLocation _locationClient = AMapFlutterLocation();
+  StreamSubscription<Map<String, Object>>? _locationSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadEntries();
+    
+    // 初始化高德定位
+    AMapFlutterLocation.updatePrivacyShow(true, true);
+    AMapFlutterLocation.updatePrivacyAgree(true);
+    
     streamChannel.receiveBroadcastStream().listen((eventJson) {
       final event = jsonDecode(eventJson);
       if (mounted && event['type'] == 'status') {
         final newStatus = event['isTracking'];
         if (isTracking && !newStatus) {
-          // If tracking was running and now stopped, reload to reflect the newly saved tracking footprint
           _loadEntries();
         }
         setState(() => isTracking = newStatus);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    _locationClient.destroy();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateNativeMap();
   }
 
   Future<void> _loadEntries() async {
@@ -1402,6 +1426,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   }
 
   void _updateNativeMap() {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    _mapChannel?.invokeMethod('setTheme', isDark);
     _mapChannel?.invokeMethod('setMapMode', mapMode);
     _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
     _mapChannel?.invokeMethod('setEntries', _allEntries);
@@ -1457,13 +1483,84 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              FloatingActionButton.small(
-                onPressed: () => _mapChannel?.invokeMethod('centerLocation'),
-                backgroundColor: cs.surfaceContainerHighest,
-                child: const Icon(Icons.my_location),
-              ),
-              const SizedBox(height: 12),
+              // 定位按钮
               FloatingActionButton(
+                heroTag: "locate_btn",
+                onPressed: () async {
+                  try {
+                    // 1. 检查并申请权限
+                    final status = await Permission.locationWhenInUse.request();
+                    if (!status.isGranted) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text("需要位置权限才能进行定位"),
+                            backgroundColor: Colors.orange,
+                            action: SnackBarAction(label: "去设置", textColor: Colors.white, onPressed: () => openAppSettings()),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    // 2. 使用 Flutter 插件获取定位
+                    // 设置定位参数
+                    _locationClient.setLocationOption(AMapLocationOption(
+                      onceLocation: true,
+                      locationMode: AMapLocationMode.Hight_Accuracy,
+                    ));
+
+                    // 监听定位结果
+                    _locationSubscription?.cancel();
+                    _locationSubscription = _locationClient.onLocationChanged().listen((Map<String, Object> result) async {
+                      if (!mounted) return;
+                      
+                      final double? lat = result['latitude'] as double?;
+                      final double? lng = result['longitude'] as double?;
+                      
+                      if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
+                        // 成功获取坐标，通知原生地图中心化
+                        await _mapChannel?.invokeMethod('centerLocation');
+                        _locationSubscription?.cancel();
+                      } else {
+                        // 定位结果异常 (如 errorCode)
+                        final errorCode = result['errorCode'];
+                        final errorInfo = result['errorInfo'];
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("定位失败: $errorInfo (错误码: $errorCode)"), backgroundColor: Colors.redAccent),
+                        );
+                      }
+                    });
+
+                    // 开始定位
+                    _locationClient.startLocation();
+                    
+                    // 设置一个超时保护，防止插件不回调
+                    Future.delayed(const Duration(seconds: 10), () {
+                      if (_locationSubscription != null) {
+                        _locationSubscription?.cancel();
+                        if (mounted) {
+                          // 如果还没有成功定位，给个反馈建议
+                          // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位请求超时，请检查 GPS")));
+                        }
+                      }
+                    });
+
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("定位异常: $e"), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
+                },
+                backgroundColor: cs.surfaceContainerHighest,
+                child: Icon(Icons.my_location, color: cs.primary),
+              ),
+              const SizedBox(height: 16),
+              // 开始足迹按钮
+              FloatingActionButton(
+                heroTag: "track_btn",
                 onPressed: () => dataChannel.invokeMethod(
                   isTracking ? 'stopTracking' : 'startTracking',
                 ),
