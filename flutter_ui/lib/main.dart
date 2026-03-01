@@ -513,14 +513,17 @@ class _MainContainerState extends State<MainContainer>
   @override
   Widget build(BuildContext context) {
     final pages = [
-      DashboardScreen(nickname: widget.nickname, avatarId: widget.avatarId),
+      DashboardScreen(
+        nickname: widget.nickname,
+        avatarId: widget.avatarId,
+        themeMode: widget.themeMode,
+        themeStyle: widget.themeStyle,
+        hapticEnabled: widget.hapticEnabled,
+        onSettingsChanged: widget.onSettingsChanged,
+      ),
       ExploreMapScreen(key: _mapKey),
       const GoalPlannerPage(),
-      SettingsScreen(
-        nickname: widget.nickname, avatarId: widget.avatarId,
-        themeMode: widget.themeMode, themeStyle: widget.themeStyle,
-        hapticEnabled: widget.hapticEnabled, onUpdate: widget.onSettingsChanged,
-      ),
+      const ArtStudioScreen(),
     ];
 
     return Scaffold(
@@ -561,8 +564,8 @@ class _MainContainerState extends State<MainContainer>
                       child: Stack(
                         alignment: Alignment.center,
                         children: List.generate(4, (index) {
-                          final icons = [Icons.dashboard, Icons.explore, Icons.flag, Icons.settings];
-                          final outlines = [Icons.dashboard_outlined, Icons.explore_outlined, Icons.outlined_flag, Icons.settings_outlined];
+                          final icons = [Icons.dashboard, Icons.explore, Icons.flag, Icons.palette];
+                          final outlines = [Icons.dashboard_outlined, Icons.explore_outlined, Icons.outlined_flag, Icons.palette_outlined];
                           final double step = fullWidth / 4;
                           final double currentX = (index - 1.5) * step * clampedT;
                           final bool isSelected = _selectedIndex == index;
@@ -613,10 +616,19 @@ class _MainContainerState extends State<MainContainer>
 class DashboardScreen extends StatefulWidget {
   final String nickname;
   final String avatarId;
+  final String themeMode;
+  final String themeStyle;
+  final bool hapticEnabled;
+  final VoidCallback onSettingsChanged;
+
   const DashboardScreen({
     super.key,
     required this.nickname,
     required this.avatarId,
+    required this.themeMode,
+    required this.themeStyle,
+    required this.hapticEnabled,
+    required this.onSettingsChanged,
   });
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -1588,9 +1600,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-              IconButton(
+              PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: cs.onSurface),
-                onPressed: () {},
+                onSelected: (value) {
+                  if (value == 'settings') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SettingsScreen(
+                          nickname: widget.nickname,
+                          avatarId: widget.avatarId,
+                          themeMode: widget.themeMode,
+                          themeStyle: widget.themeStyle,
+                          hapticEnabled: widget.hapticEnabled,
+                          onUpdate: widget.onSettingsChanged,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings, size: 20),
+                        SizedBox(width: 12),
+                        Text("设置"),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -2011,12 +2051,35 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
               color: cs.surface.withValues(alpha: 0.95),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _trackingStat(Icons.timer, _durationStr, "时长", cs),
-                    _trackingStat(Icons.straighten, "${(_totalDistance / 1000).toStringAsFixed(3)} km", "距离", cs),
-                    _trackingStat(Icons.scatter_plot, "${_trackingPath.length}", "点位", cs),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _trackingStat(Icons.timer, _durationStr, "时长", cs),
+                        _trackingStat(Icons.straighten, "${(_totalDistance / 1000).toStringAsFixed(3)} km", "距离", cs),
+                        _trackingStat(Icons.scatter_plot, "${_trackingPath.length}", "点位", cs),
+                      ],
+                    ),
+                    if (_lastLat != null && _lastLng != null) ...[
+                      const Divider(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.location_on, size: 14, color: cs.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            "Lat: ${_lastLat!.toStringAsFixed(3)}  Lng: ${_lastLng!.toStringAsFixed(3)}",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontFamily: "monospace",
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2528,9 +2591,103 @@ class ArtStudioScreen extends StatelessWidget {
   const ArtStudioScreen({super.key});
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('生成艺术')),
-      body: const Center(child: Text("工坊内容")),
+      backgroundColor: cs.surface,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 200,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              title: const Text('足迹工坊', style: TextStyle(fontWeight: FontWeight.bold)),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [cs.primary, cs.tertiary],
+                  ),
+                ),
+                child: Center(
+                  child: Icon(Icons.palette, size: 80, color: Colors.white.withOpacity(0.3)),
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("艺术创作", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _buildStudioCard(
+                    context,
+                    "艺术足迹导出",
+                    "将您的轨迹转化为精美的极简主义艺术海报",
+                    Icons.auto_awesome,
+                    cs,
+                    () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("艺术导出功能正在从原生地图引擎迁移中..."))
+                      );
+                    }
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStudioCard(
+                    context,
+                    "时空热力图",
+                    "可视化您的活动密集区域",
+                    Icons.grid_view,
+                    cs,
+                    () {}
+                  ),
+                  const SizedBox(height: 32),
+                  Text("实验室功能", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _buildStudioCard(
+                    context,
+                    "3D 足迹漫游",
+                    "在 3D 地球上回放您的旅行故事",
+                    Icons.view_in_ar,
+                    cs,
+                    () {}
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudioCard(BuildContext context, String title, String subtitle, IconData icon, ColorScheme cs, VoidCallback onTap) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cs.primaryContainer.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: cs.primary),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
     );
   }
 }
