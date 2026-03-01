@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class FootprintDetailPage extends StatefulWidget {
@@ -33,7 +34,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
     moodColor = _getMoodColor(rawMood);
     
     weather = e?['weather'] ?? "-";
-    detail = e?['notes'] ?? "没有记录详细内容。";
+    detail = e?['detail'] ?? e?['notes'] ?? "没有记录详细内容。";
     distance = (e?['distanceKm'] as num?)?.toDouble() ?? 0.0;
     energy = (e?['energyLevel'] as num?)?.toInt() ?? 0;
     
@@ -210,30 +211,36 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                   ),
                   
                   // Gallery
-                  const SizedBox(height: 32),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 24, bottom: 12),
-                    child: Text("瞬间", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  ),
-                  SizedBox(
-                    height: 200,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 3, // placeholder
-                      separatorBuilder: (context, index) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 150,
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Center(child: Icon(Icons.image, size: 48, color: Colors.grey)),
-                        );
-                      }
+                  if (photos.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24, bottom: 12),
+                      child: Text("瞬间", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                     ),
-                  ),
+                    SizedBox(
+                      height: 200,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: photos.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final photoPath = photos[index];
+                          final file = File(photoPath);
+                          return GestureDetector(
+                            onTap: () => _showFullImage(context, photoPath),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: file.existsSync()
+                                ? Image.file(file, width: 150, height: 200, fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => _photoPlaceholder(cs))
+                                : _photoPlaceholder(cs),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 32),
                   Padding(
@@ -279,6 +286,32 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
         Text(value, style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
         Text(label, style: tt.labelSmall?.copyWith(color: cs.outline)),
       ],
+    );
+  }
+  Widget _photoPlaceholder(ColorScheme cs) {
+    return Container(
+      width: 150, height: 200,
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
+      child: const Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+    );
+  }
+
+  void _showFullImage(BuildContext context, String path) {
+    final file = File(path);
+    if (!file.existsSync()) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: GestureDetector(
+          onTap: () => Navigator.pop(ctx),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.file(file, fit: BoxFit.contain),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -394,48 +394,67 @@ class MainContainer extends StatefulWidget {
 }
 
 class _MainContainerState extends State<MainContainer>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   int _selectedIndex = 0;
   late AnimationController _navController;
   late Animation<double> _elasticAnimation;
   bool _isHiding = false;
+
+  // Tab 切换弹性动画
+  late AnimationController _tabBounceController;
+  late Animation<double> _tabBounceAnimation;
 
   @override
   void initState() {
     super.initState();
     _navController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
     );
     _elasticAnimation = CurvedAnimation(
       parent: _navController,
-      curve: Curves.easeOutBack,
-      reverseCurve: Curves.easeInBack,
+      curve: const ElasticOutCurve(0.8),
+      reverseCurve: Curves.easeInCubic,
     );
     _navController.value = 1.0;
+
+    _tabBounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _tabBounceAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.85).chain(CurveTween(curve: Curves.easeOut)), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 0.85, end: 1.12).chain(CurveTween(curve: Curves.easeOut)), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.12, end: 0.95).chain(CurveTween(curve: Curves.easeInOut)), weight: 25),
+      TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)), weight: 25),
+    ]).animate(_tabBounceController);
   }
 
   void _handleScroll(ScrollNotification notification) {
     if (notification is ScrollUpdateNotification) {
       final delta = notification.scrollDelta;
       if (delta == null || delta == 0) return;
-      if (delta > 15.0 &&
-          !_isHiding &&
-          _navController.status != AnimationStatus.reverse) {
+      if (delta > 8.0 && !_isHiding && _navController.status != AnimationStatus.reverse) {
         _isHiding = true;
         _navController.reverse();
-      } else if (delta < -15.0 &&
-          _isHiding &&
-          _navController.status != AnimationStatus.forward) {
+      } else if (delta < -8.0 && _isHiding && _navController.status != AnimationStatus.forward) {
         _isHiding = false;
         _navController.forward();
       }
     }
   }
 
+  void _onTabTap(int index) {
+    if (_selectedIndex == index) return;
+    setState(() => _selectedIndex = index);
+    _tabBounceController.forward(from: 0.0);
+    if (widget.hapticEnabled) HapticFeedback.lightImpact();
+  }
+
   @override
   void dispose() {
     _navController.dispose();
+    _tabBounceController.dispose();
     super.dispose();
   }
 
@@ -446,36 +465,28 @@ class _MainContainerState extends State<MainContainer>
       const ExploreMapScreen(),
       const GoalPlannerPage(),
       SettingsScreen(
-        nickname: widget.nickname,
-        avatarId: widget.avatarId,
-        themeMode: widget.themeMode,
-        themeStyle: widget.themeStyle,
-        hapticEnabled: widget.hapticEnabled,
-        onUpdate: widget.onSettingsChanged,
+        nickname: widget.nickname, avatarId: widget.avatarId,
+        themeMode: widget.themeMode, themeStyle: widget.themeStyle,
+        hapticEnabled: widget.hapticEnabled, onUpdate: widget.onSettingsChanged,
       ),
     ];
 
     return Scaffold(
       extendBody: true,
       body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          _handleScroll(notification);
-          return false;
-        },
+        onNotification: (notification) { _handleScroll(notification); return false; },
         child: IndexedStack(index: _selectedIndex, children: pages),
       ),
       bottomNavigationBar: AnimatedBuilder(
-        animation: _elasticAnimation,
+        animation: Listenable.merge([_elasticAnimation, _tabBounceAnimation]),
         builder: (context, child) {
           final rawT = _elasticAnimation.value;
           final clampedT = rawT.clamp(0.0, 1.0);
           final fullWidth = MediaQuery.of(context).size.width - 64;
           const dropSize = 64.0;
-          final currentWidth = math.max(
-            dropSize,
-            dropSize + (fullWidth - dropSize) * rawT,
-          );
+          final currentWidth = math.max(dropSize, dropSize + (fullWidth - dropSize) * rawT);
           final overallScale = clampedT < 0.15 ? (clampedT / 0.15) : 1.0;
+          final cs = Theme.of(context).colorScheme;
 
           return Align(
             alignment: Alignment.bottomCenter,
@@ -484,84 +495,49 @@ class _MainContainerState extends State<MainContainer>
               child: Transform.scale(
                 scale: overallScale,
                 child: Container(
-                  width: currentWidth,
-                  height: dropSize,
+                  width: currentWidth, height: dropSize,
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.95),
+                    color: cs.surface.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(dropSize / 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15 * clampedT),
-                        blurRadius: 20 * clampedT,
-                        offset: Offset(0, 10 * clampedT),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant
-                          .withValues(alpha: 0.4 * clampedT),
-                    ),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15 * clampedT), blurRadius: 20 * clampedT, offset: Offset(0, 10 * clampedT))],
+                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4 * clampedT)),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(dropSize / 2),
                     child: OverflowBox(
-                      minWidth: fullWidth,
-                      maxWidth: fullWidth,
-                      minHeight: dropSize,
-                      maxHeight: dropSize,
+                      minWidth: fullWidth, maxWidth: fullWidth, minHeight: dropSize, maxHeight: dropSize,
                       child: Stack(
                         alignment: Alignment.center,
                         children: List.generate(4, (index) {
-                          final icons = [
-                            Icons.dashboard,
-                            Icons.explore,
-                            Icons.flag,
-                            Icons.settings,
-                          ];
-                          final outlines = [
-                            Icons.dashboard_outlined,
-                            Icons.explore_outlined,
-                            Icons.outlined_flag,
-                            Icons.settings_outlined,
-                          ];
+                          final icons = [Icons.dashboard, Icons.explore, Icons.flag, Icons.settings];
+                          final outlines = [Icons.dashboard_outlined, Icons.explore_outlined, Icons.outlined_flag, Icons.settings_outlined];
                           final double step = fullWidth / 4;
-                          final double currentX =
-                              (index - 1.5) * step * clampedT;
+                          final double currentX = (index - 1.5) * step * clampedT;
+                          final bool isSelected = _selectedIndex == index;
+                          // 当前选中 tab 的弹性缩放
+                          final double iconScale = isSelected ? _tabBounceAnimation.value : 1.0;
 
                           return Positioned(
                             left: (fullWidth / 2) + currentX - 24,
                             child: Opacity(
                               opacity: (clampedT * 5 - 4).clamp(0.0, 1.0),
                               child: GestureDetector(
-                                onTap: () {
-                                  setState(() => _selectedIndex = index);
-                                  if (widget.hapticEnabled)
-                                    HapticFeedback.lightImpact();
-                                },
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: _selectedIndex == index
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.primaryContainer
-                                        : Colors.transparent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _selectedIndex == index
-                                        ? icons[index]
-                                        : outlines[index],
-                                    color: _selectedIndex == index
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.onPrimaryContainer
-                                        : Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                    size: 24,
+                                onTap: () => _onTabTap(index),
+                                child: Transform.scale(
+                                  scale: iconScale,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeOutBack,
+                                    width: 48, height: 48,
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? cs.primaryContainer : Colors.transparent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isSelected ? icons[index] : outlines[index],
+                                      color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                                      size: 24,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1455,17 +1431,45 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
       }
       _locationClient.setLocationOption(AMapLocationOption(onceLocation: true, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true));
       _locationSubscription?.cancel();
+      bool hasResult = false;
       _locationSubscription = _locationClient.onLocationChanged().listen((result) async {
-        if (!mounted) return;
+        if (!mounted || hasResult) return;
         final double? lat = result['latitude'] as double?;
         final double? lng = result['longitude'] as double?;
+        final errorCode = result['errorCode'];
+        if (errorCode != null && errorCode != 0) {
+          hasResult = true;
+          _locationSubscription?.cancel();
+          if (!mounted) return;
+          String errMsg;
+          switch (errorCode) {
+            case 7: errMsg = "高德Key鉴权失败：请到设置中检查API Key是否正确，包名和SHA1是否匹配";
+            case 12: errMsg = "缺少定位权限：请在系统设置中授予位置权限";
+            case 4: errMsg = "网络连接异常：请检查网络设置";
+            case 13: errMsg = "GPS信号不可用：请到开阔地带重试";
+            default: errMsg = "定位失败(错误码:$errorCode): ${result['errorInfo'] ?? '未知错误'}";
+          }
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(errMsg), backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+            action: errorCode == 7 ? SnackBarAction(label: "设置Key", textColor: Colors.white, onPressed: () => _showApiKeyDialog()) : null,
+          ));
+          return;
+        }
         if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
+          hasResult = true;
           await _mapChannel?.invokeMethod('centerLocation');
           _locationSubscription?.cancel();
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位成功"), backgroundColor: Colors.green, duration: Duration(seconds: 1)));
         }
       });
       _locationClient.startLocation();
-      Future.delayed(const Duration(seconds: 10), () => _locationSubscription?.cancel());
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!hasResult) {
+          _locationSubscription?.cancel();
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位超时：请检查GPS是否开启及网络状况"), backgroundColor: Colors.orange));
+        }
+      });
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("定位异常: $e"), backgroundColor: Colors.redAccent));
     }
