@@ -11,7 +11,6 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -206,10 +205,10 @@ class MainActivity : FlutterActivity() {
                             val intent =
                                     Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                                         addCategory(Intent.CATEGORY_OPENABLE)
-                                        type = "application/json"
+                                        type = "*/*"
                                         putExtra(
                                                 Intent.EXTRA_TITLE,
-                                                "footprint_backup_${System.currentTimeMillis()}.json"
+                                                "footprint_backup_${System.currentTimeMillis()}.zip"
                                         )
                                     }
                             startActivityForResult(intent, EXPORT_REQUEST_CODE)
@@ -219,7 +218,7 @@ class MainActivity : FlutterActivity() {
                             val intent =
                                     Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                                         addCategory(Intent.CATEGORY_OPENABLE)
-                                        type = "application/json"
+                                        type = "*/*"
                                     }
                             startActivityForResult(intent, IMPORT_REQUEST_CODE)
                         }
@@ -362,14 +361,58 @@ class MainActivity : FlutterActivity() {
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
                         val backupData = repository.prepareBackup()
-                        val json = gson.toJson(backupData)
-                        contentResolver.openOutputStream(uri)?.use { os ->
-                            OutputStreamWriter(os).use { writer -> writer.write(json) }
+
+                        val tempDir =
+                                java.io.File(cacheDir, "backup_temp_${System.currentTimeMillis()}")
+                        if (tempDir.exists())
+                                com.footprint.utils.FileUtils.deleteRecursively(tempDir)
+                        tempDir.mkdirs()
+                        val imagesDir = java.io.File(tempDir, "images")
+                        imagesDir.mkdirs()
+
+                        // Copy images and remap paths
+                        val processedFootprints =
+                                backupData.footprints.map { footprint ->
+                                    val newPhotos =
+                                            footprint.photos.mapNotNull { photoPath ->
+                                                try {
+                                                    val originalFile = java.io.File(photoPath)
+                                                    if (originalFile.exists()) {
+                                                        val destFile =
+                                                                java.io.File(
+                                                                        imagesDir,
+                                                                        originalFile.name
+                                                                )
+                                                        com.footprint.utils.FileUtils.copyFile(
+                                                                originalFile,
+                                                                destFile
+                                                        )
+                                                        "images/${originalFile.name}"
+                                                    } else null
+                                                } catch (_: Exception) {
+                                                    null
+                                                }
+                                            }
+                                    footprint.copy(photos = newPhotos)
+                                }
+
+                        val processedBackup = backupData.copy(footprints = processedFootprints)
+                        val json = gson.toJson(processedBackup)
+
+                        val jsonFile = java.io.File(tempDir, "backup_data.json")
+                        java.io.FileWriter(jsonFile).use { it.write(json) }
+
+                        contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            com.footprint.utils.FileUtils.zipDirectory(tempDir, outputStream)
                         }
+
+                        com.footprint.utils.FileUtils.deleteRecursively(tempDir)
+
                         withContext(Dispatchers.Main) { pendingResult?.success(true) }
                     } catch (e: Exception) {
+                        e.printStackTrace()
                         withContext(Dispatchers.Main) {
-                            pendingResult?.error("EXPORT_FAILED", e.message, null)
+                            pendingResult?.error("EXPORT_FAILED", e.message ?: "导出失败", null)
                         }
                     }
                 }
@@ -377,20 +420,146 @@ class MainActivity : FlutterActivity() {
             IMPORT_REQUEST_CODE -> {
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
-                        contentResolver.openInputStream(uri)?.use { `is` ->
-                            InputStreamReader(`is`).use { reader ->
-                                val backupData =
+                        val tempDir =
+                                java.io.File(cacheDir, "import_temp_${System.currentTimeMillis()}")
+                        if (tempDir.exists())
+                                com.footprint.utils.FileUtils.deleteRecursively(tempDir)
+                        tempDir.mkdirs()
+
+                        var isZip = false
+                        try {
+                            contentResolver.openInputStream(uri)?.use { inputStream ->
+                                try {
+                                    com.footprint.utils.FileUtils.unzip(inputStream, tempDir)
+                                    if (tempDir.listFiles()?.isNotEmpty() == true) {
+                                        isZip = true
+                                    }
+                                } catch (_: Exception) {
+                                    isZip = false
+                                }
+                            }
+                        } catch (_: Exception) {
+                            isZip = false
+                        }
+
+                        val backup: com.footprint.data.model.BackupData
+
+                        if (isZip) {
+                            val jsonFile = java.io.File(tempDir, "backup_data.json")
+                            if (jsonFile.exists()) {
+                                val json = java.io.FileReader(jsonFile).use { it.readText() }
+                                backup =
                                         gson.fromJson(
-                                                reader,
+                                                json,
                                                 com.footprint.data.model.BackupData::class.java
                                         )
-                                repository.restoreFromBackup(backupData)
+                            } else {
+                                isZip = false
+                                val json =
+                                        contentResolver.openInputStream(uri)?.use {
+                                            InputStreamReader(it).use { reader ->
+                                                reader.readText()
+                                            }
+                                        }
+                                                ?: throw Exception("无法读取文件")
+                                backup =
+                                        gson.fromJson(
+                                                json,
+                                                com.footprint.data.model.BackupData::class.java
+                                        )
                             }
+                        } else {
+                            val json =
+                                    contentResolver.openInputStream(uri)?.use {
+                                        InputStreamReader(it).use { reader -> reader.readText() }
+                                    }
+                                            ?: throw Exception("无法读取文件")
+                            backup =
+                                    gson.fromJson(
+                                            json,
+                                            com.footprint.data.model.BackupData::class.java
+                                    )
                         }
+
+                        // Restore images from ZIP
+                        val restoredFootprints =
+                                if (isZip) {
+                                    val appImagesDir = java.io.File(filesDir, "footprint_images")
+                                    if (!appImagesDir.exists()) appImagesDir.mkdirs()
+
+                                    backup.footprints.map { footprint ->
+                                        val restoredPhotos =
+                                                footprint.photos.map { relativePath ->
+                                                    if (relativePath.startsWith("images/")) {
+                                                        val imageName =
+                                                                relativePath.substringAfter(
+                                                                        "images/"
+                                                                )
+                                                        val sourceFile =
+                                                                java.io.File(tempDir, relativePath)
+                                                        if (sourceFile.exists()) {
+                                                            val destFile =
+                                                                    java.io.File(
+                                                                            appImagesDir,
+                                                                            imageName
+                                                                    )
+                                                            com.footprint.utils.FileUtils.copyFile(
+                                                                    sourceFile,
+                                                                    destFile
+                                                            )
+                                                            destFile.absolutePath
+                                                        } else {
+                                                            relativePath
+                                                        }
+                                                    } else relativePath
+                                                }
+                                        footprint.copy(photos = restoredPhotos)
+                                    }
+                                } else {
+                                    backup.footprints
+                                }
+
+                        // Generate track points from entries if missing
+                        val finalTrackPoints =
+                                if (backup.trackPoints.isEmpty()) {
+                                    restoredFootprints
+                                            .filter { it.latitude != null && it.longitude != null }
+                                            .map { fp ->
+                                                com.footprint.data.local.TrackPointEntity(
+                                                        latitude = fp.latitude!!,
+                                                        longitude = fp.longitude!!,
+                                                        timestamp =
+                                                                fp.happenedOn
+                                                                        .atStartOfDay(
+                                                                                java.time.ZoneOffset
+                                                                                        .UTC
+                                                                        )
+                                                                        .toInstant()
+                                                                        .toEpochMilli(),
+                                                        speed = 0f,
+                                                        accuracy = 0f,
+                                                        altitude = fp.altitude ?: 0.0
+                                                )
+                                            }
+                                } else {
+                                    backup.trackPoints
+                                }
+
+                        val finalBackup =
+                                backup.copy(
+                                        footprints = restoredFootprints,
+                                        trackPoints = finalTrackPoints
+                                )
+                        repository.restoreFromBackup(finalBackup)
+
+                        // Cleanup temp
+                        com.footprint.utils.FileUtils.deleteRecursively(tempDir)
+
                         withContext(Dispatchers.Main) { pendingResult?.success(true) }
                     } catch (e: Exception) {
+                        e.printStackTrace()
                         withContext(Dispatchers.Main) {
-                            pendingResult?.error("IMPORT_FAILED", e.message, null)
+                            pendingResult?.error("IMPORT_FAILED", e.message ?: "导入失败", null)
                         }
                     }
                 }

@@ -79,8 +79,8 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
           if (_mapChannel != null && trackPoints.isNotEmpty) {
              _mapChannel?.invokeMethod('setTrackingPath', trackPoints);
              _mapChannel?.invokeMethod('centerLocation', {
-               'lat': trackPoints.first['lat'],
-               'lng': trackPoints.first['lng'],
+               'latitude': trackPoints.first['lat'],
+               'longitude': trackPoints.first['lng'],
                'zoom': 15.0
              });
           }
@@ -306,8 +306,8 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             if (trackPoints.isNotEmpty) {
                                _mapChannel?.invokeMethod('setTrackingPath', trackPoints);
                                _mapChannel?.invokeMethod('centerLocation', {
-                                  'lat': trackPoints.first['lat'],
-                                  'lng': trackPoints.first['lng'],
+                                  'latitude': trackPoints.first['lat'],
+                                  'longitude': trackPoints.first['lng'],
                                   'zoom': 15.0
                                });
                             }

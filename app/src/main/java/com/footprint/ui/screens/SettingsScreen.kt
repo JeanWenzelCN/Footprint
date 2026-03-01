@@ -68,7 +68,7 @@ fun SettingsScreen(
         // File Launchers
         val exportLauncher =
                 rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.CreateDocument("application/json"),
+                        contract = ActivityResultContracts.CreateDocument("*/*"),
                         onResult = { uri -> uri?.let { onExportData(it) } }
                 )
 
@@ -301,7 +301,7 @@ fun SettingsScreen(
                                                                 containerColor = Color.Transparent,
                                                                 onClick = {
                                                                         exportLauncher.launch(
-                                                                                "footprint_backup_${System.currentTimeMillis()}.json"
+                                                                                "footprint_backup_${System.currentTimeMillis()}.zip"
                                                                         )
                                                                 }
                                                         )
@@ -322,10 +322,7 @@ fun SettingsScreen(
                                                                 containerColor = Color.Transparent,
                                                                 onClick = {
                                                                         importLauncher.launch(
-                                                                                arrayOf(
-                                                                                        "application/json",
-                                                                                        "application/octet-stream"
-                                                                                )
+                                                                                arrayOf("*/*")
                                                                         )
                                                                 }
                                                         )
