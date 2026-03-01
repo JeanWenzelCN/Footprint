@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -59,6 +60,7 @@ fun SettingsScreen(
 ) {
         val context = LocalContext.current
         val haptic = LocalHapticFeedback.current
+        val uriHandler = LocalUriHandler.current
         val performHaptic = {
                 if (currentHapticFeedback) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -337,37 +339,82 @@ fun SettingsScreen(
                                 }
 
                                 // 关于
-                                item { SettingsSectionTitle("关于应用") }
-                                item {
-                                        LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
-                                                ListItem(
-                                                        headlineContent = { Text("软件版本") },
-                                                        supportingContent = {
-                                                                val versionName = remember {
-                                                                        try {
-                                                                                context.packageManager
-                                                                                        .getPackageInfo(
-                                                                                                context.packageName,
-                                                                                                0
-                                                                                        )
-                                                                                        .versionName
-                                                                        } catch (e: Exception) {
-                                                                                "2.10.1"
-                                                                        }
-                                                                }
-                                                                Text("v$versionName")
-                                                        },
-                                                        leadingContent = {
-                                                                Icon(Icons.Default.Info, null)
-                                                        },
-                                                        colors =
-                                                                ListItemDefaults.colors(
-                                                                        containerColor =
-                                                                                Color.Transparent
-                                                                )
-                                                )
-                                        }
-                                }
+                                 item { SettingsSectionTitle("关于应用") }
+                                 item {
+                                         val uriHandler = LocalUriHandler.current
+                                         LiquidGlassCard(shape = MaterialTheme.shapes.medium) {
+                                                 Column {
+                                                         ListItem(
+                                                                 headlineContent = { Text("软件版本") },
+                                                                 supportingContent = {
+                                                                         val versionName = remember {
+                                                                                 try {
+                                                                                         context.packageManager
+                                                                                                 .getPackageInfo(
+                                                                                                         context.packageName,
+                                                                                                         0
+                                                                                                 )
+                                                                                                 .versionName
+                                                                                 } catch (e: Exception) {
+                                                                                         "3.2.0"
+                                                                                 }
+                                                                         }
+                                                                         Text("v$versionName")
+                                                                 },
+                                                                 leadingContent = {
+                                                                         Icon(Icons.Default.Info, null)
+                                                                 },
+                                                                 colors =
+                                                                         ListItemDefaults.colors(
+                                                                                 containerColor =
+                                                                                         Color.Transparent
+                                                                         )
+                                                         )
+                                                         HorizontalDivider(
+                                                                 modifier =
+                                                                         Modifier.padding(
+                                                                                 horizontal = 16.dp
+                                                                         ),
+                                                                 thickness = 0.5.dp,
+                                                                 color =
+                                                                         MaterialTheme.colorScheme
+                                                                                 .outlineVariant
+                                                         )
+                                                         SettingsActionItem(
+                                                                 title = "作者主页",
+                                                                 subtitle = "访问 StarsUnsurpass 的 GitHub",
+                                                                 icon = Icons.Default.Person,
+                                                                 containerColor = Color.Transparent,
+                                                                 onClick = {
+                                                                         uriHandler.openUri(
+                                                                                 "https://github.com/StarsUnsurpass"
+                                                                         )
+                                                                 }
+                                                         )
+                                                         HorizontalDivider(
+                                                                 modifier =
+                                                                         Modifier.padding(
+                                                                                 horizontal = 16.dp
+                                                                         ),
+                                                                 thickness = 0.5.dp,
+                                                                 color =
+                                                                         MaterialTheme.colorScheme
+                                                                                 .outlineVariant
+                                                         )
+                                                         SettingsActionItem(
+                                                                 title = "项目地址",
+                                                                 subtitle = "查看源代码并提交 Issue",
+                                                                 icon = Icons.Default.Code,
+                                                                 containerColor = Color.Transparent,
+                                                                 onClick = {
+                                                                         uriHandler.openUri(
+                                                                                 "https://github.com/StarsUnsurpass/Footprint"
+                                                                         )
+                                                                 }
+                                                         )
+                                                 }
+                                         }
+                                 }
                         }
                 }
         }

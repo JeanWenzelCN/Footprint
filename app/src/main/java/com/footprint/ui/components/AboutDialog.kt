@@ -27,6 +27,7 @@ import com.footprint.R
 fun AboutDialog(onDismiss: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     val authorUrl = "https://github.com/StarsUnsurpass"
+    val projectUrl = "https://github.com/StarsUnsurpass/Footprint"
 
     Dialog(onDismissRequest = onDismiss) {
         LiquidGlassCard(shape = RoundedCornerShape(28.dp)) {
@@ -46,7 +47,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     try {
                         context.packageManager.getPackageInfo(context.packageName, 0).versionName
                     } catch (e: Exception) {
-                        "2.10.1"
+                        "3.2.0"
                     }
                 }
 
@@ -85,13 +86,22 @@ fun AboutDialog(onDismiss: () -> Unit) {
                                 fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                                text = "访问 GitHub 主页",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                textDecoration = TextDecoration.Underline,
-                                modifier = Modifier.clickable { uriHandler.openUri(authorUrl) }
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(
+                                    text = "GitHub 主页",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline,
+                                    modifier = Modifier.clickable { uriHandler.openUri(authorUrl) }
+                            )
+                            Text(
+                                    text = "项目源码",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline,
+                                    modifier = Modifier.clickable { uriHandler.openUri(projectUrl) }
+                            )
+                        }
                     }
                 }
 
