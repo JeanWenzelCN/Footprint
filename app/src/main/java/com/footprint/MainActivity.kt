@@ -121,6 +121,63 @@ class MainActivity : FlutterActivity() {
                     }
                     startActivityForResult(intent, IMPORT_REQUEST_CODE)
                 }
+                
+                // --- Flutter 追踪：保存单个轨迹点 ---
+                "saveTrackPoint" -> {
+                    val args = call.arguments as Map<String, Any>
+                    val lat = (args["latitude"] as Number).toDouble()
+                    val lng = (args["longitude"] as Number).toDouble()
+                    val alt = (args["altitude"] as Number).toDouble()
+                    val acc = (args["accuracy"] as Number).toFloat()
+                    val spd = (args["speed"] as Number).toFloat()
+                    val ts = (args["timestamp"] as Number).toLong()
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            repository.saveTrackPointRaw(lat, lng, alt, acc, spd, ts)
+                            withContext(Dispatchers.Main) { result.success(true) }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { result.error("SAVE_FAILED", e.message, null) }
+                        }
+                    }
+                }
+                // --- Flutter 追踪：保存完整追踪会话为足迹记录 ---
+                "saveTrackingSession" -> {
+                    val args = call.arguments as Map<String, Any>
+                    val totalDistanceM = (args["totalDistanceM"] as Number).toDouble()
+                    val pointCount = (args["pointCount"] as Number).toInt()
+                    val address = args["address"] as? String ?: "未知地点"
+                    val lat = (args["latitude"] as? Number)?.toDouble()
+                    val lng = (args["longitude"] as? Number)?.toDouble()
+                    val alt = (args["altitude"] as? Number)?.toDouble()
+                    val durationMin = (args["durationMinutes"] as Number).toInt()
+                    val entry = com.footprint.data.model.FootprintEntry(
+                        title = "自动追踪",
+                        location = address.ifEmpty { "未知地点" },
+                        detail = "通过自动追踪记录：共 $pointCount 个点，耗时 $durationMin 分钟",
+                        mood = com.footprint.data.model.Mood.RELAXED,
+                        tags = listOf("自动追踪"),
+                        distanceKm = totalDistanceM / 1000.0,
+                        photos = emptyList(),
+                        energyLevel = 5,
+                        happenedOn = java.time.LocalDate.now(),
+                        latitude = lat,
+                        longitude = lng,
+                        altitude = alt,
+                        weather = null,
+                        temperature = null,
+                        transportType = com.footprint.data.model.TransportType.WALK,
+                        carbonSavedKg = 0.0,
+                        icon = "RunCircle"
+                    )
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            repository.saveEntry(entry)
+                            withContext(Dispatchers.Main) { result.success(true) }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { result.error("SAVE_FAILED", e.message, null) }
+                        }
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

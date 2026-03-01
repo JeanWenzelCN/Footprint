@@ -51,6 +51,25 @@ class FootprintRepository(
                 trackPointDao.insert(entity)
         }
 
+        suspend fun saveTrackPointRaw(
+                latitude: Double,
+                longitude: Double,
+                altitude: Double,
+                accuracy: Float,
+                speed: Float,
+                timestamp: Long
+        ) {
+                val entity = com.footprint.data.local.TrackPointEntity(
+                        latitude = latitude,
+                        longitude = longitude,
+                        timestamp = timestamp,
+                        speed = speed,
+                        accuracy = accuracy,
+                        altitude = altitude
+                )
+                trackPointDao.insert(entity)
+        }
+
         fun getTrackPoints(
                 startTime: Long,
                 endTime: Long

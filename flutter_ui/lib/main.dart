@@ -1349,41 +1349,48 @@ class ExploreMapScreen extends StatefulWidget {
 
 class _ExploreMapScreenState extends State<ExploreMapScreen> {
   static const dataChannel = MethodChannel('com.footprint/data');
-  static const streamChannel = EventChannel('com.footprint/stream');
   String mapMode = 'STANDARD';
-  bool isTracking = false;
   MethodChannel? _mapChannel;
   List<dynamic> _allEntries = [];
-  
-  // Flutter Location Client
+
+  // Flutter 高德定位客户端
   final AMapFlutterLocation _locationClient = AMapFlutterLocation();
   StreamSubscription<Map<String, Object>>? _locationSubscription;
+
+  // === 追踪状态 (Flutter 实现，匹配原 Kotlin LocationTrackingService) ===
+  bool _isTracking = false;
+  final List<Map<String, double>> _trackingPath = [];
+  double _totalDistance = 0.0;
+  int _sessionStartTime = 0;
+  double? _lastLat;
+  double? _lastLng;
+  int? _lastPointTime;
+  int _lastSaveTime = 0;
+  String _lastAddress = '';
+  double? _lastAltitude;
+  Timer? _durationTimer;
+  String _durationStr = '00:00:00';
+
+  // 匹配原 Kotlin 服务的过滤阈值
+  static const double _maxSpeedMs = 50.0;
+  static const double _minDistanceM = 0.5;
+  static const double _minValidLatLng = 0.1;
+  static const int _saveIntervalMs = 2000;
 
   @override
   void initState() {
     super.initState();
     _loadEntries();
-    
-    // 初始化高德定位
+    // 初始化高德隐私合规（不自动开启定位）
     AMapFlutterLocation.updatePrivacyShow(true, true);
     AMapFlutterLocation.updatePrivacyAgree(true);
-    
-    streamChannel.receiveBroadcastStream().listen((eventJson) {
-      final event = jsonDecode(eventJson);
-      if (mounted && event['type'] == 'status') {
-        final newStatus = event['isTracking'];
-        if (isTracking && !newStatus) {
-          _loadEntries();
-        }
-        setState(() => isTracking = newStatus);
-      }
-    });
   }
 
   @override
   void dispose() {
     _locationSubscription?.cancel();
     _locationClient.destroy();
+    _durationTimer?.cancel();
     super.dispose();
   }
 
@@ -1433,6 +1440,143 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     _mapChannel?.invokeMethod('setEntries', _allEntries);
   }
 
+  // === 定位按钮：单次定位 + 地图居中 ===
+  Future<void> _handleLocateMe() async {
+    try {
+      final status = await Permission.locationWhenInUse.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text("需要位置权限才能进行定位"), backgroundColor: Colors.orange,
+            action: SnackBarAction(label: "去设置", textColor: Colors.white, onPressed: () => openAppSettings()),
+          ));
+        }
+        return;
+      }
+      _locationClient.setLocationOption(AMapLocationOption(onceLocation: true, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true));
+      _locationSubscription?.cancel();
+      _locationSubscription = _locationClient.onLocationChanged().listen((result) async {
+        if (!mounted) return;
+        final double? lat = result['latitude'] as double?;
+        final double? lng = result['longitude'] as double?;
+        if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
+          await _mapChannel?.invokeMethod('centerLocation');
+          _locationSubscription?.cancel();
+        }
+      });
+      _locationClient.startLocation();
+      Future.delayed(const Duration(seconds: 10), () => _locationSubscription?.cancel());
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("定位异常: $e"), backgroundColor: Colors.redAccent));
+    }
+  }
+
+  // === 开始追踪 ===
+  Future<void> _startTracking() async {
+    final status = await Permission.locationWhenInUse.request();
+    if (!status.isGranted) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("需要位置权限才能记录足迹"), backgroundColor: Colors.orange));
+      return;
+    }
+    setState(() {
+      _isTracking = true; _trackingPath.clear(); _totalDistance = 0.0;
+      _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
+      _lastLat = null; _lastLng = null; _lastPointTime = null;
+      _lastSaveTime = 0; _lastAddress = ''; _lastAltitude = null; _durationStr = '00:00:00';
+    });
+    _locationClient.setLocationOption(AMapLocationOption(
+      onceLocation: false, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true, locationInterval: 2000,
+    ));
+    _locationSubscription?.cancel();
+    _locationSubscription = _locationClient.onLocationChanged().listen(_onTrackingLocationUpdate);
+    _locationClient.startLocation();
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_isTracking) return;
+      setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
+    });
+  }
+
+  // === 停止追踪 ===
+  Future<void> _stopTracking() async {
+    _locationSubscription?.cancel(); _locationClient.stopLocation(); _durationTimer?.cancel();
+    if (_trackingPath.length >= 2) {
+      final endTime = DateTime.now().millisecondsSinceEpoch;
+      final durationMin = ((endTime - _sessionStartTime) / 60000).round();
+      try {
+        await dataChannel.invokeMethod('saveTrackingSession', {
+          'totalDistanceM': _totalDistance, 'startTime': _sessionStartTime, 'endTime': endTime,
+          'pointCount': _trackingPath.length, 'address': _lastAddress,
+          'latitude': _lastLat, 'longitude': _lastLng, 'altitude': _lastAltitude, 'durationMinutes': durationMin,
+        });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("足迹已保存：${(_totalDistance / 1000).toStringAsFixed(2)} km，$durationMin 分钟"), backgroundColor: Colors.green,
+        ));
+      } catch (e) { debugPrint('Failed to save tracking session: $e'); }
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("轨迹点太少，未保存"), backgroundColor: Colors.orange));
+    }
+    setState(() { _isTracking = false; _trackingPath.clear(); _totalDistance = 0.0; _durationStr = '00:00:00'; });
+    _mapChannel?.invokeMethod('setTrackingPath', <Map<String, double>>[]);
+    _loadEntries();
+  }
+
+  // === 位置回调处理（匹配原 Kotlin onLocationChanged 逻辑）===
+  void _onTrackingLocationUpdate(Map<String, Object> result) {
+    if (!mounted || !_isTracking) return;
+    final errorCode = result['errorCode'];
+    if (errorCode != null && errorCode != 0) return;
+    final double? lat = result['latitude'] as double?;
+    final double? lng = result['longitude'] as double?;
+    final double? accuracy = result['accuracy'] as double?;
+    final double? speed = result['speed'] as double?;
+    final String? address = result['address'] as String?;
+    final double? altitude = result['altitude'] as double?;
+    if (lat == null || lng == null) return;
+    if (lat.abs() < _minValidLatLng || lng.abs() < _minValidLatLng) return;
+    if (accuracy != null && accuracy > 500) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    bool isValidPoint = false;
+    if (_lastLat != null && _lastLng != null && _lastPointTime != null) {
+      final distance = _haversineDistance(_lastLat!, _lastLng!, lat, lng);
+      final timeSec = (now - _lastPointTime!) / 1000.0;
+      if (timeSec > 0) {
+        final calcSpeed = distance / timeSec;
+        if (calcSpeed > _maxSpeedMs) { /* glitch */ }
+        else if (distance < _minDistanceM) { /* too close */ }
+        else { isValidPoint = true; _totalDistance += distance; }
+      }
+    } else { isValidPoint = true; }
+    if (isValidPoint) {
+      setState(() {
+        _trackingPath.add({'lat': lat, 'lng': lng});
+        _lastLat = lat; _lastLng = lng; _lastPointTime = now; _lastAltitude = altitude;
+        if (address != null && address.isNotEmpty) _lastAddress = address;
+      });
+      _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
+      if (now - _lastSaveTime > _saveIntervalMs) {
+        _lastSaveTime = now;
+        dataChannel.invokeMethod('saveTrackPoint', {
+          'latitude': lat, 'longitude': lng, 'altitude': altitude ?? 0.0,
+          'accuracy': accuracy ?? 0.0, 'speed': speed ?? 0.0, 'timestamp': now,
+        });
+      }
+    }
+  }
+
+  double _haversineDistance(double lat1, double lng1, double lat2, double lng2) {
+    const R = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLng = (lng2 - lng1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) * math.cos(lat2 * math.pi / 180) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  String _formatDuration(int ms) {
+    final s = (ms ~/ 1000) % 60, m = (ms ~/ 60000) % 60, h = ms ~/ 3600000;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1476,6 +1620,29 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
             child: const Icon(Icons.settings_outlined),
           ),
         ),
+        // 追踪信息面板（仅在追踪时显示）
+        if (_isTracking)
+          Positioned(
+            bottom: 185,
+            left: 16,
+            right: 90,
+            child: Card(
+              elevation: 6,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              color: cs.surface.withValues(alpha: 0.95),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _trackingStat(Icons.timer, _durationStr, "时长", cs),
+                    _trackingStat(Icons.straighten, "${(_totalDistance / 1000).toStringAsFixed(2)} km", "距离", cs),
+                    _trackingStat(Icons.scatter_plot, "${_trackingPath.length}", "点位", cs),
+                  ],
+                ),
+              ),
+            ),
+          ),
         // 右下角 FAB 组
         Positioned(
           bottom: 110,
@@ -1486,87 +1653,18 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
               // 定位按钮
               FloatingActionButton(
                 heroTag: "locate_btn",
-                onPressed: () async {
-                  try {
-                    // 1. 检查并申请权限
-                    final status = await Permission.locationWhenInUse.request();
-                    if (!status.isGranted) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text("需要位置权限才能进行定位"),
-                            backgroundColor: Colors.orange,
-                            action: SnackBarAction(label: "去设置", textColor: Colors.white, onPressed: () => openAppSettings()),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // 2. 使用 Flutter 插件获取定位
-                    // 设置定位参数
-                    _locationClient.setLocationOption(AMapLocationOption(
-                      onceLocation: true,
-                      locationMode: AMapLocationMode.Hight_Accuracy,
-                    ));
-
-                    // 监听定位结果
-                    _locationSubscription?.cancel();
-                    _locationSubscription = _locationClient.onLocationChanged().listen((Map<String, Object> result) async {
-                      if (!mounted) return;
-                      
-                      final double? lat = result['latitude'] as double?;
-                      final double? lng = result['longitude'] as double?;
-                      
-                      if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
-                        // 成功获取坐标，通知原生地图中心化
-                        await _mapChannel?.invokeMethod('centerLocation');
-                        _locationSubscription?.cancel();
-                      } else {
-                        // 定位结果异常 (如 errorCode)
-                        final errorCode = result['errorCode'];
-                        final errorInfo = result['errorInfo'];
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("定位失败: $errorInfo (错误码: $errorCode)"), backgroundColor: Colors.redAccent),
-                        );
-                      }
-                    });
-
-                    // 开始定位
-                    _locationClient.startLocation();
-                    
-                    // 设置一个超时保护，防止插件不回调
-                    Future.delayed(const Duration(seconds: 10), () {
-                      if (_locationSubscription != null) {
-                        _locationSubscription?.cancel();
-                        if (mounted) {
-                          // 如果还没有成功定位，给个反馈建议
-                          // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位请求超时，请检查 GPS")));
-                        }
-                      }
-                    });
-
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("定位异常: $e"), backgroundColor: Colors.redAccent),
-                      );
-                    }
-                  }
-                },
+                onPressed: _handleLocateMe,
                 backgroundColor: cs.surfaceContainerHighest,
                 child: Icon(Icons.my_location, color: cs.primary),
               ),
               const SizedBox(height: 16),
-              // 开始足迹按钮
+              // 开始/停止足迹记录按钮
               FloatingActionButton(
                 heroTag: "track_btn",
-                onPressed: () => dataChannel.invokeMethod(
-                  isTracking ? 'stopTracking' : 'startTracking',
-                ),
-                backgroundColor: isTracking ? Colors.red : cs.primary,
+                onPressed: () => _isTracking ? _stopTracking() : _startTracking(),
+                backgroundColor: _isTracking ? Colors.red : cs.primary,
                 child: Icon(
-                  isTracking ? Icons.stop : Icons.play_arrow,
+                  _isTracking ? Icons.stop : Icons.play_arrow,
                   color: Colors.white,
                   size: 32,
                 ),
@@ -1574,6 +1672,18 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _trackingStat(IconData icon, String value, String label, ColorScheme cs) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: cs.primary, size: 20),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cs.onSurface)),
+        Text(label, style: TextStyle(color: cs.outline, fontSize: 11)),
       ],
     );
   }
