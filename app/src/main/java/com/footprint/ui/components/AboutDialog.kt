@@ -47,7 +47,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     try {
                         context.packageManager.getPackageInfo(context.packageName, 0).versionName
                     } catch (e: Exception) {
-                        "3.2.0"
+                        "3.2.1"
                     }
                 }
 

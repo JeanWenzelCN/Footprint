@@ -1668,7 +1668,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showAboutDialog(
       context: context,
       applicationName: "Footprint",
-      applicationVersion: "v3.2.0",
+      applicationVersion: "v3.2.1",
       applicationIcon: const Icon(Icons.explore, size: 48, color: Colors.blue),
       children: [
         const Text("一款基于 Flutter 构建的液态玻璃风格足迹探索应用。"),
@@ -2577,7 +2577,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text("软件版本"),
-                  trailing: Text("v3.2.0"),
+                  trailing: Text("v3.2.1"),
                 ),
                 ListTile(
                   leading: const Icon(Icons.person_outline),
