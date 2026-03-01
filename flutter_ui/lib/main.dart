@@ -1617,6 +1617,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     );
+                  } else if (value == 'about') {
+                    _showAboutDialog(context);
                   }
                 },
                 itemBuilder: (context) => [
@@ -1627,6 +1629,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icon(Icons.settings, size: 20),
                         SizedBox(width: 12),
                         Text("设置"),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'about',
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 20),
+                        SizedBox(width: 12),
+                        Text("关于"),
                       ],
                     ),
                   ),
@@ -1652,6 +1664,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     ),
   );
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: "Footprint",
+      applicationVersion: "v3.2.0",
+      applicationIcon: const Icon(Icons.explore, size: 48, color: Colors.blue),
+      children: [
+        const Text("一款基于 Flutter 构建的液态玻璃风格足迹探索应用。"),
+        const SizedBox(height: 12),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.person_outline),
+          title: const Text("作者主页"),
+          subtitle: const Text("StarsUnsurpass"),
+          onTap: () {
+            const channel = MethodChannel('com.footprint/data');
+            channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass");
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.code),
+          title: const Text("项目源码"),
+          subtitle: const Text("GitHub / Footprint"),
+          onTap: () {
+            const channel = MethodChannel('com.footprint/data');
+            channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass/Footprint");
+          },
+        ),
+      ],
+    );
+  }
 }
 
 // --- 探索地图页 (ExploreMapScreen) - 1:1 复刻原生功能 ---
@@ -2528,10 +2572,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _t("关于", cs),
           _card(
             cs,
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text("软件版本"),
-              trailing: const Text("v2.11.1"),
+            Column(
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text("软件版本"),
+                  trailing: Text("v3.2.0"),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.person_outline),
+                  title: const Text("作者主页"),
+                  subtitle: const Text("StarsUnsurpass"),
+                  trailing: const Icon(Icons.open_in_new, size: 16),
+                  onTap: () => _launchURL("https://github.com/StarsUnsurpass"),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.code),
+                  title: const Text("项目源码"),
+                  subtitle: const Text("查看并提交 Issue"),
+                  trailing: const Icon(Icons.open_in_new, size: 16),
+                  onTap: () => _launchURL("https://github.com/StarsUnsurpass/Footprint"),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 100),
@@ -2573,6 +2635,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : null,
     onTap: () => _up('updateThemeStyle', v),
   );
+  void _launchURL(String url) async {
+    const channel = MethodChannel('com.footprint/data');
+    await channel.invokeMethod('openUrl', url);
+  }
+
   IconData _getAv(String id) {
     switch (id) {
       case "avatar_2":
