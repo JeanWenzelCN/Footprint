@@ -178,6 +178,11 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
           ),
           const SizedBox(height: 16),
           TextField(
+            controller: _locationController,
+            decoration: InputDecoration(labelText: '地点', prefixIcon: const Icon(Icons.place_outlined), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+          ),
+          const SizedBox(height: 16),
+          TextField(
             controller: _tagsController,
             decoration: InputDecoration(
               labelText: '标签 (用逗号分隔)',

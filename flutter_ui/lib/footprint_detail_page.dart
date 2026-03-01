@@ -41,7 +41,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
     location = entry['location'] ?? "未知地点";
 
     // Format location if it looks like raw coordinates
-    final coordRegex = RegExp(r'^(\d+\.\d+)\s*,\s*(\d+\.\d+)$');
+    final coordRegex = RegExp(r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
     final match = coordRegex.firstMatch(location);
     if (match != null) {
       try {
