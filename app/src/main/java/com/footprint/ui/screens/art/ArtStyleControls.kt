@@ -78,7 +78,7 @@ fun ArtStyleControls(
                 Text(
                         "足迹艺术工坊",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -102,9 +102,7 @@ fun ArtStyleControls(
                                         },
                                         colors =
                                                 FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = accentColor,
-                                                        labelColor = Color.White,
-                                                        selectedLabelColor = Color.Black
+                                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                                 )
                                 )
                         }
@@ -114,7 +112,7 @@ fun ArtStyleControls(
                 Column {
                         Text(
                                 "时间范围",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall
                         )
                         Row(
@@ -142,7 +140,7 @@ fun ArtStyleControls(
                 Column {
                         Text(
                                 "艺术作品标题",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall
                         )
                         OutlinedTextField(
@@ -151,10 +149,10 @@ fun ArtStyleControls(
                                 singleLine = true,
                                 colors =
                                         OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = Color.White,
-                                                unfocusedTextColor = Color.White,
-                                                focusedBorderColor = accentColor,
-                                                unfocusedBorderColor = Color.Gray
+                                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
                                         ),
                                 modifier = Modifier.fillMaxWidth()
                         )
@@ -195,15 +193,9 @@ fun ArtStyleControls(
                                                                 Icons.Default.Check,
                                                                 contentDescription = null,
                                                                 tint =
-                                                                        if (cName == "Gold")
+                                                                        if (cValue.toArgb() == Color(0xFFFFCC00).toArgb())
                                                                                 Color.Black
                                                                         else Color.White,
-                                                                modifier =
-                                                                        Modifier.align(
-                                                                                androidx.compose.ui
-                                                                                        .Alignment
-                                                                                        .Center
-                                                                        )
                                                         )
                                                 }
                                         }
@@ -215,7 +207,7 @@ fun ArtStyleControls(
                 Column {
                         Text(
                                 "海报布局",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -238,8 +230,7 @@ fun ArtStyleControls(
                                                         FilterChipDefaults.filterChipColors(
                                                                 selectedContainerColor =
                                                                         accentColor,
-                                                                labelColor = Color.White,
-                                                                selectedLabelColor = Color.Black
+                                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                                         )
                                         )
                                 }
@@ -277,11 +268,8 @@ fun ArtStyleControls(
                                                         label = { Text(label) },
                                                         colors =
                                                                 FilterChipDefaults.filterChipColors(
-                                                                        selectedContainerColor =
-                                                                                accentColor,
-                                                                        labelColor = Color.White,
-                                                                        selectedLabelColor =
-                                                                                Color.Black
+                                                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                                                 )
                                                 )
                                         }
@@ -291,7 +279,7 @@ fun ArtStyleControls(
                         // Wood Tweaks
                         if (polaroidFrameStyle == "ACOUSTIC_WOOD") {
                                 HorizontalDivider(
-                                        color = Color.White.copy(alpha = 0.1f),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
                                         modifier = Modifier.padding(vertical = 8.dp)
                                 )
 
@@ -356,7 +344,7 @@ fun ArtStyleControls(
                                         ) {
                                                 Text(
                                                         "雕刻深度 (Engraving)",
-                                                        color = Color.Gray,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         style = MaterialTheme.typography.labelSmall
                                                 )
                                                 Text(
@@ -384,7 +372,7 @@ fun ArtStyleControls(
                                         ) {
                                                 Text(
                                                         "纸张质感 (Grain)",
-                                                        color = Color.Gray,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         style = MaterialTheme.typography.labelSmall
                                                 )
                                                 Text(
@@ -405,7 +393,7 @@ fun ArtStyleControls(
                                 }
 
                                 HorizontalDivider(
-                                        color = Color.White.copy(alpha = 0.1f),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
                                         modifier = Modifier.padding(vertical = 8.dp)
                                 )
                         }
@@ -417,7 +405,7 @@ fun ArtStyleControls(
                                         Column {
                                                 Text(
                                                         "装甲涂装 (Armor Plating)",
-                                                        color = Color.Gray,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         style = MaterialTheme.typography.labelSmall
                                                 )
                                                 Spacer(Modifier.height(8.dp))
@@ -486,7 +474,7 @@ fun ArtStyleControls(
                                                 ) {
                                                         Text(
                                                                 "铆钉与接缝 (Rivets & Seams)",
-                                                                color = Color.Gray,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                 style =
                                                                         MaterialTheme.typography
                                                                                 .labelSmall
@@ -524,7 +512,7 @@ fun ArtStyleControls(
                                                 Column {
                                                         Text(
                                                                 "警戒涂装 (Hazard)",
-                                                                color = Color.Gray,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                 style =
                                                                         MaterialTheme.typography
                                                                                 .labelSmall
@@ -571,7 +559,7 @@ fun ArtStyleControls(
                                                 ) {
                                                         Text(
                                                                 "雾化半径 (Frost Radius)",
-                                                                color = Color.Gray,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                 style =
                                                                         MaterialTheme.typography
                                                                                 .labelSmall
@@ -775,10 +763,8 @@ fun ArtStyleControls(
                                                 label = { Text(cLabel) },
                                                 colors =
                                                         FilterChipDefaults.filterChipColors(
-                                                                selectedContainerColor =
-                                                                        accentColor,
-                                                                labelColor = Color.White,
-                                                                selectedLabelColor = Color.Black
+                                                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                                         )
                                         )
                                 }
@@ -911,10 +897,8 @@ fun ArtStyleControls(
                                                 },
                                                 colors =
                                                         FilterChipDefaults.filterChipColors(
-                                                                selectedContainerColor =
-                                                                        accentColor,
-                                                                labelColor = Color.White,
-                                                                selectedLabelColor = Color.Black
+                                                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                                         )
                                         )
                                 }
@@ -933,23 +917,21 @@ fun ArtStyleControls(
                                         onClick = { onItalicChange(!isItalic) },
                                         label = { Text("斜体 (Italic)") },
                                         colors =
-                                                FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = accentColor,
-                                                        labelColor = Color.White,
-                                                        selectedLabelColor = Color.Black
-                                                )
-                                )
+                                        FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                        )
                                 FilterChip(
                                         selected = hasBorder,
                                         onClick = { onBorderChange(!hasBorder) },
                                         label = { Text("黑边 (Black Border)") },
                                         colors =
-                                                FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = accentColor,
-                                                        labelColor = Color.White,
-                                                        selectedLabelColor = Color.Black
-                                                )
-                                )
+                                        FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                        )
                         }
                 }
 
@@ -957,7 +939,7 @@ fun ArtStyleControls(
                 Column {
                         Text(
                                 "线条粗细",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall
                         )
                         Slider(
@@ -975,7 +957,7 @@ fun ArtStyleControls(
                 Column {
                         Text(
                                 "霓虹光晕",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall
                         )
                         Slider(

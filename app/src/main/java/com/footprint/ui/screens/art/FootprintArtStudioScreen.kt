@@ -318,11 +318,9 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
         androidx.compose.material3.BottomSheetScaffold(
                 scaffoldState = scaffoldState,
                 sheetPeekHeight = 240.dp,
-                sheetContainerColor = Color.Black.copy(alpha = 0.6f),
+                sheetContainerColor = MaterialTheme.colorScheme.surface,
                 sheetDragHandle = {
-                        androidx.compose.material3.BottomSheetDefaults.DragHandle(
-                                color = Color.White
-                        )
+                        androidx.compose.material3.BottomSheetDefaults.DragHandle()
                 },
                 sheetContent = {
                         if (showControls) {
