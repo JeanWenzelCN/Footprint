@@ -195,55 +195,52 @@ class FlutterMapView(
                 result.success(true)
             }
             "centerLocation" -> {
-                // 1. 检查 Key 是否存在 (从 PreferenceManager 或 ApiKeyManager 获取)
-                val apiKey = com.footprint.utils.ApiKeyManager.getApiKey(context)
-                if (apiKey.isNullOrBlank()) {
-                    result.error("KEY_MISSING", "高德地图 API Key 缺失", "请在设置中配置有效的 API Key 以使用地图功能")
+                // 优先使用 Flutter 传入的坐标
+                val args = call.arguments
+                var lat: Double? = null
+                var lng: Double? = null
+                if (args is Map<*, *>) {
+                    lat = (args["latitude"] as? Number)?.toDouble()
+                    lng = (args["longitude"] as? Number)?.toDouble()
+                }
+
+                // 1. Flutter 传入的坐标
+                if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
+                    aMap?.animateCamera(
+                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(lat, lng), 17f
+                            )
+                    )
+                    result.success(true)
                     return
                 }
 
-                // 2. 检查位置权限
-                val hasFineLocation =
-                        androidx.core.content.ContextCompat.checkSelfPermission(
-                                context,
-                                android.Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                if (!hasFineLocation) {
-                    result.error("PERMISSION_DENIED", "定位权限未授予", "请在系统设置中允许应用访问位置信息")
-                    return
-                }
-
+                // 2. AMap 自身的定位蓝点
                 val loc = aMap?.myLocation
                 if (loc != null && loc.latitude > 1.0 && loc.longitude > 1.0) {
                     aMap?.animateCamera(
                             com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(loc.latitude, loc.longitude),
-                                    17f
+                                    LatLng(loc.latitude, loc.longitude), 17f
                             )
                     )
                     result.success(true)
-                } else {
-                    val trackingLoc = LocationTrackingService.currentLocation.value
-                    if (trackingLoc != null &&
-                                    trackingLoc.latitude > 1.0 &&
-                                    trackingLoc.longitude > 1.0
-                    ) {
-                        aMap?.animateCamera(
-                                com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                        LatLng(trackingLoc.latitude, trackingLoc.longitude),
-                                        17f
-                                )
-                        )
-                        result.success(true)
-                    } else {
-                        // 如果都没有位置信息，返回错误提示
-                        result.error(
-                                "LOCATION_UNAVAILABLE",
-                                "获取位置失败",
-                                "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带"
-                        )
-                    }
+                    return
                 }
+
+                // 3. Kotlin 追踪服务的位置（兼容旧逻辑）
+                val trackingLoc = LocationTrackingService.currentLocation.value
+                if (trackingLoc != null && trackingLoc.latitude > 1.0 && trackingLoc.longitude > 1.0) {
+                    aMap?.animateCamera(
+                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(trackingLoc.latitude, trackingLoc.longitude), 17f
+                            )
+                    )
+                    result.success(true)
+                    return
+                }
+
+                // 都没有位置信息
+                result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
             }
             else -> result.notImplemented()
         }

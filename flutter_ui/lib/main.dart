@@ -1458,7 +1458,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         }
         if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
           hasResult = true;
-          await _mapChannel?.invokeMethod('centerLocation');
+          // 关键：将 Flutter 获取到的坐标传给原生地图
+          await _mapChannel?.invokeMethod('centerLocation', {'latitude': lat, 'longitude': lng});
           _locationSubscription?.cancel();
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位成功"), backgroundColor: Colors.green, duration: Duration(seconds: 1)));
         }
