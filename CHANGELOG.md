@@ -1,5 +1,13 @@
 # 更新日志 (Changelog)
 
+### 2026-03-01: 数据库稳定性修复与重构适配 (v3.2.2)
+
+#### 🔧 修复 (Fixes)
+- **解决数据库 Schema 不匹配导致的闪退**: 
+  - 修复了 `IllegalStateException: Room cannot verify the data integrity` 错误。
+  - 将数据库版本提升至 9，并启用了 `fallbackToDestructiveMigration()`，确保在 Flutter 重构过程中若出现 Schema 变更，应用能够自动重建数据库而不会闪退。
+  - 注意：此操作在 Schema 变更且未提供迁移路径时会清空本地数据库，建议在重构频繁阶段使用。
+
 ### 2026-03-01: 关于界面优化与功能迁移 (v3.2.1)
 
 #### ✨ 核心特性 (Features)

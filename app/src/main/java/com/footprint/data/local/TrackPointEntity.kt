@@ -1,9 +1,8 @@
 package com.footprint.data.local
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import androidx.room.*
 
-@Entity(tableName = "track_points")
+@Entity(tableName = "track_points", indices = [Index(value = ["timestamp"])])
 data class TrackPointEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val latitude: Double,

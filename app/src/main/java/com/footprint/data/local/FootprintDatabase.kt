@@ -15,7 +15,7 @@ import androidx.room.TypeConverters
                         PrivacyFenceEntity::class,
                         TrackPointEntity::class,
                         TimeCapsuleEntity::class],
-        version = 8,
+        version = 9,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -159,6 +159,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         "footprint-db"
                                 )
                                 .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                                .fallbackToDestructiveMigration()
                                 .build()
         }
 }
