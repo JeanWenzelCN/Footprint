@@ -137,7 +137,14 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.edit),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddFootprintPage(initialEntry: widget.entry),
+                        ),
+                      );
+                    },
                   ),
                 ],
                 flexibleSpace: FlexibleSpaceBar(

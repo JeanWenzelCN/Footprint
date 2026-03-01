@@ -45,19 +45,20 @@ void main() {
 
 // --- 顶级定义的录入页面 (1:1 复刻) ---
 class AddFootprintPage extends StatefulWidget {
-  const AddFootprintPage({super.key});
+  final dynamic initialEntry;
+  const AddFootprintPage({super.key, this.initialEntry});
   @override
   State<AddFootprintPage> createState() => _AddFootprintPageState();
 }
 
 class _AddFootprintPageState extends State<AddFootprintPage> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _detailController = TextEditingController();
-  final TextEditingController _distanceController = TextEditingController(text: "5.0");
-  final TextEditingController _tagsController = TextEditingController();
-  final TextEditingController _tempController = TextEditingController();
-  final TextEditingController _altController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _locationController;
+  late TextEditingController _detailController;
+  late TextEditingController _distanceController;
+  late TextEditingController _tagsController;
+  late TextEditingController _tempController;
+  late TextEditingController _altController;
 
   String selectedIcon = "LocationOn";
   double energyLevel = 6.0;
@@ -73,7 +74,45 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
 
   final List<String> weathers = ["晴朗", "多云", "阴天", "雨", "雪", "风", "雾"];
   final List<String> transports = ["步行", "骑行", "自驾", "铁路", "航空", "未知"];
-  final List<String> moods = ["愉快", "平静", "兴奋", "疲惫", "失落", "惊喜"];
+  final List<String> moods = ["愉快", "平静", "兴奋", "疲惫", "失落", "惊喜", "激情", "探索", "放松", "思考"];
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.initialEntry;
+    _titleController = TextEditingController(text: e?['title'] ?? '');
+    _locationController = TextEditingController(text: e?['location'] ?? '');
+    _detailController = TextEditingController(text: e?['detail'] ?? '');
+    _distanceController = TextEditingController(text: e != null ? (e['distanceKm']?.toString() ?? '5.0') : "5.0");
+    _tagsController = TextEditingController(text: (e?['tags'] as List<dynamic>?)?.join(', ') ?? '');
+    _tempController = TextEditingController();
+    _altController = TextEditingController();
+
+    if (e != null) {
+      if (e['icon'] != null && availableIcons.contains(e['icon'])) selectedIcon = e['icon'];
+      if (e['energyLevel'] != null) energyLevel = (e['energyLevel'] as num).toDouble();
+      if (e['mood'] != null) selectedMood = moods.contains(e['mood']) ? e['mood'] : "愉快";
+      if (e['weather'] != null) selectedWeather = weathers.contains(e['weather']) ? e['weather'] : "晴朗";
+      if (e['transportMethod'] != null) selectedTransport = transports.contains(e['transportMethod']) ? e['transportMethod'] : "步行";
+      
+      final ps = e['photoPaths'] as List<dynamic>?;
+      if (ps != null) {
+        photos.addAll(ps.where((p) => p != null).map((p) => File(p.toString())));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _locationController.dispose();
+    _detailController.dispose();
+    _distanceController.dispose();
+    _tagsController.dispose();
+    _tempController.dispose();
+    _altController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -89,7 +128,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
     final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('记录新的足迹', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(widget.initialEntry == null ? '记录新的足迹' : '编辑足迹记录', style: const TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
@@ -248,7 +287,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
           FilledButton(
             onPressed: () => Navigator.pop(context),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-            child: const Text("记录足迹", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(widget.initialEntry == null ? "记录足迹" : "保存修改", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
@@ -591,6 +630,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double totalDistance = 0.0;
   int uniquePlacesLength = 0;
   double avgEnergy = 0.0;
+  Set<int> _expandedMonths = {};
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -733,7 +773,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showStatDetail(BuildContext context, String title, String subtitle, List<dynamic> entriesToList) {
+  void _showStatDetail(BuildContext context, String title, String type, List<dynamic> entriesToList) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -758,23 +798,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    ),
                    const Divider(),
                    Expanded(
-                     child: entriesToList.isEmpty ? 
-                       Center(child: Text("暂无记录", style: TextStyle(color: cs.outline))) :
-                       ListView.builder(
+                     child: entriesToList.isEmpty
+                       ? Center(child: Text("暂无记录", style: TextStyle(color: cs.outline)))
+                       : ListView.builder(
                        controller: controller,
                        itemCount: entriesToList.length,
                        itemBuilder: (context, index) {
                          final entry = entriesToList[index];
-                         final eTitle = entry['title'] ?? '未知足迹';
-                         final eLoc = entry['location'] ?? '未知地点';
-                         final eDist = entry['distanceKm']?.toString() ?? '0';
                          final eDate = entry['happenedOn'] ?? '';
-                         return ListTile(
-                           leading: Icon(Icons.place, color: cs.primary),
-                           title: Text(eTitle),
-                           subtitle: Text("$eDate · $eLoc"),
-                           trailing: Text("${eDist}km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
-                         );
+                         switch (type) {
+                           case 'distance':
+                             final dist = (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
+                             return ListTile(
+                               leading: Icon(Icons.straighten, color: cs.primary),
+                               title: Text(eDate),
+                               subtitle: Text(entry['title'] ?? '未知足迹'),
+                               trailing: Text("${dist.toStringAsFixed(5)} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                               onTap: () { Navigator.pop(context); _showDetail(entry); },
+                             );
+                           case 'location':
+                             return ListTile(
+                               leading: Icon(Icons.location_on, color: cs.primary),
+                               title: Text(eDate),
+                               subtitle: Text(entry['location'] ?? '未知地点', maxLines: 2, overflow: TextOverflow.ellipsis),
+                               onTap: () { Navigator.pop(context); _showDetail(entry); },
+                             );
+                           case 'energy':
+                             final energy = (entry['energyLevel'] as num?)?.toInt() ?? 0;
+                             return ListTile(
+                               leading: Icon(Icons.bolt, color: Colors.amber),
+                               title: Text(eDate),
+                               subtitle: Text(entry['title'] ?? '未知足迹'),
+                               trailing: Row(mainAxisSize: MainAxisSize.min, children: List.generate(5, (i) => Icon(i < energy ? Icons.star : Icons.star_border, size: 14, color: i < energy ? Colors.amber : cs.outline))),
+                               onTap: () { Navigator.pop(context); _showDetail(entry); },
+                             );
+                           case 'mood':
+                             final mood = _mapMoodToChinese(entry['mood'] ?? '');
+                             return ListTile(
+                               leading: Icon(Icons.mood, color: cs.tertiary),
+                               title: Text(entry['title'] ?? '未知足迹'),
+                               subtitle: Text(eDate),
+                               trailing: Container(
+                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                 decoration: BoxDecoration(color: cs.tertiaryContainer, borderRadius: BorderRadius.circular(8)),
+                                 child: Text(mood, style: TextStyle(color: cs.onTertiaryContainer, fontWeight: FontWeight.bold, fontSize: 12)),
+                               ),
+                               onTap: () { Navigator.pop(context); _showDetail(entry); },
+                             );
+                           default:
+                             return ListTile(
+                               leading: Icon(Icons.place, color: cs.primary),
+                               title: Text(entry['title'] ?? '未知足迹'),
+                               subtitle: Text("$eDate · ${entry['location'] ?? '未知地点'}"),
+                               trailing: Text("${(entry['distanceKm'] as num?)?.toDouble().toStringAsFixed(1) ?? '0'} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
+                               onTap: () { Navigator.pop(context); _showDetail(entry); },
+                             );
+                         }
                        },
                      ),
                    ),
@@ -837,11 +916,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Row(
                     children: [
-                      _sBox(cs, tt, "足迹", "${allEntries.length}", onTap: () => _showStatDetail(context, "所有足迹 (${allEntries.length})", "年度足迹概览", allEntries)),
+                      _sBox(cs, tt, "足迹", "${allEntries.length}", onTap: () => _showStatDetail(context, "所有足迹 (${allEntries.length})", "footprint", allEntries)),
                       const SizedBox(width: 8),
                       _sBox(cs, tt, "里程", totalDistance.toStringAsFixed(1), u: "km", onTap: () {
                         final sorted = List.of(allEntries)..sort((a,b) => ((b['distanceKm'] as num?)?.toDouble() ?? 0.0).compareTo((a['distanceKm'] as num?)?.toDouble() ?? 0.0));
-                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(1)} km)", "按距离降序排序", sorted);
+                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(1)} km)", "distance", sorted);
                       }),
                       const SizedBox(width: 8),
                       _sBox(cs, tt, "地点", "$uniquePlacesLength", onTap: () {
@@ -852,38 +931,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           seen.add(loc);
                           return true;
                         }).toList();
-                        _showStatDetail(context, "探索地点 ($uniquePlacesLength)", "不重复地点列表", unique);
+                        _showStatDetail(context, "探索地点 ($uniquePlacesLength)", "location", unique);
                       }),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      _sBox(cs, tt, "记录", "${allEntries.length}", onTap: () => _showStatDetail(context, "记录条数 (${allEntries.length})", "今年所有打卡记录", allEntries)),
+                      _sBox(cs, tt, "记录", "${allEntries.length}", onTap: () => _showStatDetail(context, "记录条数 (${allEntries.length})", "footprint", allEntries)),
                       const SizedBox(width: 8),
                       _sBox(cs, tt, "活力", avgEnergy.toStringAsFixed(1), u: "指数", onTap: () {
                         final sorted = List.of(allEntries)..sort((a,b) => ((b['energyLevel'] as num?)?.toDouble() ?? 0.0).compareTo((a['energyLevel'] as num?)?.toDouble() ?? 0.0));
-                        _showStatDetail(context, "平均活力指数 (${avgEnergy.toStringAsFixed(1)})", "按活力等级排序", sorted);
+                        _showStatDetail(context, "平均活力指数 (${avgEnergy.toStringAsFixed(1)})", "energy", sorted);
                       }),
                       const SizedBox(width: 8),
                       _sBox(cs, tt, "主情绪", dominantMoodStr, onTap: () {
                          final filtered = allEntries.where((e) => e['mood'] == dominantMoodStr).toList();
-                         _showStatDetail(context, "主导心情 ($dominantMoodStr)", "心情统计明细", filtered);
+                         _showStatDetail(context, "主导心情 ($dominantMoodStr)", "mood", filtered);
                       }),
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Text("情绪热力图", style: TextStyle(color: cs.outline)),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cs.outlineVariant)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Icon(Icons.grid_view, color: cs.primary, size: 16),
+                      const SizedBox(width: 6),
+                      Text("情绪热力图", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Spacer(),
+                      Text("$currentYear", style: TextStyle(color: cs.outline, fontSize: 11)),
+                    ]),
+                    const SizedBox(height: 8),
+                    _buildMoodHeatmap(cs),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 10, runSpacing: 4, children: [
+                      _heatLegend("激情", Colors.orange, cs), _heatLegend("探索", Colors.teal, cs),
+                      _heatLegend("放松", Colors.blue, cs), _heatLegend("思考", Colors.purple, cs),
+                      _heatLegend("愉快", Colors.amber, cs), _heatLegend("平静", Colors.lightBlue, cs),
+                    ]),
+                  ]),
                 ),
               ),
               const SizedBox(height: 24),
@@ -1140,65 +1232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              if (allEntries.isEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: Text(
-                      "此年份暂无足迹记录",
-                      style: TextStyle(color: cs.outline),
-                    ),
-                  ),
-                )
-              ] else ...[
-                // Render the list of footprints chronologically
-                ...allEntries.map((entry) {
-                   final String dateStr = entry['happenedOn'] ?? '';
-                   final fragments = dateStr.split('-');
-                   final String displayDate = fragments.length >= 3 ? "${fragments[1]}-${fragments[2].substring(0,2)}" : dateStr;
-                   return Padding(
-                     padding: const EdgeInsets.only(bottom: 12),
-                     child: InkWell(
-                       onTap: () => _showDetail(entry),
-                       borderRadius: BorderRadius.circular(16),
-                       child: Card(
-                         elevation: 0,
-                         margin: EdgeInsets.zero,
-                         shape: RoundedRectangleBorder(
-                           borderRadius: BorderRadius.circular(16),
-                           side: BorderSide(
-                             color: cs.outlineVariant.withValues(alpha: 0.5),
-                           ),
-                         ),
-                         child: ListTile(
-                           leading: CircleAvatar(
-                             backgroundColor: cs.primaryContainer,
-                             child: Icon(Icons.place, color: cs.onPrimaryContainer),
-                           ),
-                           title: Text(
-                             entry['title'] ?? '未知足迹',
-                             style: const TextStyle(fontWeight: FontWeight.bold),
-                             maxLines: 1,
-                             overflow: TextOverflow.ellipsis,
-                           ),
-                           subtitle: Text(
-                             '$displayDate · ${entry['location'] ?? '未知地点'}',
-                             style: const TextStyle(fontSize: 12),
-                           ),
-                           trailing: Text(
-                             '${entry['distanceKm']?.toString() ?? '0'} km',
-                             style: TextStyle(
-                               color: cs.primary,
-                               fontWeight: FontWeight.bold,
-                               fontSize: 12,
-                             ),
-                           ),
-                         ),
-                       ),
-                     ),
-                   );
-                }).toList(),
-              ],
+              ..._buildTimeline(cs),
             ],
           ),
           _fixedTop(cs, tt),
@@ -1259,6 +1293,257 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       );
+
+  Widget _heatLegend(String label, Color color, ColorScheme cs) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 10, color: cs.outline)),
+    ],
+  );
+
+  Widget _buildMoodHeatmap(ColorScheme cs) {
+    // Generate dates for the current year
+    final now = DateTime.now();
+    final year = currentYear;
+    final firstDay = DateTime(year, 1, 1);
+    final daysInYear = DateTime(year + 1, 1, 1).difference(firstDay).inDays;
+    
+    // Map entries to dates and colors
+    final Map<String, Color> dateColors = {};
+    for (var entry in allEntries) {
+      final dateStr = entry['happenedOn'] as String?;
+      final moodStr = entry['mood'] as String?;
+      if (dateStr != null && dateStr.length >= 10 && moodStr != null) {
+        final dateKey = dateStr.substring(0, 10);
+        final chineseMood = _mapMoodToChinese(moodStr);
+        Color c = cs.surfaceContainerHighest;
+        switch (chineseMood) {
+          case '激情': c = Colors.orange; break;
+          case '探索': c = Colors.teal; break;
+          case '放松': c = Colors.blue; break;
+          case '思考': c = Colors.purple; break;
+          case '愉快': c = Colors.amber; break;
+          case '平静': c = Colors.lightBlue; break;
+          default: c = cs.primary;
+        }
+        dateColors[dateKey] = c;
+      }
+    }
+
+    // Determine grid dimensions
+    final firstWeekday = (firstDay.weekday) % 7; // 0 for Sunday
+    const int rows = 7;
+    final int cols = ((daysInYear + firstWeekday) / 7).ceil();
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final cellSize = math.max(4.0, (constraints.maxWidth - (cols - 1) * 2) / cols);
+      
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Month labels
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(12, (i) => Text('${i+1}月', style: TextStyle(fontSize: 10, color: cs.outline))),
+          ),
+          const SizedBox(height: 4),
+          // Heatmap grid
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: List.generate(cols, (colIndex) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 2),
+                  child: Column(
+                    children: List.generate(rows, (rowIndex) {
+                      final dayIndex = colIndex * rows + rowIndex - firstWeekday;
+                      if (dayIndex < 0 || dayIndex >= daysInYear) {
+                         // Empty cell for padding
+                         return Container(width: cellSize, height: cellSize, margin: const EdgeInsets.only(bottom: 2));
+                      }
+                      
+                      final date = firstDay.add(Duration(days: dayIndex));
+                      if (date.year > year || (year == now.year && date.isAfter(now))) {
+                         return Container(width: cellSize, height: cellSize, margin: const EdgeInsets.only(bottom: 2));
+                      }
+                      
+                      final dateKey = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                      final color = dateColors[dateKey] ?? cs.surfaceContainerHighest.withValues(alpha: 0.5);
+                      
+                      return Container(
+                        width: cellSize,
+                        height: cellSize,
+                        margin: const EdgeInsets.only(bottom: 2),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+  
+  // Custom timeline renderer grouping by month
+  List<Widget> _buildTimeline(ColorScheme cs) {
+    if (allEntries.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: Text("此年份暂无足迹记录", style: TextStyle(color: cs.outline)),
+          ),
+        )
+      ];
+    }
+
+    final Map<int, List<dynamic>> groupedByMonth = {};
+    for (var entry in allEntries) {
+      final dateStr = entry['happenedOn'] as String?;
+      if (dateStr != null && dateStr.length >= 7) {
+        final m = int.tryParse(dateStr.split('-')[1]) ?? 1;
+        groupedByMonth.putIfAbsent(m, () => []).add(entry);
+      }
+    }
+
+    final sortedMonths = groupedByMonth.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return sortedMonths.map((m) {
+      final isExpanded = _expandedMonths.contains(m);
+      final monthEntries = groupedByMonth[m]!;
+      
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                if (isExpanded) _expandedMonths.remove(m);
+                else _expandedMonths.add(m);
+              });
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Text("$m 月", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.primary)),
+                  const Spacer(),
+                  Text("${monthEntries.length} 篇", style: TextStyle(color: cs.outline, fontSize: 12)),
+                  Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: cs.outline, size: 20),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            ...monthEntries.map((entry) {
+              final String dateStr = entry['happenedOn'] ?? '';
+              final fragments = dateStr.split('-');
+              final String displayDate = fragments.length >= 3 ? "${fragments[1]}-${fragments[2].substring(0,2)}" : dateStr;
+              
+              String? thumbPath;
+              final photos = entry['photoPaths'] as List<dynamic>?;
+              if (photos != null && photos.isNotEmpty && photos[0] is String) {
+                thumbPath = photos[0];
+              }
+
+              final iconStr = entry['icon'] as String? ?? '';
+              IconData iconData = Icons.location_on;
+              switch (iconStr) {
+                case "Restaurant": iconData = Icons.restaurant; break;
+                case "LocalCafe": iconData = Icons.local_cafe; break;
+                case "Park": iconData = Icons.park; break;
+                case "Flight": iconData = Icons.flight; break;
+                case "Train": iconData = Icons.train; break;
+                case "DirectionsBike": iconData = Icons.directions_bike; break;
+                case "ShoppingBag": iconData = Icons.shopping_bag; break;
+                case "CameraAlt": iconData = Icons.camera_alt; break;
+              }
+              
+              final dist = (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
+              final rDist = dist.toStringAsFixed(5);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12, left: 8),
+                child: InkWell(
+                  onTap: () => _showDetail(entry),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Card(
+                    elevation: 0,
+                    margin: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: cs.primaryContainer,
+                            child: Icon(iconData, color: cs.onPrimaryContainer, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry['title'] ?? '未知足迹',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$displayDate · ${entry['location'] ?? '未知地点'}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (thumbPath != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(thumbPath),
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c,e,s) => Icon(Icons.image_not_supported, size: 40, color: cs.outline),
+                              ),
+                            )
+                          else
+                            Text(
+                              '$rDist km',
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          const SizedBox(height: 8),
+        ],
+      );
+    }).toList();
+  }
 
   Widget _fixedTop(ColorScheme cs, TextTheme tt) => Positioned(
     top: 0,
@@ -1973,6 +2258,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.onUpdate();
   }
 
+  Future<void> _handleDataOperation(String method, String label) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 24),
+            Text('正在$label数据...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final result = await channel.invokeMethod<bool>(method);
+      if (context.mounted) {
+        Navigator.pop(context); // Close dialog
+        if (result == true) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label成功！'), backgroundColor: Colors.green));
+          widget.onUpdate();
+        } else {
+          // Some operations might return false or null if cancelled (like file picker)
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已取消$label或$label失败')));
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Close dialog
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label失败: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
   void _onNicknameChanged(String v) {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 600), () {
@@ -2114,12 +2434,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.cloud_upload),
                   title: const Text("导出足迹备份"),
-                  onTap: () => _up('exportData', null),
+                  onTap: () => _handleDataOperation('exportData', '导出'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.cloud_download),
                   title: const Text("导入历史记录"),
-                  onTap: () => _up('importData', null),
+                  onTap: () => _handleDataOperation('importData', '导入'),
                 ),
               ],
             ),
