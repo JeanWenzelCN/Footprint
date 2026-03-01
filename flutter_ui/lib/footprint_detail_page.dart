@@ -81,7 +81,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: cs.background,
+      backgroundColor: cs.surface,
       body: Stack(
         children: [
           CustomScrollView(
@@ -122,7 +122,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              cs.background,
+                              cs.surface,
                             ],
                           ),
                         ),

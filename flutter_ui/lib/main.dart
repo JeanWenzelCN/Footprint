@@ -1637,7 +1637,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
                     "Package Name:",
                     style: TextStyle(
                       fontSize: 12,
-                      color: colorScheme.onSurface.withOpacity(0.7),
+                      color: colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1647,7 +1647,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
                     "SHA1:",
                     style: TextStyle(
                       fontSize: 12,
-                      color: colorScheme.onSurface.withOpacity(0.7),
+                      color: colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1706,7 +1706,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: colorScheme.onSurface.withOpacity(0.05),
+          color: colorScheme.onSurface.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(

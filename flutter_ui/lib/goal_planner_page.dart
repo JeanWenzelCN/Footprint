@@ -36,7 +36,7 @@ class _GoalPlannerPageState extends State<GoalPlannerPage> {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: cs.background,
+      backgroundColor: cs.surface,
       body: Stack(
         children: [
           // Background pattern/color if needed
