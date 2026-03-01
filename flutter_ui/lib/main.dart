@@ -2632,9 +2632,7 @@ class ArtStudioScreen extends StatelessWidget {
                     Icons.auto_awesome,
                     cs,
                     () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("艺术导出功能正在从原生地图引擎迁移中..."))
-                      );
+                      const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'art_studio'});
                     }
                   ),
                   const SizedBox(height: 16),
@@ -2644,7 +2642,9 @@ class ArtStudioScreen extends StatelessWidget {
                     "可视化您的活动密集区域",
                     Icons.grid_view,
                     cs,
-                    () {}
+                    () {
+                      const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'generative_art'});
+                    }
                   ),
                   const SizedBox(height: 32),
                   Text("实验室功能", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
@@ -2655,7 +2655,9 @@ class ArtStudioScreen extends StatelessWidget {
                     "在 3D 地球上回放您的旅行故事",
                     Icons.view_in_ar,
                     cs,
-                    () {}
+                    () {
+                      const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'export_trace'});
+                    }
                   ),
                 ],
               ),

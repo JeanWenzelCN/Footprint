@@ -48,6 +48,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.NativeScreenActivity"
+            android:exported="false"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|uiMode"
+            android:theme="@style/Theme.Footprint" />
         <service
             android:name=".service.LocationTrackingService"
             android:enabled="true"

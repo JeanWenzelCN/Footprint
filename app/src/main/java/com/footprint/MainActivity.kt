@@ -285,6 +285,16 @@ class MainActivity : FlutterActivity() {
                                 }
                             }
                         }
+                        "openNativeScreen" -> {
+                            val args = call.arguments as Map<String, Any>
+                            val screenType = args["screen_type"] as String
+                            val intent = Intent(this@MainActivity, com.footprint.ui.NativeScreenActivity::class.java).apply {
+                                putExtra("screen_type", screenType)
+                                (args["initial_year"] as? Number)?.let { putExtra("initial_year", it.toInt()) }
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        }
                         else -> result.notImplemented()
                     }
                 }
