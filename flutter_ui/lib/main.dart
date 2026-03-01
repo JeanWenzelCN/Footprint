@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -65,6 +66,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   String selectedMood = "愉快";
   String selectedWeather = "晴朗";
   String selectedTransport = "步行";
+  DateTime selectedDate = DateTime.now();
   List<File> photos = [];
 
   final List<String> availableIcons = [
@@ -95,6 +97,11 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
       if (e['weather'] != null) selectedWeather = weathers.contains(e['weather']) ? e['weather'] : "晴朗";
       if (e['transportMethod'] != null) selectedTransport = transports.contains(e['transportMethod']) ? e['transportMethod'] : "步行";
       
+      final dateStr = e['happenedOn'] as String?;
+      if (dateStr != null) {
+        try { selectedDate = DateTime.parse(dateStr); } catch (_) {}
+      }
+
       final ps = e['photoPaths'] as List<dynamic>?;
       if (ps != null) {
         photos.addAll(ps.where((p) => p != null).map((p) => File(p.toString())));
@@ -106,11 +113,11 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   void dispose() {
     _titleController.dispose();
     _locationController.dispose();
-    _detailController.dispose();
     _distanceController.dispose();
     _tagsController.dispose();
     _tempController.dispose();
     _altController.dispose();
+    _detailController.dispose();
     super.dispose();
   }
 
@@ -142,6 +149,31 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             decoration: InputDecoration(
               labelText: '标题',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate,
+                firstDate: DateTime(2000),
+                lastDate: DateTime.now(),
+                locale: const Locale('zh'),
+              );
+              if (picked != null) setState(() => selectedDate = picked);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: '记录日期',
+                prefixIcon: const Icon(Icons.calendar_today_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
+                style: const TextStyle(fontSize: 16),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -318,6 +350,104 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   }
 }
 
+class AddGoalPage extends StatefulWidget {
+  const AddGoalPage({super.key});
+
+  @override
+  State<AddGoalPage> createState() => _AddGoalPageState();
+}
+
+class _AddGoalPageState extends State<AddGoalPage> {
+  final _titleController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _notesController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('新增旅行目标', style: TextStyle(fontWeight: FontWeight.bold)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          TextField(
+            controller: _titleController,
+            decoration: InputDecoration(
+              labelText: '目标名称',
+              hintText: '例如：川西环线摄影',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _locationController,
+            decoration: InputDecoration(
+              labelText: '目的地',
+              prefixIcon: const Icon(Icons.place_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime.now(),
+                lastDate: DateTime(2030),
+                locale: const Locale('zh'),
+              );
+              if (picked != null) setState(() => _selectedDate = picked);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: '预期日期',
+                prefixIcon: const Icon(Icons.calendar_today_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                "${_selectedDate.year}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.day.toString().padLeft(2, '0')}",
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _notesController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: '计划备注',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 32),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("目标已添加")),
+              );
+            },
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text("保存目标", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
   @override
@@ -386,6 +516,16 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       themeMode: _getThemeMode(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('zh', 'CN'),
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -1516,9 +1656,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  '$displayDate · ${entry['location'] ?? '未知地点'}',
-                                  style: const TextStyle(fontSize: 12),
+                                Builder(
+                                  builder: (context) {
+                                    String loc = entry['location'] ?? '未知地点';
+                                    final coordRegex = RegExp(r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
+                                    final match = coordRegex.firstMatch(loc);
+                                    if (match != null) {
+                                      try {
+                                        double lat = double.parse(match.group(1)!);
+                                        double lng = double.parse(match.group(2)!);
+                                        loc = "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
+                                      } catch (_) {}
+                                    }
+                                    return Text(
+                                      '$displayDate · $loc',
+                                      style: const TextStyle(fontSize: 12),
+                                    );
+                                  }
                                 ),
                               ],
                             ),
@@ -1665,35 +1819,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ),
   );
   void _showAboutDialog(BuildContext context) {
-    showAboutDialog(
+    showDialog(
       context: context,
-      applicationName: "Footprint",
-      applicationVersion: "v3.2.1",
-      applicationIcon: const Icon(Icons.explore, size: 48, color: Colors.blue),
-      children: [
-        const Text("一款基于 Flutter 构建的液态玻璃风格足迹探索应用。"),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.person_outline),
-          title: const Text("作者主页"),
-          subtitle: const Text("StarsUnsurpass"),
-          onTap: () {
-            const channel = MethodChannel('com.footprint/data');
-            channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass");
-          },
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.code),
-          title: const Text("项目源码"),
-          subtitle: const Text("GitHub / Footprint"),
-          onTap: () {
-            const channel = MethodChannel('com.footprint/data');
-            channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass/Footprint");
-          },
-        ),
-      ],
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: const Text("关于 Footprint"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Icon(Icons.explore, size: 64, color: Colors.blue),
+              ),
+              const SizedBox(height: 16),
+              const Center(
+                child: Text(
+                  "Footprint v3.2.2",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text("一款基于 Flutter 构建的 Material Design 3 风格足迹探索应用。"),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_outline),
+                title: const Text("作者主页"),
+                subtitle: const Text("StarsUnsurpass"),
+                onTap: () {
+                  const channel = MethodChannel('com.footprint/data');
+                  channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass");
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.code),
+                title: const Text("项目源码"),
+                subtitle: const Text("GitHub / Footprint"),
+                onTap: () {
+                  const channel = MethodChannel('com.footprint/data');
+                  channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass/Footprint");
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("关闭"),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -2568,34 +2746,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          _t("关于", cs),
-          _card(
-            cs,
-            Column(
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text("软件版本"),
-                  trailing: Text("v3.2.1"),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.person_outline),
-                  title: const Text("作者主页"),
-                  subtitle: const Text("StarsUnsurpass"),
-                  trailing: const Icon(Icons.open_in_new, size: 16),
-                  onTap: () => _launchURL("https://github.com/StarsUnsurpass"),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.code),
-                  title: const Text("项目源码"),
-                  subtitle: const Text("查看并提交 Issue"),
-                  trailing: const Icon(Icons.open_in_new, size: 16),
-                  onTap: () => _launchURL("https://github.com/StarsUnsurpass/Footprint"),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 100),
         ],
       ),
@@ -2884,6 +3034,7 @@ class _TimeFootprintPlaybackPageState extends State<TimeFootprintPlaybackPage> {
       initialDate: isStart ? _startDate : _endDate,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
+      locale: const Locale('zh'),
     );
     if (picked != null) {
       setState(() {
@@ -3012,7 +3163,21 @@ class _TimeFootprintPlaybackPageState extends State<TimeFootprintPlaybackPage> {
                       child: Icon(Icons.location_on, color: cs.primary, size: 20),
                     ),
                     title: Text(e['title'] ?? '未知记录', style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text("${e['happenedOn'] ?? ''} · ${e['location'] ?? ''}", maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Builder(
+                      builder: (context) {
+                        String loc = e['location'] ?? '未知地点';
+                        final coordRegex = RegExp(r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
+                        final match = coordRegex.firstMatch(loc);
+                        if (match != null) {
+                          try {
+                            double lat = double.parse(match.group(1)!);
+                            double lng = double.parse(match.group(2)!);
+                            loc = "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
+                          } catch (_) {}
+                        }
+                        return Text("${e['happenedOn'] ?? ''} · $loc", maxLines: 1, overflow: TextOverflow.ellipsis);
+                      }
+                    ),
                     trailing: Text("${dist.toStringAsFixed(3)} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
                     onTap: () {
                       if (e['latitude'] != null) {

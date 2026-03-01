@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'main.dart';
 
 class GoalPlannerPage extends StatefulWidget {
   const GoalPlannerPage({super.key});
@@ -72,17 +73,25 @@ class _GoalPlannerPageState extends State<GoalPlannerPage> {
                 ),
                 actions: [
                   Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: InkWell(
-                      onTap: () {},
-                      borderRadius: BorderRadius.circular(24),
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Center(
                       child: Container(
-                        padding: const EdgeInsets.all(12),
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerHighest,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.add, color: cs.primary),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(Icons.add, color: cs.primary),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AddGoalPage()),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

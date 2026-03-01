@@ -39,6 +39,18 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
 
     title = entry['title'] ?? "未命名足迹";
     location = entry['location'] ?? "未知地点";
+
+    // Format location if it looks like raw coordinates
+    final coordRegex = RegExp(r'^(\d+\.\d+)\s*,\s*(\d+\.\d+)$');
+    final match = coordRegex.firstMatch(location);
+    if (match != null) {
+      try {
+        double lat = double.parse(match.group(1)!);
+        double lng = double.parse(match.group(2)!);
+        location = "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
+      } catch (_) {}
+    }
+
     date = entry['happenedOn'] ?? "未知日期";
     
     String rawMood = entry['mood'] ?? "";
