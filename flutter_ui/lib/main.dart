@@ -400,6 +400,9 @@ class _MainContainerState extends State<MainContainer>
   late Animation<double> _elasticAnimation;
   bool _isHiding = false;
 
+  // GlobalKey 用于通知地图页面 tab 切换事件
+  final GlobalKey<_ExploreMapScreenState> _mapKey = GlobalKey<_ExploreMapScreenState>();
+
   // Tab 切换弹性动画
   late AnimationController _tabBounceController;
   late Animation<double> _tabBounceAnimation;
@@ -446,9 +449,19 @@ class _MainContainerState extends State<MainContainer>
 
   void _onTabTap(int index) {
     if (_selectedIndex == index) return;
+    final prevIndex = _selectedIndex;
     setState(() => _selectedIndex = index);
     _tabBounceController.forward(from: 0.0);
     if (widget.hapticEnabled) HapticFeedback.lightImpact();
+
+    // 离开地图页时通知停止后台定位（除非正在追踪）
+    if (prevIndex == 1 && index != 1) {
+      _mapKey.currentState?.onTabDeselected();
+    }
+    // 进入地图页时通知恢复
+    if (index == 1 && prevIndex != 1) {
+      _mapKey.currentState?.onTabActivated();
+    }
   }
 
   @override
@@ -462,7 +475,7 @@ class _MainContainerState extends State<MainContainer>
   Widget build(BuildContext context) {
     final pages = [
       DashboardScreen(nickname: widget.nickname, avatarId: widget.avatarId),
-      const ExploreMapScreen(),
+      ExploreMapScreen(key: _mapKey),
       const GoalPlannerPage(),
       SettingsScreen(
         nickname: widget.nickname, avatarId: widget.avatarId,
@@ -1318,12 +1331,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 // --- 探索地图页 (ExploreMapScreen) - 1:1 复刻原生功能 ---
 class ExploreMapScreen extends StatefulWidget {
-  const ExploreMapScreen({super.key});
+  ExploreMapScreen({super.key});
   @override
   State<ExploreMapScreen> createState() => _ExploreMapScreenState();
 }
 
-class _ExploreMapScreenState extends State<ExploreMapScreen> {
+class _ExploreMapScreenState extends State<ExploreMapScreen>
+    with WidgetsBindingObserver {
   static const dataChannel = MethodChannel('com.footprint/data');
   String mapMode = 'STANDARD';
   MethodChannel? _mapChannel;
@@ -1332,6 +1346,10 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   // Flutter 高德定位客户端
   final AMapFlutterLocation _locationClient = AMapFlutterLocation();
   StreamSubscription<Map<String, Object>>? _locationSubscription;
+
+  // === 定位状态管理 ===
+  bool _isLocating = false;    // 是否正在执行单次定位
+  bool _isMapActive = true;    // 当前是否在地图 tab
 
   // === 追踪状态 (Flutter 实现，匹配原 Kotlin LocationTrackingService) ===
   bool _isTracking = false;
@@ -1356,6 +1374,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadEntries();
     // 初始化高德隐私合规（不自动开启定位）
     AMapFlutterLocation.updatePrivacyShow(true, true);
@@ -1364,10 +1383,49 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _locationSubscription?.cancel();
     _locationClient.destroy();
     _durationTimer?.cancel();
     super.dispose();
+  }
+
+  // === 应用生命周期管理：后台时停止定位（除非正在记录足迹）===
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      // 应用进入后台，如果没有在记录足迹，停止定位
+      _stopLocationIfIdle();
+    } else if (state == AppLifecycleState.resumed) {
+      // 应用回到前台，如果在地图页且正在追踪，确保定位运行
+      if (_isMapActive && _isTracking) {
+        _locationClient.startLocation();
+      }
+    }
+  }
+
+  /// Tab 切换离开地图页时调用
+  void onTabDeselected() {
+    _isMapActive = false;
+    _stopLocationIfIdle();
+  }
+
+  /// Tab 切换进入地图页时调用
+  void onTabActivated() {
+    _isMapActive = true;
+    // 如果正在追踪，确保定位活跃
+    if (_isTracking) {
+      _locationClient.startLocation();
+    }
+  }
+
+  /// 在非追踪/非定位时停止定位服务
+  void _stopLocationIfIdle() {
+    if (!_isTracking && !_isLocating) {
+      _locationSubscription?.cancel();
+      _locationClient.stopLocation();
+    }
   }
 
   @override
@@ -1416,7 +1474,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     _mapChannel?.invokeMethod('setEntries', _allEntries);
   }
 
-  // === 定位按钮：单次定位 + 地图居中 ===
+  // === 定位按钮：直接使用原生地图的位置居中 ===
   Future<void> _handleLocateMe() async {
     try {
       final status = await Permission.locationWhenInUse.request();
@@ -1429,6 +1487,22 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         }
         return;
       }
+
+      // === 策略1：直接让原生地图居中到它自己已知的蓝点位置 ===
+      // 原生地图的 isMyLocationEnabled=true 有独立的定位能力
+      // 不需要通过 Flutter 定位 SDK 中转坐标
+      try {
+        final nativeResult = await _mapChannel?.invokeMethod('centerLocation', {'zoom': 17.0});
+        if (nativeResult == true) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位成功"), backgroundColor: Colors.green, duration: Duration(seconds: 1)));
+          return;
+        }
+      } catch (e) {
+        debugPrint("Native centerLocation failed: $e, trying Flutter SDK fallback...");
+      }
+
+      // === 策略2：原生没有位置数据时，使用 Flutter AMap 定位 SDK 获取坐标 ===
+      _isLocating = true;
       _locationClient.setLocationOption(AMapLocationOption(onceLocation: true, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true));
       _locationSubscription?.cancel();
       bool hasResult = false;
@@ -1439,7 +1513,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         final errorCode = result['errorCode'];
         if (errorCode != null && errorCode != 0) {
           hasResult = true;
+          _isLocating = false;
           _locationSubscription?.cancel();
+          _locationClient.stopLocation();
           if (!mounted) return;
           String errMsg;
           switch (errorCode) {
@@ -1458,42 +1534,68 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         }
         if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
           hasResult = true;
-          // 关键：将 Flutter 获取到的坐标传给原生地图
-          await _mapChannel?.invokeMethod('centerLocation', {'latitude': lat, 'longitude': lng});
+          _isLocating = false;
+          await _mapChannel?.invokeMethod('centerLocation', {'latitude': lat, 'longitude': lng, 'zoom': 17.0});
           _locationSubscription?.cancel();
+          _locationClient.stopLocation();
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位成功"), backgroundColor: Colors.green, duration: Duration(seconds: 1)));
         }
       });
       _locationClient.startLocation();
       Future.delayed(const Duration(seconds: 10), () {
         if (!hasResult) {
+          _isLocating = false;
           _locationSubscription?.cancel();
+          _locationClient.stopLocation();
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位超时：请检查GPS是否开启及网络状况"), backgroundColor: Colors.orange));
         }
       });
     } catch (e) {
+      _isLocating = false;
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("定位异常: $e"), backgroundColor: Colors.redAccent));
     }
   }
 
-  // === 开始追踪 ===
+  // === 开始追踪：自动定位并放大到当前位置 ===
   Future<void> _startTracking() async {
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("需要位置权限才能记录足迹"), backgroundColor: Colors.orange));
       return;
     }
+    bool _hasInitialZoom = false;
     setState(() {
       _isTracking = true; _trackingPath.clear(); _totalDistance = 0.0;
       _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
       _lastLat = null; _lastLng = null; _lastPointTime = null;
       _lastSaveTime = 0; _lastAddress = ''; _lastAltitude = null; _durationStr = '00:00:00';
     });
+
+    // === 立即尝试居中到原生地图已知的位置 ===
+    try {
+      final nativeResult = await _mapChannel?.invokeMethod('centerLocation', {'zoom': 18.0});
+      if (nativeResult == true) _hasInitialZoom = true;
+    } catch (_) {}
+
     _locationClient.setLocationOption(AMapLocationOption(
       onceLocation: false, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true, locationInterval: 2000,
     ));
     _locationSubscription?.cancel();
-    _locationSubscription = _locationClient.onLocationChanged().listen(_onTrackingLocationUpdate);
+    _locationSubscription = _locationClient.onLocationChanged().listen((result) {
+      // 如果原生居中失败，首次收到有效位置时用 Flutter SDK 坐标居中
+      if (!_hasInitialZoom) {
+        final double? lat = result['latitude'] as double?;
+        final double? lng = result['longitude'] as double?;
+        final errorCode = result['errorCode'];
+        if (errorCode == null || errorCode == 0) {
+          if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
+            _hasInitialZoom = true;
+            _mapChannel?.invokeMethod('centerLocation', {'latitude': lat, 'longitude': lng, 'zoom': 18.0});
+          }
+        }
+      }
+      _onTrackingLocationUpdate(result);
+    });
     _locationClient.startLocation();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || !_isTracking) return;

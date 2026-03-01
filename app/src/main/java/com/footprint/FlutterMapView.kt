@@ -1,16 +1,14 @@
 package com.footprint
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.*
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
-import androidx.core.content.ContextCompat
 import com.amap.api.maps.AMap
 import com.amap.api.maps.MapView
 import com.amap.api.maps.model.*
+import com.amap.api.maps.model.MyLocationStyle
 import com.footprint.service.LocationTrackingService
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -37,6 +35,10 @@ class FlutterMapView(
 
     private var isDark: Boolean = false
 
+    // 缓存原生地图最新的定位坐标（通过 OnMyLocationChangeListener 实时更新）
+    private var cachedLat: Double = 0.0
+    private var cachedLng: Double = 0.0
+
     // 数据引用
     private var currentPathPoints: List<LatLng> = emptyList()
     private var historyPoints: List<LatLng> = emptyList()
@@ -56,6 +58,25 @@ class FlutterMapView(
             isMyLocationEnabled = true
             // 默认设置为夜间模式以配合液态玻璃风格
             mapType = AMap.MAP_TYPE_NIGHT
+
+            // 配置定位蓝点样式：保留默认箭头图标，精度圈稍小一些
+            val locationStyle =
+                    MyLocationStyle()
+                            .myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
+                            .radiusFillColor(Color.parseColor("#1A4FC3F7")) // 浅蓝填充（10%不透明度）
+                            .strokeColor(Color.parseColor("#404FC3F7")) // 蓝色边框（25%不透明度）
+                            .strokeWidth(1f)
+            myLocationStyle = locationStyle
+
+            // === 关键：监听原生地图的位置变化，缓存最新坐标 ===
+            // aMap?.myLocation 在异步获取位置前可能返回 (0,0)
+            // 通过 listener 可以在蓝点显示的同时拿到真实坐标
+            setOnMyLocationChangeListener { location ->
+                if (location.latitude > 1.0 && location.longitude > 1.0) {
+                    cachedLat = location.latitude
+                    cachedLng = location.longitude
+                }
+            }
 
             setOnMarkerClickListener { marker ->
                 val entryId = marker.snippet?.toLongOrNull()
@@ -185,11 +206,13 @@ class FlutterMapView(
             }
             "setTrackingPath" -> {
                 val points = call.arguments as? List<Map<String, Any>>
-                currentPathPoints = points?.mapNotNull { pt ->
-                    val lat = (pt["lat"] as? Number)?.toDouble()
-                    val lng = (pt["lng"] as? Number)?.toDouble()
-                    if (lat != null && lng != null) LatLng(lat, lng) else null
-                } ?: emptyList()
+                currentPathPoints =
+                        points?.mapNotNull { pt ->
+                            val lat = (pt["lat"] as? Number)?.toDouble()
+                            val lng = (pt["lng"] as? Number)?.toDouble()
+                            if (lat != null && lng != null) LatLng(lat, lng) else null
+                        }
+                                ?: emptyList()
                 updateLivePolyline()
                 fogOverlay.invalidate()
                 result.success(true)
@@ -199,28 +222,44 @@ class FlutterMapView(
                 val args = call.arguments
                 var lat: Double? = null
                 var lng: Double? = null
+                var zoomLevel = 17f
                 if (args is Map<*, *>) {
                     lat = (args["latitude"] as? Number)?.toDouble()
                     lng = (args["longitude"] as? Number)?.toDouble()
+                    zoomLevel = (args["zoom"] as? Number)?.toFloat() ?: 17f
                 }
 
                 // 1. Flutter 传入的坐标
                 if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
                     aMap?.animateCamera(
                             com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(lat, lng), 17f
+                                    LatLng(lat, lng),
+                                    zoomLevel
                             )
                     )
                     result.success(true)
                     return
                 }
 
-                // 2. AMap 自身的定位蓝点
+                // 2. 使用缓存的位置坐标（来自 OnMyLocationChangeListener）
+                if (cachedLat > 1.0 && cachedLng > 1.0) {
+                    aMap?.animateCamera(
+                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(cachedLat, cachedLng),
+                                    zoomLevel
+                            )
+                    )
+                    result.success(true)
+                    return
+                }
+
+                // 3. AMap 自身的 myLocation 属性
                 val loc = aMap?.myLocation
                 if (loc != null && loc.latitude > 1.0 && loc.longitude > 1.0) {
                     aMap?.animateCamera(
                             com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(loc.latitude, loc.longitude), 17f
+                                    LatLng(loc.latitude, loc.longitude),
+                                    zoomLevel
                             )
                     )
                     result.success(true)
@@ -229,10 +268,12 @@ class FlutterMapView(
 
                 // 3. Kotlin 追踪服务的位置（兼容旧逻辑）
                 val trackingLoc = LocationTrackingService.currentLocation.value
-                if (trackingLoc != null && trackingLoc.latitude > 1.0 && trackingLoc.longitude > 1.0) {
+                if (trackingLoc != null && trackingLoc.latitude > 1.0 && trackingLoc.longitude > 1.0
+                ) {
                     aMap?.animateCamera(
                             com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(trackingLoc.latitude, trackingLoc.longitude), 17f
+                                    LatLng(trackingLoc.latitude, trackingLoc.longitude),
+                                    zoomLevel
                             )
                     )
                     result.success(true)
@@ -241,6 +282,11 @@ class FlutterMapView(
 
                 // 都没有位置信息
                 result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
+            }
+            "setLocationEnabled" -> {
+                val enabled = call.arguments as? Boolean ?: false
+                aMap?.isMyLocationEnabled = enabled
+                result.success(true)
             }
             else -> result.notImplemented()
         }
