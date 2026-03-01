@@ -239,7 +239,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _statDrop("里程", "${distance.toStringAsFixed(1)} KM", Icons.directions_walk, cs, tt),
+                        _statDrop("里程", "${distance.toStringAsFixed(3)} KM", Icons.directions_walk, cs, tt),
                         _statDrop("能量", "$energy", Icons.bolt, cs, tt),
                         _statDrop("天气", weather, Icons.wb_sunny, cs, tt),
                         _statDrop("心情", mood, Icons.mood, cs, tt),

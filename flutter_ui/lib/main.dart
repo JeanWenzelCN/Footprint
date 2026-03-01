@@ -813,7 +813,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                leading: Icon(Icons.straighten, color: cs.primary),
                                title: Text(eDate),
                                subtitle: Text(entry['title'] ?? '未知足迹'),
-                               trailing: Text("${dist.toStringAsFixed(5)} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                               trailing: Text("${dist.toStringAsFixed(3)} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 12)),
                                onTap: () { Navigator.pop(context); _showDetail(entry); },
                              );
                            case 'location':
@@ -850,7 +850,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                leading: Icon(Icons.place, color: cs.primary),
                                title: Text(entry['title'] ?? '未知足迹'),
                                subtitle: Text("$eDate · ${entry['location'] ?? '未知地点'}"),
-                               trailing: Text("${(entry['distanceKm'] as num?)?.toDouble().toStringAsFixed(1) ?? '0'} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
+                               trailing: Text("${(entry['distanceKm'] as num?)?.toDouble().toStringAsFixed(3) ?? '0'} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
                                onTap: () { Navigator.pop(context); _showDetail(entry); },
                              );
                          }
@@ -918,9 +918,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       _sBox(cs, tt, "足迹", "${allEntries.length}", onTap: () => _showStatDetail(context, "所有足迹 (${allEntries.length})", "footprint", allEntries)),
                       const SizedBox(width: 8),
-                      _sBox(cs, tt, "里程", totalDistance.toStringAsFixed(1), u: "km", onTap: () {
+                      _sBox(cs, tt, "里程", totalDistance.toStringAsFixed(3), u: "km", onTap: () {
                         final sorted = List.of(allEntries)..sort((a,b) => ((b['distanceKm'] as num?)?.toDouble() ?? 0.0).compareTo((a['distanceKm'] as num?)?.toDouble() ?? 0.0));
-                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(1)} km)", "distance", sorted);
+                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(3)} km)", "distance", sorted);
                       }),
                       const SizedBox(width: 8),
                       _sBox(cs, tt, "地点", "$uniquePlacesLength", onTap: () {
@@ -1470,7 +1470,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
               
               final dist = (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
-              final rDist = dist.toStringAsFixed(5);
+              final rDist = dist.toStringAsFixed(3);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12, left: 8),
@@ -1680,13 +1680,21 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
           });
         } else if (data['type'] == 'location') {
           if (_isTracking && data['data'] != null) {
-            final lat = data['data']['latitude'] as double;
-            final lng = data['data']['longitude'] as double;
+            final lat = (data['data']['latitude'] as num).toDouble();
+            final lng = (data['data']['longitude'] as num).toDouble();
+            
             setState(() {
+              if (_lastLat != null && _lastLng != null) {
+                final d = _haversineDistance(_lastLat!, _lastLng!, lat, lng);
+                if (d > 0.5) { // Filter jitter
+                  _totalDistance += d;
+                }
+              }
+              _lastLat = lat;
+              _lastLng = lng;
               _trackingPath.add({'latitude': lat, 'longitude': lng});
             });
             _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
-            // 这里我们不需要本地计算距离，因为后台 Kotlin 服务已经在计算并保存
           }
         }
       } catch (e) {
@@ -1881,6 +1889,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     setState(() {
       _trackingPath.clear();
       _totalDistance = 0.0;
+      _lastLat = null;
+      _lastLng = null;
       _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
       _durationStr = '00:00:00';
     });
@@ -1914,7 +1924,14 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       debugPrint('Error stopping tracking: $e');
     }
 
-    setState(() { _isTracking = false; _trackingPath.clear(); _totalDistance = 0.0; _durationStr = '00:00:00'; });
+    setState(() {
+      _isTracking = false;
+      _trackingPath.clear();
+      _totalDistance = 0.0;
+      _lastLat = null;
+      _lastLng = null;
+      _durationStr = '00:00:00';
+    });
     _mapChannel?.invokeMethod('setTrackingPath', <Map<String, double>>[]);
     
     // 延迟重新加载，给 Kotlin 保存 DB 留一点时间
@@ -1998,7 +2015,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _trackingStat(Icons.timer, _durationStr, "时长", cs),
-                    _trackingStat(Icons.straighten, "${(_totalDistance / 1000).toStringAsFixed(2)} km", "距离", cs),
+                    _trackingStat(Icons.straighten, "${(_totalDistance / 1000).toStringAsFixed(3)} km", "距离", cs),
                     _trackingStat(Icons.scatter_plot, "${_trackingPath.length}", "点位", cs),
                   ],
                 ),
@@ -2533,27 +2550,260 @@ class NativeMapView extends StatelessWidget {
   }
 }
 
-class TimeFootprintPlaybackPage extends StatelessWidget {
+class TimeFootprintPlaybackPage extends StatefulWidget {
   const TimeFootprintPlaybackPage({super.key});
+
+  @override
+  State<TimeFootprintPlaybackPage> createState() => _TimeFootprintPlaybackPageState();
+}
+
+class _TimeFootprintPlaybackPageState extends State<TimeFootprintPlaybackPage> {
+  static const dataChannel = MethodChannel('com.footprint/data');
+  MethodChannel? _mapChannel;
+  
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
+  DateTime _endDate = DateTime.now();
+  
+  List<dynamic> _allEntries = [];
+  List<dynamic> _filteredEntries = [];
+  bool _isLoading = true;
+  double _totalDistance = 0.0;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final String jsonStr = await dataChannel.invokeMethod('getAllEntries');
+      if (!mounted) return;
+      setState(() {
+        _allEntries = jsonDecode(jsonStr);
+      });
+      _filterData();
+    } catch (e) {
+      debugPrint("Failed to load map entries: $e");
+    }
+  }
+
+  Future<void> _filterData() async {
+    setState(() { _isLoading = true; });
+    final startStr = "${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}";
+    final endStr = "${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}";
+    
+    _filteredEntries = _allEntries.where((e) {
+      final d = e['happenedOn'] as String?;
+      if (d == null) return false;
+      return d.compareTo(startStr) >= 0 && d.compareTo(endStr) <= 0;
+    }).toList();
+    
+    _totalDistance = 0.0;
+    for (var e in _filteredEntries) {
+      _totalDistance += (e['distanceKm'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    try {
+      final startMs = DateTime(_startDate.year, _startDate.month, _startDate.day).millisecondsSinceEpoch;
+      final endMs = DateTime(_endDate.year, _endDate.month, _endDate.day).add(const Duration(days: 1)).millisecondsSinceEpoch;
+      final String trackJson = await dataChannel.invokeMethod('getTrackPoints', {'startTime': startMs, 'endTime': endMs});
+      final List<dynamic> tracks = jsonDecode(trackJson);
+      
+      _mapChannel?.invokeMethod('setEntries', _filteredEntries);
+      _mapChannel?.invokeMethod('setTrackingPath', tracks.map((t) => {
+        'lat': (t['latitude'] as num?)?.toDouble(),
+        'lng': (t['longitude'] as num?)?.toDouble()
+      }).toList());
+      
+      // Auto center to the first point of the track or entry
+      if (tracks.isNotEmpty) {
+        _mapChannel?.invokeMethod('centerLocation', {
+          'latitude': (tracks.first['latitude'] as num?)?.toDouble(),
+          'longitude': (tracks.first['longitude'] as num?)?.toDouble(),
+          'zoom': 13.0
+        });
+      } else if (_filteredEntries.isNotEmpty) {
+        final entry = _filteredEntries.firstWhere((e) => e['latitude'] != null, orElse: () => null);
+        if (entry != null) {
+          _mapChannel?.invokeMethod('centerLocation', {
+            'latitude': (entry['latitude'] as num?)?.toDouble(),
+            'longitude': (entry['longitude'] as num?)?.toDouble(),
+            'zoom': 13.0
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to load track points: $e");
+    }
+    
+    if (mounted) {
+      setState(() { _isLoading = false; });
+    }
+  }
+
+  void _onMapCreated(int id) {
+    _mapChannel = MethodChannel('com.footprint/amap_$id');
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    _mapChannel?.invokeMethod('setTheme', isDark);
+    _mapChannel?.invokeMethod('setMapMode', "STANDARD"); // or FOG
+    // after map created, apply the filtered data immediately if available
+    _mapChannel?.invokeMethod('setEntries', _filteredEntries);
+    _filterData(); // trigger re-fetch and apply
+  }
+
+  Future<void> _selectDate(BuildContext context, bool isStart) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isStart ? _startDate : _endDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) _startDate = picked;
+        else _endDate = picked;
+        if (_startDate.isAfter(_endDate)) {
+          _startDate = _endDate;
+        }
+      });
+      _filterData();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final df = "${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}";
+    final dt = "${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}";
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('时光足迹回放', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: cs.surface,
+        scrolledUnderElevation: 0,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.map, size: 80, color: cs.primary.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-             Text("轨迹回放地图加载中...", style: TextStyle(color: cs.primary)),
-            const SizedBox(height: 8),
-             Text("这里将展示您的年度轨迹绿线动态回放", style: TextStyle(color: cs.outline)),
-          ],
-        ),
+      body: Column(
+        children: [
+          // Time Selector
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context, true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(child: Text("起始: $df", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold))),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context, false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(child: Text("结束: $dt", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold))),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Map View
+          Expanded(
+            flex: 5,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: Stack(
+                children: [
+                  NativeMapView(onCreated: _onMapCreated),
+                  if (_isLoading)
+                    Container(
+                      color: cs.surface.withValues(alpha: 0.5),
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("区间总里程", style: TextStyle(color: cs.outline, fontSize: 12)),
+                                Text("${_totalDistance.toStringAsFixed(3)} km", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text("区间足迹篇数", style: TextStyle(color: cs.outline, fontSize: 12)),
+                                Text("${_filteredEntries.length} 篇", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+
+          // Footprint List (BottomSheet-like)
+          Expanded(
+            flex: 4,
+            child: Container(
+              color: cs.surface,
+              child: ListView.builder(
+                itemCount: _filteredEntries.length,
+                itemBuilder: (context, index) {
+                  final e = _filteredEntries[index];
+                  final dist = (e['distanceKm'] as num?)?.toDouble() ?? 0.0;
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: cs.primaryContainer,
+                      child: Icon(Icons.location_on, color: cs.primary, size: 20),
+                    ),
+                    title: Text(e['title'] ?? '未知记录', style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text("${e['happenedOn'] ?? ''} · ${e['location'] ?? ''}", maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: Text("${dist.toStringAsFixed(3)} km", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      if (e['latitude'] != null) {
+                         _mapChannel?.invokeMethod('centerLocation', {
+                           'latitude': (e['latitude'] as num?)?.toDouble(),
+                           'longitude': (e['longitude'] as num?)?.toDouble(),
+                           'zoom': 16.0
+                         });
+                      }
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => FootprintDetailPage(entry: e)));
+                    }
+                  );
+                },
+              ),
+            ),
+          )
+        ],
       ),
     );
   }

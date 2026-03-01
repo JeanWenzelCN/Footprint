@@ -258,7 +258,7 @@ private fun TelegramEntryItem(
                                 ) {
                                         Text(
                                                 text =
-                                                        "${String.format("%.1f", entry.distanceKm)} km",
+                                                        "${String.format("%.3f", entry.distanceKm)} km",
                                                 modifier =
                                                         Modifier.padding(
                                                                 horizontal = 4.dp,

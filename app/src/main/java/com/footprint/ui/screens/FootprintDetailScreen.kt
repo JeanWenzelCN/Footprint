@@ -35,7 +35,6 @@ import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.PolylineOptions
 import com.footprint.data.local.TrackPointEntity
 import com.footprint.data.model.FootprintEntry
-import com.footprint.ui.components.IconUtils
 import com.footprint.ui.components.LiquidGlassCard
 import com.footprint.ui.components.weather.HolographicWeatherIcon
 import com.footprint.ui.components.weather.WeatherType
@@ -333,22 +332,26 @@ fun FootprintDetailScreen(
                                                 StatDrop(
                                                         label = "里程",
                                                         value =
-                                                                "${String.format("%.1f", entry.distanceKm)} KM",
+                                                                "${String.format("%.3f", entry.distanceKm)} KM",
                                                         iconContent = {
-                                                                com.footprint.ui.components.HolographicMileageIcon(
-                                                                        distanceKm = entry.distanceKm,
-                                                                        size = 24.dp
-                                                                )
+                                                                com.footprint.ui.components
+                                                                        .HolographicMileageIcon(
+                                                                                distanceKm =
+                                                                                        entry.distanceKm,
+                                                                                size = 24.dp
+                                                                        )
                                                         }
                                                 )
                                                 StatDrop(
                                                         label = "能量",
                                                         value = "${entry.energyLevel}",
                                                         iconContent = {
-                                                                com.footprint.ui.components.HolographicEnergyIcon(
-                                                                        energyLevel = entry.energyLevel,
-                                                                        size = 24.dp
-                                                                )
+                                                                com.footprint.ui.components
+                                                                        .HolographicEnergyIcon(
+                                                                                energyLevel =
+                                                                                        entry.energyLevel,
+                                                                                size = 24.dp
+                                                                        )
                                                         }
                                                 )
                                                 val weatherType =
@@ -388,10 +391,11 @@ fun FootprintDetailScreen(
                                                         label = "心情",
                                                         value = entry.mood.label,
                                                         iconContent = {
-                                                                com.footprint.ui.components.HolographicMoodIcon(
-                                                                        mood = entry.mood,
-                                                                        size = 24.dp
-                                                                )
+                                                                com.footprint.ui.components
+                                                                        .HolographicMoodIcon(
+                                                                                mood = entry.mood,
+                                                                                size = 24.dp
+                                                                        )
                                                         }
                                                 )
                                         }

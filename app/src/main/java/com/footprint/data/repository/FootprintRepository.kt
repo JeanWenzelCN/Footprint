@@ -34,8 +34,7 @@ class FootprintRepository(
         suspend fun getAllEntries(): List<FootprintEntry> =
                 footprintDao.getAll().map { it.toModel() }
 
-        suspend fun getAllGoals(): List<TravelGoal> =
-                travelGoalDao.getAll().map { it.toModel() }
+        suspend fun getAllGoals(): List<TravelGoal> = travelGoalDao.getAll().map { it.toModel() }
 
         // --- Tracking ---
         suspend fun saveTrackPoint(location: com.amap.api.location.AMapLocation) {
@@ -59,14 +58,15 @@ class FootprintRepository(
                 speed: Float,
                 timestamp: Long
         ) {
-                val entity = com.footprint.data.local.TrackPointEntity(
-                        latitude = latitude,
-                        longitude = longitude,
-                        timestamp = timestamp,
-                        speed = speed,
-                        accuracy = accuracy,
-                        altitude = altitude
-                )
+                val entity =
+                        com.footprint.data.local.TrackPointEntity(
+                                latitude = latitude,
+                                longitude = longitude,
+                                timestamp = timestamp,
+                                speed = speed,
+                                accuracy = accuracy,
+                                altitude = altitude
+                        )
                 trackPointDao.insert(entity)
         }
 
@@ -85,6 +85,16 @@ class FootprintRepository(
         }
 
         suspend fun getTrackPointCount(year: Int, month: Int? = null): Int {
+                val (start, end) = getRangeForYearMonth(year, month)
+                return trackPointDao.getCountInRange(start, end)
+        }
+
+        fun observeTrackPointCount(year: Int, month: Int? = null): Flow<Int> {
+                val (start, end) = getRangeForYearMonth(year, month)
+                return trackPointDao.observeCountInRange(start, end)
+        }
+
+        private fun getRangeForYearMonth(year: Int, month: Int?): Pair<Long, Long> {
                 val start =
                         if (month == null) {
                                 LocalDate.of(year, 1, 1)
@@ -111,8 +121,7 @@ class FootprintRepository(
                                         .toInstant(ZoneOffset.UTC)
                                         .toEpochMilli()
                         }
-
-                return trackPointDao.getCountInRange(start, end)
+                return start to end
         }
 
         suspend fun prepareBackup(): com.footprint.data.model.BackupData {

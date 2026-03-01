@@ -33,7 +33,8 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, onBack: () -> Unit) {
@@ -67,6 +68,13 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         mutableStateOf<List<com.footprint.data.local.TrackPointEntity>>(emptyList())
     }
 
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val entriesInRange = remember(uiState.entries, startDate, endDate) {
+        uiState.entries.filter { 
+            !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
+        }
+    }
+
     // Map lifecycle
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
@@ -96,10 +104,13 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         mapView.map.mapType = if (isDark) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
     }
 
-    LaunchedEffect(points) {
+    LaunchedEffect(points, uiState.entries, startDate, endDate) {
         mapView.map.clear()
         val validPoints = points.filter { it.latitude != 0.0 && it.longitude != 0.0 }
         
+        val builder = LatLngBounds.builder()
+        var hasBounds = false
+
         if (validPoints.isNotEmpty()) {
             val latLngs = validPoints.map { LatLng(it.latitude, it.longitude) }
             mapView.map.addPolyline(
@@ -108,16 +119,33 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                             .width(18f)
                             .color(android.graphics.Color.parseColor("#00FF9F"))
             )
+            latLngs.forEach { builder.include(it); hasBounds = true }
+        }
 
-            // Zoom to bounds
-            val builder = LatLngBounds.builder()
-            latLngs.forEach { builder.include(it) }
+        val entriesInRange = uiState.entries.filter { 
+            !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
+        }
+        val validEntries = entriesInRange.filter { it.latitude != null && it.longitude != null }
+        validEntries.forEach { entry ->
+            val position = LatLng(entry.latitude!!, entry.longitude!!)
+            mapView.map.addMarker(
+                com.amap.api.maps.model.MarkerOptions()
+                    .position(position)
+                    .title(entry.title)
+                    .snippet("${entry.location} | ${entry.distanceKm}km")
+            )
+            builder.include(position)
+            hasBounds = true
+        }
+
+        if (hasBounds) {
             try {
                 mapView.map.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100))
             } catch (e: Exception) {
-                // Bounds might be invalid if points are too close
-                if (latLngs.isNotEmpty()) {
-                    mapView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngs[0], 15f))
+                if (validPoints.isNotEmpty()) {
+                    mapView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(validPoints[0].latitude, validPoints[0].longitude), 15f))
+                } else if (validEntries.isNotEmpty()) {
+                    mapView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(validEntries[0].latitude!!, validEntries[0].longitude!!), 15f))
                 }
             }
         }
@@ -244,8 +272,43 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 Button(
                         onClick = { /* Auto updates via Flow */},
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = points.isNotEmpty()
-                ) { Text("显示 ${points.size} 个点 | 里程: %.2f km".format(totalDistanceKm)) }
+                        enabled = points.isNotEmpty() || entriesInRange.isNotEmpty()
+                ) { Text("显示 ${points.size} 个记录点 | 里程: %.3f km".format(totalDistanceKm)) }
+
+                if (entriesInRange.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    Text(
+                        "包含 ${entriesInRange.size} 次足迹记录", 
+                        style = MaterialTheme.typography.labelMedium, 
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 200.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(entriesInRange, key = { it.id }) { entry ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f), RoundedCornerShape(8.dp))
+                                        .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(entry.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text("${entry.happenedOn} · ${entry.location}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(
+                                    "${String.format("%.3f", entry.distanceKm)} km", 
+                                    style = MaterialTheme.typography.bodyMedium, 
+                                    color = MaterialTheme.colorScheme.primary, 
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

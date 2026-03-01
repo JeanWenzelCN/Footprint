@@ -36,7 +36,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private var _lastLocation: AMapLocation? = null
     private var _sessionStartTime: Long = 0
     private var _notificationUpdateJob: Job? = null
-    
+
     // Rate limiting for IO / UI updates
     private var _lastSaveTime: Long = 0
     private var _lastNotifyTime: Long = 0
@@ -181,7 +181,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 } else {
                     startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
                 }
-                
+
                 // Initialize AMap after promoting to foreground
                 initLocationClient()
                 locationClient?.startLocation()
@@ -200,10 +200,14 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 }
                 wakeLock = null
 
-                serviceScope.launch { saveTrackingSessionAsFootprint() }
-                locationClient?.disableBackgroundLocation(true)
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                serviceScope.launch {
+                    withContext(NonCancellable) {
+                        saveTrackingSessionAsFootprint()
+                        locationClient?.disableBackgroundLocation(true)
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
+                }
             }
         }
         return START_STICKY
@@ -214,8 +218,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
             if (location.errorCode == 0) {
                 // Filter 0,0 and Low Accuracy
                 if (abs(location.latitude) > MIN_VALID_LATLNG &&
-                    abs(location.longitude) > MIN_VALID_LATLNG &&
-                    location.accuracy < 500
+                                abs(location.longitude) > MIN_VALID_LATLNG &&
+                                location.accuracy < 500
                 ) {
                     val clonedLocation = location.clone()
                     _sharedCurrentLocation.value = clonedLocation
@@ -224,16 +228,19 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     if (_sharedIsTracking.value) {
                         var isValidPoint = false
                         val now = System.currentTimeMillis()
-                        
+
                         _lastLocation?.let { lastLoc ->
                             val distance = location.distanceTo(lastLoc)
                             val timeDeltaMs = location.time - lastLoc.time
                             val timeDeltaSec = timeDeltaMs / 1000.0
-                            
+
                             if (timeDeltaSec > 0) {
                                 val speed = distance / timeDeltaSec
                                 if (speed > MAX_SPEED_THRESHOLD_MS) {
-                                    Log.w("FootprintLoc", "Ignored glitch: $distance m in $timeDeltaSec s ($speed m/s)")
+                                    Log.w(
+                                            "FootprintLoc",
+                                            "Ignored glitch: $distance m in $timeDeltaSec s ($speed m/s)"
+                                    )
                                 } else if (distance < MIN_DISTANCE_THRESHOLD_M) {
                                     // Too close
                                 } else {
@@ -241,10 +248,11 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                     _totalDistanceTraveled.value += distance.toFloat()
                                 }
                             }
-                        } ?: run {
-                            // First point
-                            isValidPoint = true
                         }
+                                ?: run {
+                                    // First point
+                                    isValidPoint = true
+                                }
 
                         if (isValidPoint) {
                             // Rate limit DB saves to once per 2 seconds
@@ -252,7 +260,9 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 _lastSaveTime = now
                                 serviceScope.launch {
                                     try {
-                                        val app = applicationContext as com.footprint.FootprintApplication
+                                        val app =
+                                                applicationContext as
+                                                        com.footprint.FootprintApplication
                                         app.repository.saveTrackPoint(clonedLocation)
                                     } catch (e: Exception) {
                                         Log.e("FootprintLoc", "Failed to save point: ${e.message}")
@@ -267,27 +277,35 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             // Adaptive Interval
                             updateAdaptiveInterval(location.speed)
 
-                            // Rate limit notification updates to 5s (the background timer also handles this)
+                            // Rate limit notification updates to 5s (the background timer also
+                            // handles this)
                             if (now - _lastNotifyTime > 5000) {
                                 _lastNotifyTime = now
                                 updateNotificationImmediately(
-                                    _totalDistanceTraveled.value.toInt(),
-                                    location.speed,
-                                    location.address ?: ""
+                                        _totalDistanceTraveled.value.toInt(),
+                                        location.speed,
+                                        location.address ?: ""
                                 )
                             }
                         }
                     }
-                    Log.d("FootprintLoc", "Location update success: ${location.latitude}, ${location.longitude}, acc: ${location.accuracy}")
+                    Log.d(
+                            "FootprintLoc",
+                            "Location update success: ${location.latitude}, ${location.longitude}, acc: ${location.accuracy}"
+                    )
                 }
             } else {
-                Log.e("FootprintLoc", "Location Error: ${location.errorCode} - ${location.errorInfo}")
+                Log.e(
+                        "FootprintLoc",
+                        "Location Error: ${location.errorCode} - ${location.errorInfo}"
+                )
                 if (location.errorCode == 7 || location.errorCode == 12) {
-                    val userMsg = when (location.errorCode) {
-                        7 -> "Key鉴权失败：请检查高德后台包名"
-                        12 -> "缺少定位权限：请在设置中授予"
-                        else -> "未知定位错误: ${location.errorCode}"
-                    }
+                    val userMsg =
+                            when (location.errorCode) {
+                                7 -> "Key鉴权失败：请检查高德后台包名"
+                                12 -> "缺少定位权限：请在设置中授予"
+                                else -> "未知定位错误: ${location.errorCode}"
+                            }
                     _locationError.value = userMsg
                 }
             }
@@ -314,7 +332,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
         remoteViews.setTextViewText(
                 com.footprint.R.id.notification_distance,
-                "%.2f km".format(distanceKm)
+                "%.3f km".format(distanceKm)
         )
         remoteViews.setTextViewText(
                 com.footprint.R.id.notification_speed,
@@ -394,9 +412,9 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     while (isActive && _sharedIsTracking.value) {
                         delay(2000) // 每2秒更新一次时间，降低负载
                         updateNotificationImmediately(
-                            _totalDistanceTraveled.value.toInt(),
-                            _sharedCurrentLocation.value?.speed ?: 0f,
-                            _sharedCurrentLocation.value?.address ?: ""
+                                _totalDistanceTraveled.value.toInt(),
+                                _sharedCurrentLocation.value?.speed ?: 0f,
+                                _sharedCurrentLocation.value?.address ?: ""
                         )
                     }
                 }

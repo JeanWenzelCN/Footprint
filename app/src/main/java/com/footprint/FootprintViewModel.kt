@@ -79,15 +79,10 @@ class FootprintViewModel(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val yearlyTrackPointCount: Flow<Int> =
-            yearFilter.flatMapLatest { year ->
-                flow<Int> { emit(repository.getTrackPointCount(year)) }
-            }
+            yearFilter.flatMapLatest { year -> repository.observeTrackPointCount(year) }
 
     private val monthlyTrackPointCount: Flow<Int> =
-            flow<Int> {
-                val now = LocalDate.now()
-                emit(repository.getTrackPointCount(now.year, now.monthValue))
-            }
+            repository.observeTrackPointCount(LocalDate.now().year, LocalDate.now().monthValue)
 
     // 定义显式的数据组结构
     private data class DataGroup(
@@ -184,9 +179,9 @@ class FootprintViewModel(
                 val cAberration = args[10] as Float
                 val gTint = args[11] as String
                 Triple(
-                    Triple(style, padding, border),
-                    Triple(wType, eDepth, cGrain) to Triple(aType, mSeams, hHazard),
-                    Triple(fRadius, cAberration, gTint)
+                        Triple(style, padding, border),
+                        Triple(wType, eDepth, cGrain) to Triple(aType, mSeams, hHazard),
+                        Triple(fRadius, cAberration, gTint)
                 )
             }
 
@@ -727,15 +722,17 @@ class FootprintViewModel(
             icon: String = "LocationOn",
             weather: String? = null,
             temperature: Double? = null,
-            transportType: com.footprint.data.model.TransportType = com.footprint.data.model.TransportType.UNKNOWN,
+            transportType: com.footprint.data.model.TransportType =
+                    com.footprint.data.model.TransportType.UNKNOWN,
             altitude: Double? = null
     ) {
-        val carbonSaved = when (transportType) {
-            com.footprint.data.model.TransportType.WALK -> distanceKm * 0.16
-            com.footprint.data.model.TransportType.BIKE -> distanceKm * 0.12
-            com.footprint.data.model.TransportType.TRAIN -> distanceKm * 0.04
-            else -> 0.0
-        }
+        val carbonSaved =
+                when (transportType) {
+                    com.footprint.data.model.TransportType.WALK -> distanceKm * 0.16
+                    com.footprint.data.model.TransportType.BIKE -> distanceKm * 0.12
+                    com.footprint.data.model.TransportType.TRAIN -> distanceKm * 0.04
+                    else -> 0.0
+                }
         viewModelScope.launch {
             val entry =
                     FootprintEntry(
