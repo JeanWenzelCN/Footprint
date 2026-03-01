@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'main.dart';
 
 class FootprintDetailPage extends StatefulWidget {
   final dynamic entry;
