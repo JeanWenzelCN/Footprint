@@ -898,6 +898,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadEntries();
   }
 
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _loadEntries();
+  }
+
   String _mapMoodToChinese(String englishMood) {
     if (englishMood.contains(RegExp(r'[\u4e00-\u9fa5]'))) return englishMood;
     switch (englishMood.toUpperCase()) {
@@ -1331,7 +1337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Icon(Icons.flag, color: cs.secondary, size: 18),
                           const SizedBox(width: 8),
                           Text(
-                            "年度旅行目标",
+                            "$currentYear 年度旅行目标",
                             style: TextStyle(
                               color: cs.secondary,
                               fontWeight: FontWeight.bold,
@@ -1353,7 +1359,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: InkWell(
                             onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const GoalPlannerPage()));
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const GoalPlannerPage()))
+                                .then((_) => _loadEntries());
                             },
                             child: Row(
                               children: [
