@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'main.dart';
 
 class FootprintDetailPage extends StatefulWidget {
@@ -331,6 +333,9 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                         borderRadius: BorderRadius.circular(24),
                         child: AndroidView(
                           viewType: 'com.footprint/amap',
+                          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                            Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                          },
                           onPlatformViewCreated: (id) {
                             _mapChannel = MethodChannel('com.footprint/amap_$id');
                             if (trackPoints.isNotEmpty) {

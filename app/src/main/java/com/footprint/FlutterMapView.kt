@@ -54,7 +54,14 @@ class FlutterMapView(
 
         // 基础地图配置
         aMap?.apply {
-            uiSettings.isMyLocationButtonEnabled = false
+            uiSettings.apply {
+                isMyLocationButtonEnabled = false
+                isZoomControlsEnabled = false
+                isZoomGesturesEnabled = true
+                isScrollGesturesEnabled = true
+                isRotateGesturesEnabled = true
+                isTiltGesturesEnabled = false
+            }
             isMyLocationEnabled = true
             // 默认设置为夜间模式以配合液态玻璃风格
             mapType = AMap.MAP_TYPE_NIGHT
