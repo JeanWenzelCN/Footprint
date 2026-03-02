@@ -45,9 +45,6 @@ data class FootprintUiState(
         val armorType: ArmorType = ArmorType.GUNMETAL,
         val mechanicalSeams: Float = 0.5f,
         val hasHazardStriping: Boolean = false,
-        val frostRadius: Float = 20f,
-        val chromaticAberration: Float = 0.5f,
-        val glassTint: String = "Clear",
         val randomMemory: FootprintEntry? = null,
         val memoryQuote: String? = null,
         val isLoading: Boolean = true

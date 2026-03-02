@@ -146,15 +146,4 @@ class PreferenceManager(context: Context) {
         get() = prefs.getBoolean("has_hazard_striping", false)
         set(value) = prefs.edit().putBoolean("has_hazard_striping", value).apply()
 
-    var frostRadius: Float
-        get() = prefs.getFloat("frost_radius", 20f)
-        set(value) = prefs.edit().putFloat("frost_radius", value).apply()
-
-    var chromaticAberration: Float
-        get() = prefs.getFloat("chromatic_aberration", 0.5f)
-        set(value) = prefs.edit().putFloat("chromatic_aberration", value).apply()
-
-    var glassTint: String
-        get() = prefs.getString("glass_tint", "Clear") ?: "Clear"
-        set(value) = prefs.edit().putString("glass_tint", value).apply()
 }

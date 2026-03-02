@@ -10,7 +10,7 @@ plugins {
 android {
     namespace = "com.footprint"
     compileSdk = 36
-    layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("app_new_build"))
+    // layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("app_new_build"))
 
     val localProperties = Properties().apply {
         val file = rootProject.file("local.properties")
@@ -23,8 +23,8 @@ android {
         applicationId = "com.footprint"
         minSdk = 24
         targetSdk = 36
-        versionCode = 35
-        versionName = "3.2.3"
+        versionCode = 36
+        versionName = "3.3.0"
 
         manifestPlaceholders["AMAP_KEY"] = localProperties.getProperty("AMAP_KEY") ?: "YOUR_AMAP_API_KEY"
 
@@ -48,6 +48,10 @@ android {
             )
             // 关键：确保子项目（如 Flutter 模块）也使用 Release 模式
             matchingFallbacks += listOf("release")
+            
+            ndk {
+                abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            }
         }
         debug {
             // 移除后缀，确保包名与高德后台配置 ("com.footprint") 一致

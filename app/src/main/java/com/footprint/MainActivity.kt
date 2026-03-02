@@ -109,6 +109,18 @@ class MainActivity : FlutterActivity() {
                                 }
                             }
                         }
+                        "getTrackingState" -> {
+                            val service = com.footprint.service.LocationTrackingService
+                            val state = mapOf(
+                                "isTracking" to service.isTracking.value,
+                                "totalDistance" to service.totalDistance.value,
+                                "sessionStartTime" to service.sessionStartTime,
+                                "path" to service.trackingPath.value.map { 
+                                    mapOf("latitude" to it.latitude, "longitude" to it.longitude)
+                                }
+                            )
+                            result.success(gson.toJson(state))
+                        }
                         "startTracking" -> {
                             com.footprint.service.LocationTrackingService.startTracking(
                                     this@MainActivity
@@ -348,56 +360,73 @@ class MainActivity : FlutterActivity() {
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_STREAM)
                 .setStreamHandler(
                         object : EventChannel.StreamHandler {
-                            private var locationJob: Job? = null
-                            private var statusJob: Job? = null
-                            override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
-                                locationJob =
-                                        lifecycleScope.launch {
-                                            com.footprint.service.LocationTrackingService
-                                                    .currentLocation
-                                                    .collect { loc ->
-                                                        loc?.let {
-                                                            events.success(
-                                                                    gson.toJson(
-                                                                            mapOf(
-                                                                                    "type" to
-                                                                                            "location",
-                                                                                    "data" to
-                                                                                            mapOf(
-                                                                                                    "latitude" to
-                                                                                                            it.latitude,
-                                                                                                    "longitude" to
-                                                                                                            it.longitude,
-                                                                                                    "address" to
-                                                                                                            (it.address
-                                                                                                                    ?: "")
-                                                                                            )
-                                                                            )
-                                                                    )
-                                                            )
-                                                        }
-                                                    }
-                                        }
-                                statusJob =
-                                        lifecycleScope.launch {
-                                            com.footprint.service.LocationTrackingService.isTracking
-                                                    .collect { isTracking ->
-                                                        events.success(
-                                                                gson.toJson(
-                                                                        mapOf(
-                                                                                "type" to "status",
-                                                                                "isTracking" to
-                                                                                        isTracking
-                                                                        )
-                                                                )
-                                                        )
-                                                    }
-                                        }
-                            }
-                            override fun onCancel(arguments: Any?) {
-                                locationJob?.cancel()
-                                statusJob?.cancel()
-                            }
+                             private var locationJob: Job? = null
+                             private var statusJob: Job? = null
+                             private var distanceJob: Job? = null
+                             
+                             override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                                 locationJob =
+                                         lifecycleScope.launch {
+                                             com.footprint.service.LocationTrackingService
+                                                     .currentLocation
+                                                     .collect { loc ->
+                                                         loc?.let {
+                                                             events.success(
+                                                                     gson.toJson(
+                                                                             mapOf(
+                                                                                     "type" to
+                                                                                             "location",
+                                                                                     "data" to
+                                                                                             mapOf(
+                                                                                                     "latitude" to
+                                                                                                             it.latitude,
+                                                                                                     "longitude" to
+                                                                                                             it.longitude,
+                                                                                                     "address" to
+                                                                                                             (it.address
+                                                                                                                     ?: "")
+                                                                                             )
+                                                                             )
+                                                                     )
+                                                             )
+                                                         }
+                                                     }
+                                         }
+                                 statusJob =
+                                         lifecycleScope.launch {
+                                             com.footprint.service.LocationTrackingService.isTracking
+                                                     .collect { isTracking ->
+                                                         events.success(
+                                                                 gson.toJson(
+                                                                         mapOf(
+                                                                                 "type" to "status",
+                                                                                 "isTracking" to
+                                                                                         isTracking
+                                                                         )
+                                                                 )
+                                                         )
+                                                     }
+                                         }
+                                 distanceJob =
+                                         lifecycleScope.launch {
+                                             com.footprint.service.LocationTrackingService.totalDistance
+                                                     .collect { distance ->
+                                                         events.success(
+                                                             gson.toJson(
+                                                                 mapOf(
+                                                                     "type" to "distance",
+                                                                     "distance" to distance
+                                                                 )
+                                                             )
+                                                         )
+                                                     }
+                                         }
+                             }
+                             override fun onCancel(arguments: Any?) {
+                                 locationJob?.cancel()
+                                 statusJob?.cancel()
+                                 distanceJob?.cancel()
+                             }
                         }
                 )
     }

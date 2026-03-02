@@ -213,21 +213,9 @@ object HolographicExportUtils {
                                 val frameBg =
                                         when (uiState.polaroidFrameStyle) {
                                                 "CLASSIC_BLACK" -> "#1A1A1A"
-                                                "LIQUID_GLASS" -> {
-                                                        when (uiState.glassTint) {
-                                                                "Cyan" -> "rgba(0, 255, 255, 0.15)"
-                                                                "Gold" -> "rgba(255, 215, 0, 0.15)"
-                                                                "Rose" ->
-                                                                        "rgba(255, 182, 193, 0.18)"
-                                                                else -> "rgba(255, 255, 255, 0.12)"
-                                                        }
-                                                }
                                                 else -> "#FAFAFA"
                                         }
-                                val glassEffect =
-                                        if (uiState.polaroidFrameStyle == "LIQUID_GLASS")
-                                                "backdrop-filter:blur(${uiState.frostRadius}px);-webkit-backdrop-filter:blur(${uiState.frostRadius}px);border: 0.5px solid rgba(255,255,255,0.3);box-shadow: inset 0 0 10px rgba(255,255,255,0.1), 0 4px 15px rgba(0,0,0,0.2);"
-                                        else ""
+                                val glassEffect = ""
 
                                 append(
                                         ".pol-frame{position:absolute;top:0;left:0;right:0;bottom:0;display:grid;grid-template-columns:${sideP}vw 1fr ${sideP}vw;grid-template-rows:${topP}vh 1fr ${bottomP}vh;pointer-events:none}"
@@ -237,18 +225,6 @@ object HolographicExportUtils {
                                         val bc =
                                                 when (uiState.polaroidFrameStyle) {
                                                         "CLASSIC_BLACK" -> "rgba(255,255,255,0.2)"
-                                                        "LIQUID_GLASS" -> {
-                                                                when (uiState.glassTint) {
-                                                                        "Cyan" ->
-                                                                                "rgba(0, 255, 255, 0.6)"
-                                                                        "Gold" ->
-                                                                                "rgba(255, 215, 0, 0.6)"
-                                                                        "Rose" ->
-                                                                                "rgba(255, 182, 193, 0.7)"
-                                                                        else ->
-                                                                                "rgba(255, 255, 255, 0.5)"
-                                                                }
-                                                        }
                                                         else -> "rgba(0,0,0,0.1)"
                                                 }
                                         append(
@@ -263,11 +239,7 @@ object HolographicExportUtils {
                                 append(
                                         ".pol-wm{grid-column:1 / span 3;grid-row:3;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;color:$pColor;font-family:$fontCss}"
                                 )
-                                val polTtlExtra =
-                                        if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                                                val ca = uiState.chromaticAberration
-                                                "text-shadow: ${-ca}px 0 rgba(255,0,0,0.5), ${ca}px 0 rgba(0,255,255,0.3);"
-                                        } else ""
+                                val polTtlExtra = ""
                                 append(
                                         ".pol-ttl{font-size:24px;font-weight:bold;margin-bottom:8px;opacity:0.9;$polTtlExtra}"
                                 )
@@ -292,11 +264,7 @@ object HolographicExportUtils {
                                 append(
                                         ".geek-box{background:rgba(0,0,0,0.7);padding:16px;border-radius:8px;border-right:4px solid $traceColor;backdrop-filter:blur(4px);text-align:right}"
                                 )
-                                val ttlExtra =
-                                        if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                                                val ca = uiState.chromaticAberration
-                                                "text-shadow: ${-ca}px 0 rgba(255,0,0,0.5), ${ca}px 0 rgba(0,255,255,0.5), $shadow;"
-                                        } else "text-shadow: $shadow;"
+                                val ttlExtra = "text-shadow: $shadow;"
                                 append(
                                         ".ttl{font-size:22px;margin-bottom:3px;letter-spacing:1.5px;color:$textColorHex;font-family:$fontCss;font-style:$fontStyle;$ttlExtra}"
                                 )
@@ -333,7 +301,11 @@ object HolographicExportUtils {
                                                 append("<div class=\"pol-div\"></div>")
                                                 append("<div class=\"pol-row\">")
                                                 val now = java.time.LocalTime.now()
-                                                val timeStr = now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+                                                val timeStr =
+                                                        now.format(
+                                                                java.time.format.DateTimeFormatter
+                                                                        .ofPattern("HH:mm:ss")
+                                                        )
                                                 append(
                                                         "<div class=\"pol-meta\"><div>$safeMeta</div><div style=\"font-family:monospace;font-size:8px;margin-top:2px\">TIMESTAMP: $timeStr</div><div style=\"font-family:monospace;font-size:8px;margin-top:2px\">TOTAL DISTANCE: %.2f KM</div></div>".format(
                                                                 totalDistanceKm

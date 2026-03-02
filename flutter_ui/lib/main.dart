@@ -2039,6 +2039,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     AMapFlutterLocation.updatePrivacyShow(true, true);
     AMapFlutterLocation.updatePrivacyAgree(true);
 
+    _recoverTrackingState();
+
     _streamSubscription = streamChannel.receiveBroadcastStream().listen((event) {
       if (!mounted) return;
       try {
@@ -2048,6 +2050,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
             _isTracking = data['isTracking'];
             if (!_isTracking) {
               _durationStr = '00:00:00';
+              _durationTimer?.cancel();
+            } else if (_durationTimer == null || !_durationTimer!.isActive) {
+               _startDurationTimer();
             }
           });
         } else if (data['type'] == 'location') {
@@ -2056,22 +2061,50 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
             final lng = (data['data']['longitude'] as num).toDouble();
             
             setState(() {
-              if (_lastLat != null && _lastLng != null) {
-                final d = _haversineDistance(_lastLat!, _lastLng!, lat, lng);
-                if (d > 0.5) { // Filter jitter
-                  _totalDistance += d;
-                }
-              }
               _lastLat = lat;
               _lastLng = lng;
               _trackingPath.add({'latitude': lat, 'longitude': lng});
             });
             _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
           }
+        } else if (data['type'] == 'distance') {
+           setState(() {
+             _totalDistance = (data['distance'] as num).toDouble();
+           });
         }
       } catch (e) {
         debugPrint('Stream Error: $e');
       }
+    });
+  }
+
+  Future<void> _recoverTrackingState() async {
+    try {
+      final json = await dataChannel.invokeMethod('getTrackingState');
+      final state = jsonDecode(json);
+      if (state['isTracking'] == true) {
+        setState(() {
+          _isTracking = true;
+          _totalDistance = (state['totalDistance'] as num).toDouble();
+          _sessionStartTime = state['sessionStartTime'];
+          _trackingPath.clear();
+          for (var p in state['path']) {
+            _trackingPath.add({'latitude': p['latitude'], 'longitude': p['longitude']});
+          }
+        });
+        _startDurationTimer();
+        _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
+      }
+    } catch (e) {
+      debugPrint('Error recovering state: $e');
+    }
+  }
+
+  void _startDurationTimer() {
+    _durationTimer?.cancel();
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_isTracking) return;
+      setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
     });
   }
 
@@ -2276,11 +2309,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       await dataChannel.invokeMethod('startTracking');
       setState(() => _isTracking = true);
 
-      _durationTimer?.cancel();
-      _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted || !_isTracking) return;
-        setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
-      });
+      _startDurationTimer();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("启动追踪失败: $e"), backgroundColor: Colors.orange));
     }

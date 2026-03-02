@@ -1,9 +1,12 @@
 package com.footprint.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,14 +30,12 @@ import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
 import com.amap.api.maps.model.PolylineOptions
 import com.footprint.FootprintViewModel
-import com.footprint.ui.components.LiquidGlassCard
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, onBack: () -> Unit) {
@@ -69,26 +70,28 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val entriesInRange = remember(uiState.entries, startDate, endDate) {
-        uiState.entries.filter { 
-            !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
-        }
-    }
+    val entriesInRange =
+            remember(uiState.entries, startDate, endDate) {
+                uiState.entries.filter {
+                    !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
+                }
+            }
 
     // Map lifecycle
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            when (event) {
-                androidx.lifecycle.Lifecycle.Event.ON_CREATE -> mapView.onCreate(null)
-                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
-                else -> {}
-            }
-        }
+        val observer =
+                androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    when (event) {
+                        androidx.lifecycle.Lifecycle.Event.ON_CREATE -> mapView.onCreate(null)
+                        androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                        androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                        androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                        else -> {}
+                    }
+                }
         lifecycle.addObserver(observer)
-        
+
         // Handle initial state if verified (e.g. if already RESUMED)
         if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
             mapView.onResume()
@@ -107,7 +110,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     LaunchedEffect(points, uiState.entries, startDate, endDate) {
         mapView.map.clear()
         val validPoints = points.filter { it.latitude != 0.0 && it.longitude != 0.0 }
-        
+
         val builder = LatLngBounds.builder()
         var hasBounds = false
 
@@ -119,20 +122,24 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                             .width(18f)
                             .color(android.graphics.Color.parseColor("#00FF9F"))
             )
-            latLngs.forEach { builder.include(it); hasBounds = true }
+            latLngs.forEach {
+                builder.include(it)
+                hasBounds = true
+            }
         }
 
-        val entriesInRange = uiState.entries.filter { 
-            !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
-        }
+        val entriesInRange =
+                uiState.entries.filter {
+                    !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
+                }
         val validEntries = entriesInRange.filter { it.latitude != null && it.longitude != null }
         validEntries.forEach { entry ->
             val position = LatLng(entry.latitude!!, entry.longitude!!)
             mapView.map.addMarker(
-                com.amap.api.maps.model.MarkerOptions()
-                    .position(position)
-                    .title(entry.title)
-                    .snippet("${entry.location} | ${entry.distanceKm}km")
+                    com.amap.api.maps.model.MarkerOptions()
+                            .position(position)
+                            .title(entry.title)
+                            .snippet("${entry.location} | ${entry.distanceKm}km")
             )
             builder.include(position)
             hasBounds = true
@@ -143,9 +150,19 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 mapView.map.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100))
             } catch (e: Exception) {
                 if (validPoints.isNotEmpty()) {
-                    mapView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(validPoints[0].latitude, validPoints[0].longitude), 15f))
+                    mapView.map.moveCamera(
+                            CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(validPoints[0].latitude, validPoints[0].longitude),
+                                    15f
+                            )
+                    )
                 } else if (validEntries.isNotEmpty()) {
-                    mapView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(validEntries[0].latitude!!, validEntries[0].longitude!!), 15f))
+                    mapView.map.moveCamera(
+                            CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(validEntries[0].latitude!!, validEntries[0].longitude!!),
+                                    15f
+                            )
+                    )
                 }
             }
         }
@@ -202,9 +219,19 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         }
 
         // Controls
-        LiquidGlassCard(
+        Card(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp)
+                shape = RoundedCornerShape(28.dp),
+                colors =
+                        CardDefaults.cardColors(
+                                containerColor =
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+                        ),
+                border =
+                        BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
         ) {
             Column(
                     modifier = Modifier.padding(16.dp),
@@ -276,34 +303,50 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 ) { Text("显示 ${points.size} 个记录点 | 里程: %.3f km".format(totalDistanceKm)) }
 
                 if (entriesInRange.isNotEmpty()) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                    )
                     Text(
-                        "包含 ${entriesInRange.size} 次足迹记录", 
-                        style = MaterialTheme.typography.labelMedium, 
-                        color = MaterialTheme.colorScheme.primary
+                            "包含 ${entriesInRange.size} 次足迹记录",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
                     )
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 200.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.heightIn(max = 200.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(entriesInRange, key = { it.id }) { entry ->
                             Row(
-                                modifier = Modifier.fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f), RoundedCornerShape(8.dp))
-                                        .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    modifier =
+                                            Modifier.fillMaxWidth()
+                                                    .background(
+                                                            MaterialTheme.colorScheme.surfaceVariant
+                                                                    .copy(alpha = 0.5f),
+                                                            RoundedCornerShape(8.dp)
+                                                    )
+                                                    .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(entry.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    Text(
+                                            entry.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                    )
                                     Spacer(Modifier.height(2.dp))
-                                    Text("${entry.happenedOn} · ${entry.location}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                            "${entry.happenedOn} · ${entry.location}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                                 Text(
-                                    "${String.format("%.3f", entry.distanceKm)} km", 
-                                    style = MaterialTheme.typography.bodyMedium, 
-                                    color = MaterialTheme.colorScheme.primary, 
-                                    fontWeight = FontWeight.Bold
+                                        "${String.format("%.3f", entry.distanceKm)} km",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
                                 )
                             }
                         }

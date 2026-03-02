@@ -21,12 +21,31 @@ object ArtLayoutOverlayUtils {
                 customTypeface: Typeface,
                 scale: Double
         ) {
+                val coreColorInt =
+                        when (uiState.artColorStyle) {
+                                "Deep Blue" -> Color.parseColor("#007AFF")
+                                "Cyber Pink" -> Color.parseColor("#FF2D55")
+                                "Neon Green" -> Color.parseColor("#00FF9F")
+                                "Gold" -> Color.parseColor("#FFCC00")
+                                else -> Color.parseColor("#00FF9F")
+                        }
+
+                val themeContentColor =
+                        when (uiState.polaroidFrameStyle) {
+                                "ACOUSTIC_WOOD" -> Color.parseColor("#3E2723")
+                                "CYBER_GLITCH" -> Color.parseColor("#00FFFF")
+                                "HEAVY_MECHANICAL", "CLASSIC_BLACK" -> Color.WHITE
+                                "CLASSIC_WHITE" -> Color.BLACK
+                                else -> Color.WHITE
+                        }
+
                 val textCValue =
                         when (uiState.artTextColor) {
                                 "Black" -> Color.BLACK
                                 "Gold" -> Color.parseColor("#FFCC00")
                                 "Deep Blue" -> Color.parseColor("#007AFF")
-                                else -> Color.WHITE
+                                "Match Core" -> themeContentColor
+                                else -> themeContentColor
                         }
 
                 val dateFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
@@ -110,16 +129,22 @@ object ArtLayoutOverlayUtils {
                                                 com.footprint.ui.screens.art.WoodType.VINTAGE_OAK ->
                                                         Color.parseColor("#D2B48C")
                                         }
+                                val armorColor =
+                                        when (uiState.armorType) {
+                                                ArmorType.GUNMETAL -> Color.parseColor("#2C2C2E")
+                                                ArmorType.CARBON_FIBER ->
+                                                        Color.parseColor("#1C1C1E")
+                                                ArmorType.WORN_OLIVE -> Color.parseColor("#4B5320")
+                                        }
                                 val frameColor =
                                         when (uiState.polaroidFrameStyle) {
                                                 "CLASSIC_BLACK" -> Color.parseColor("#1A1A1A")
-                                                "LIQUID_GLASS" -> Color.argb(120, 255, 255, 255)
                                                 "ACOUSTIC_WOOD" -> woodBaseColor
-                                                "HEAVY_MECHANICAL" -> Color.parseColor("#455A64")
-                                                "CYBER_GLITCH" -> Color.parseColor("#0D0D0D")
+                                                "HEAVY_MECHANICAL" -> armorColor
+                                                "CYBER_GLITCH" -> Color.parseColor("#0F0F0F")
                                                 else -> Color.parseColor("#FAFAFA")
                                         }
-                                val framePaint = Paint().apply { color = frameColor }
+                                val polaroidFramePaint = Paint().apply { color = frameColor }
 
                                 val mapWidth = bitmap.width * 0.9f
                                 val mapHeight = mapWidth
@@ -127,54 +152,29 @@ object ArtLayoutOverlayUtils {
                                 val mapTop = bitmap.height * 0.15f
                                 val mapBottom = mapTop + mapHeight
 
-                                // For LIQUID_GLASS, we draw a blurred version of the map in the
-                                // frame area
-                                if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                                        val blurRadius = 40f * scale.toFloat()
-                                        val blurredMap = blurBitmap(bitmap, blurRadius)
-                                        if (blurredMap != null) {
-                                                // Draw blurred background only in frame area
-                                                canvas.save()
-                                                val framePath =
-                                                        Path().apply {
-                                                                addRect(
-                                                                        0f,
-                                                                        0f,
-                                                                        bitmap.width.toFloat(),
-                                                                        bitmap.height.toFloat(),
-                                                                        Path.Direction.CW
-                                                                )
-                                                                addRect(
-                                                                        mapLeft,
-                                                                        mapTop,
-                                                                        mapLeft + mapWidth,
-                                                                        mapTop + mapHeight,
-                                                                        Path.Direction.CCW
-                                                                )
-                                                        }
-                                                canvas.clipPath(framePath)
-                                                canvas.drawBitmap(blurredMap, 0f, 0f, null)
-                                                canvas.restore()
-                                                blurredMap.recycle()
-                                        }
-                                }
 
                                 // Draw Frame
-                                canvas.drawRect(0f, 0f, bitmap.width.toFloat(), mapTop, framePaint)
+                                canvas.drawRect(
+                                        0f,
+                                        0f,
+                                        bitmap.width.toFloat(),
+                                        mapTop,
+                                        polaroidFramePaint
+                                )
                                 canvas.drawRect(
                                         0f,
                                         mapBottom,
                                         bitmap.width.toFloat(),
                                         bitmap.height.toFloat(),
-                                        framePaint
+                                        polaroidFramePaint
                                 )
-                                canvas.drawRect(0f, mapTop, mapLeft, mapBottom, framePaint)
+                                canvas.drawRect(0f, mapTop, mapLeft, mapBottom, polaroidFramePaint)
                                 canvas.drawRect(
                                         mapLeft + mapWidth,
                                         mapTop,
                                         bitmap.width.toFloat(),
                                         mapBottom,
-                                        framePaint
+                                        polaroidFramePaint
                                 )
 
                                 // Material Textures
@@ -326,73 +326,144 @@ object ArtLayoutOverlayUtils {
                                                 )
                                         }
                                         "HEAVY_MECHANICAL" -> {
-                                                val armorColor = when (uiState.armorType) {
-                                                        ArmorType.GUNMETAL -> Color.parseColor("#2C2C2E")
-                                                        ArmorType.CARBON_FIBER -> Color.parseColor("#1C1C1E")
-                                                        ArmorType.WORN_OLIVE -> Color.parseColor("#4B5320")
-                                                }
-                                                val framePaint = Paint().apply {
-                                                        color = armorColor
-                                                        isAntiAlias = true
-                                                }
-                                                
+                                                val armorColor =
+                                                        when (uiState.armorType) {
+                                                                ArmorType.GUNMETAL ->
+                                                                        Color.parseColor("#2C2C2E")
+                                                                ArmorType.CARBON_FIBER ->
+                                                                        Color.parseColor("#1C1C1E")
+                                                                ArmorType.WORN_OLIVE ->
+                                                                        Color.parseColor("#4B5320")
+                                                        }
+                                                val heavyFramePaint =
+                                                        Paint().apply {
+                                                                color = armorColor
+                                                                isAntiAlias = true
+                                                        }
+
                                                 // 1. Chamfered Frame Path
                                                 val chamfer = 60f * scale.toFloat()
-                                                val framePath = Path().apply {
-                                                        moveTo(chamfer, 0f)
-                                                        lineTo(bitmap.width - chamfer, 0f)
-                                                        lineTo(bitmap.width.toFloat(), chamfer)
-                                                        lineTo(bitmap.width.toFloat(), bitmap.height - chamfer)
-                                                        lineTo(bitmap.width - chamfer, bitmap.height.toFloat())
-                                                        lineTo(chamfer, bitmap.height.toFloat())
-                                                        lineTo(0f, bitmap.height - chamfer)
-                                                        lineTo(0f, chamfer)
-                                                        close()
-                                                        // Hole for map
-                                                        addRect(mapLeft, mapTop, mapLeft + mapWidth, mapTop + mapHeight, Path.Direction.CCW)
-                                                        fillType = Path.FillType.EVEN_ODD
-                                                }
-                                                canvas.drawPath(framePath, framePaint)
+                                                val framePath =
+                                                        Path().apply {
+                                                                moveTo(chamfer, 0f)
+                                                                lineTo(bitmap.width - chamfer, 0f)
+                                                                lineTo(
+                                                                        bitmap.width.toFloat(),
+                                                                        chamfer
+                                                                )
+                                                                lineTo(
+                                                                        bitmap.width.toFloat(),
+                                                                        bitmap.height - chamfer
+                                                                )
+                                                                lineTo(
+                                                                        bitmap.width - chamfer,
+                                                                        bitmap.height.toFloat()
+                                                                )
+                                                                lineTo(
+                                                                        chamfer,
+                                                                        bitmap.height.toFloat()
+                                                                )
+                                                                lineTo(0f, bitmap.height - chamfer)
+                                                                lineTo(0f, chamfer)
+                                                                close()
+                                                                // Hole for map
+                                                                addRect(
+                                                                        mapLeft,
+                                                                        mapTop,
+                                                                        mapLeft + mapWidth,
+                                                                        mapTop + mapHeight,
+                                                                        Path.Direction.CCW
+                                                                )
+                                                                fillType = Path.FillType.EVEN_ODD
+                                                        }
+                                                canvas.drawPath(framePath, heavyFramePaint)
+
+                                                // Draw accent lines on the frame
+                                                val accentPaint =
+                                                        Paint().apply {
+                                                                color = Color.WHITE
+                                                                alpha = 30
+                                                                style = Paint.Style.STROKE
+                                                                strokeWidth = 2f * scale.toFloat()
+                                                        }
+                                                canvas.drawPath(framePath, accentPaint)
 
                                                 // 2. Armor Texture (Simulated)
                                                 if (uiState.canvasGrain > 0f) {
-                                                        val noisePaint = Paint().apply {
-                                                                color = Color.BLACK
-                                                                alpha = (25 * uiState.canvasGrain).toInt()
-                                                                xfermode = PorterDuffXfermode(PorterDuff.Mode.OVERLAY)
-                                                        }
-                                                        canvas.drawRect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat(), noisePaint)
+                                                        val noisePaint =
+                                                                Paint().apply {
+                                                                        color = Color.BLACK
+                                                                        alpha =
+                                                                                (25 *
+                                                                                                uiState.canvasGrain)
+                                                                                        .toInt()
+                                                                        xfermode =
+                                                                                PorterDuffXfermode(
+                                                                                        PorterDuff
+                                                                                                .Mode
+                                                                                                .OVERLAY
+                                                                                )
+                                                                }
+                                                        canvas.drawRect(
+                                                                0f,
+                                                                0f,
+                                                                bitmap.width.toFloat(),
+                                                                bitmap.height.toFloat(),
+                                                                noisePaint
+                                                        )
                                                 }
 
                                                 // 3. Rivets
-                                                val rivetPaint = Paint().apply {
-                                                        color = Color.BLACK
-                                                        alpha = 100
-                                                        isAntiAlias = true
-                                                }
-                                                val rivetHighlight = Paint().apply {
-                                                        color = Color.WHITE
-                                                        alpha = 50
-                                                        isAntiAlias = true
-                                                }
-                                                val rRadius = (6f + (uiState.mechanicalSeams * 8f)) * scale.toFloat()
-                                                val rSpacing = (150f + (1.0f - uiState.mechanicalSeams) * 250f) * scale.toFloat()
+                                                val rivetPaint =
+                                                        Paint().apply {
+                                                                color = Color.BLACK
+                                                                alpha = 100
+                                                                isAntiAlias = true
+                                                        }
+                                                val rivetHighlight =
+                                                        Paint().apply {
+                                                                color = Color.WHITE
+                                                                alpha = 50
+                                                                isAntiAlias = true
+                                                        }
+                                                val rRadius =
+                                                        (6f + (uiState.mechanicalSeams * 8f)) *
+                                                                scale.toFloat()
+                                                val rSpacing =
+                                                        (150f +
+                                                                (1.0f - uiState.mechanicalSeams) *
+                                                                        250f) * scale.toFloat()
 
                                                 fun drawRivet(x: Float, y: Float) {
                                                         canvas.drawCircle(x, y, rRadius, rivetPaint)
-                                                        canvas.drawCircle(x - 2f * scale.toFloat(), y - 2f * scale.toFloat(), rRadius * 0.5f, rivetHighlight)
+                                                        canvas.drawCircle(
+                                                                x - 2f * scale.toFloat(),
+                                                                y - 2f * scale.toFloat(),
+                                                                rRadius * 0.5f,
+                                                                rivetHighlight
+                                                        )
                                                 }
 
                                                 // Frame Rivets
                                                 drawRivet(mapLeft / 2, mapTop / 2)
                                                 drawRivet(bitmap.width - mapLeft / 2, mapTop / 2)
-                                                drawRivet(mapLeft / 2, bitmap.height - (60f * scale.toFloat()))
-                                                drawRivet(bitmap.width - mapLeft / 2, bitmap.height - (60f * scale.toFloat()))
+                                                drawRivet(
+                                                        mapLeft / 2,
+                                                        bitmap.height - (60f * scale.toFloat())
+                                                )
+                                                drawRivet(
+                                                        bitmap.width - mapLeft / 2,
+                                                        bitmap.height - (60f * scale.toFloat())
+                                                )
 
                                                 var rx = mapLeft + rSpacing
                                                 while (rx < mapLeft + mapWidth - rSpacing) {
                                                         drawRivet(rx, mapTop / 2)
-                                                        drawRivet(rx, bitmap.height - (60f * scale.toFloat()))
+                                                        drawRivet(
+                                                                rx,
+                                                                bitmap.height -
+                                                                        (60f * scale.toFloat())
+                                                        )
                                                         rx += rSpacing
                                                 }
 
@@ -401,70 +472,147 @@ object ArtLayoutOverlayUtils {
                                                         val sWidth = 40f * scale.toFloat()
                                                         val sHeight = 70f * scale.toFloat()
                                                         val sSpacing = 80f * scale.toFloat()
-                                                        val sPaint = Paint().apply {
-                                                                color = Color.parseColor("#FBC02D")
-                                                                alpha = 200
-                                                                isAntiAlias = true
-                                                        }
-                                                        val sStartX = (mapLeft + mapWidth) - (300f * scale.toFloat())
-                                                        val sY = mapTop + mapHeight + (40f * scale.toFloat())
+                                                        val sPaint =
+                                                                Paint().apply {
+                                                                        color =
+                                                                                Color.parseColor(
+                                                                                        "#FBC02D"
+                                                                                )
+                                                                        alpha = 200
+                                                                        isAntiAlias = true
+                                                                }
+                                                        val sStartX =
+                                                                (mapLeft + mapWidth) -
+                                                                        (300f * scale.toFloat())
+                                                        val sY =
+                                                                mapTop +
+                                                                        mapHeight +
+                                                                        (40f * scale.toFloat())
 
                                                         for (i in 0 until 6) {
                                                                 val x = sStartX + (i * sSpacing)
-                                                                val sPath = Path().apply {
-                                                                        moveTo(x, sY)
-                                                                        lineTo(x + sWidth, sY)
-                                                                        lineTo(x + sWidth - (20f * scale.toFloat()), sY + sHeight)
-                                                                        lineTo(x - (20f * scale.toFloat()), sY + sHeight)
-                                                                        close()
-                                                                }
+                                                                val sPath =
+                                                                        Path().apply {
+                                                                                moveTo(x, sY)
+                                                                                lineTo(
+                                                                                        x + sWidth,
+                                                                                        sY
+                                                                                )
+                                                                                lineTo(
+                                                                                        x + sWidth -
+                                                                                                (20f *
+                                                                                                        scale.toFloat()),
+                                                                                        sY + sHeight
+                                                                                )
+                                                                                lineTo(
+                                                                                        x -
+                                                                                                (20f *
+                                                                                                        scale.toFloat()),
+                                                                                        sY + sHeight
+                                                                                )
+                                                                                close()
+                                                                        }
                                                                 canvas.drawPath(sPath, sPaint)
                                                         }
                                                 }
 
                                                 // 5. Tactical HUD (Post-processing on map area)
-                                                val hudColor = Color.parseColor(uiState.artColorStyle)
-                                                val gridPaint = Paint().apply {
-                                                        color = hudColor
-                                                        alpha = 40
-                                                        strokeWidth = 1f * scale.toFloat()
-                                                }
+                                                val hudColor =
+                                                        when (uiState.polaroidFrameStyle) {
+                                                                "CYBER_GLITCH" ->
+                                                                        Color.parseColor("#00FFFF")
+                                                                "HEAVY_MECHANICAL" -> Color.WHITE
+                                                                else -> Color.WHITE
+                                                        }
+                                                val gridPaint =
+                                                        Paint().apply {
+                                                                color = hudColor
+                                                                alpha = 60
+                                                                strokeWidth = 1f * scale.toFloat()
+                                                        }
                                                 val gridCount = 10
                                                 for (i in 1 until gridCount) {
-                                                        val gx = mapLeft + (mapWidth / gridCount) * i
-                                                        val gy = mapTop + (mapHeight / gridCount) * i
-                                                        canvas.drawLine(gx, mapTop, gx, mapTop + mapHeight, gridPaint)
-                                                        canvas.drawLine(mapLeft, gy, mapLeft + mapWidth, gy, gridPaint)
+                                                        val gx =
+                                                                mapLeft + (mapWidth / gridCount) * i
+                                                        val gy =
+                                                                mapTop + (mapHeight / gridCount) * i
+                                                        canvas.drawLine(
+                                                                gx,
+                                                                mapTop,
+                                                                gx,
+                                                                mapTop + mapHeight,
+                                                                gridPaint
+                                                        )
+                                                        canvas.drawLine(
+                                                                mapLeft,
+                                                                gy,
+                                                                mapLeft + mapWidth,
+                                                                gy,
+                                                                gridPaint
+                                                        )
                                                 }
-                                                
-                                                val retPaint = Paint().apply {
-                                                        color = hudColor
-                                                        alpha = 180
-                                                        style = Paint.Style.STROKE
-                                                        strokeWidth = 3f * scale.toFloat()
-                                                }
+
+                                                val retPaint =
+                                                        Paint().apply {
+                                                                color = hudColor
+                                                                alpha = 180
+                                                                style = Paint.Style.STROKE
+                                                                strokeWidth = 3f * scale.toFloat()
+                                                        }
                                                 val rs = 60f * scale.toFloat()
                                                 // Corner Reticles
-                                                canvas.drawLines(floatArrayOf(
-                                                        mapLeft, mapTop, mapLeft + rs, mapTop,
-                                                        mapLeft, mapTop, mapLeft, mapTop + rs,
-                                                        mapLeft + mapWidth, mapTop + mapHeight, mapLeft + mapWidth - rs, mapTop + mapHeight,
-                                                        mapLeft + mapWidth, mapTop + mapHeight, mapLeft + mapWidth, mapTop + mapHeight - rs
-                                                ), retPaint)
+                                                canvas.drawLines(
+                                                        floatArrayOf(
+                                                                mapLeft,
+                                                                mapTop,
+                                                                mapLeft + rs,
+                                                                mapTop,
+                                                                mapLeft,
+                                                                mapTop,
+                                                                mapLeft,
+                                                                mapTop + rs,
+                                                                mapLeft + mapWidth,
+                                                                mapTop + mapHeight,
+                                                                mapLeft + mapWidth - rs,
+                                                                mapTop + mapHeight,
+                                                                mapLeft + mapWidth,
+                                                                mapTop + mapHeight,
+                                                                mapLeft + mapWidth,
+                                                                mapTop + mapHeight - rs
+                                                        ),
+                                                        retPaint
+                                                )
                                         }
                                         "CYBER_GLITCH" -> {
                                                 val neonPaint =
                                                         Paint().apply {
-                                                                color = Color.parseColor("#00F2FF")
-                                                                alpha = 150
+                                                                color = Color.parseColor("#00FFFF")
+                                                                alpha = 180
                                                                 style = Paint.Style.STROKE
-                                                                strokeWidth = 2f * scale.toFloat()
+                                                                strokeWidth = 3f * scale.toFloat()
+                                                                setShadowLayer(
+                                                                        15f * scale.toFloat(),
+                                                                        0f,
+                                                                        0f,
+                                                                        Color.parseColor("#00FFFF")
+                                                                )
                                                         }
                                                 canvas.drawRect(
-                                                        mapLeft - (4f * scale.toFloat()),
-                                                        mapTop - (4f * scale.toFloat()),
-                                                        mapLeft + mapWidth + (4f * scale.toFloat()),
-                                                        mapBottom + (4f * scale.toFloat()),
+                                                        mapLeft - (8f * scale.toFloat()),
+                                                        mapTop - (8f * scale.toFloat()),
+                                                        mapLeft + mapWidth + (8f * scale.toFloat()),
+                                                        mapBottom + (8f * scale.toFloat()),
+                                                        neonPaint
+                                                )
+
+                                                // Inner Glow
+                                                neonPaint.alpha = 60
+                                                neonPaint.strokeWidth = 1f * scale.toFloat()
+                                                canvas.drawRect(
+                                                        mapLeft - (2f * scale.toFloat()),
+                                                        mapTop - (2f * scale.toFloat()),
+                                                        mapLeft + mapWidth + (2f * scale.toFloat()),
+                                                        mapBottom + (2f * scale.toFloat()),
                                                         neonPaint
                                                 )
                                         }
@@ -475,12 +623,11 @@ object ArtLayoutOverlayUtils {
                                         when (uiState.polaroidFrameStyle) {
                                                 "CLASSIC_BLACK", "CYBER_GLITCH" ->
                                                         Color.argb(51, 255, 255, 255)
-                                                "LIQUID_GLASS" -> Color.argb(128, 255, 255, 255)
                                                 "HEAVY_MECHANICAL" -> Color.parseColor("#B0BEC5")
                                                 "ACOUSTIC_WOOD" -> Color.argb(102, 141, 110, 99)
                                                 else -> Color.argb(38, 0, 0, 0)
                                         }
-                                val borderPaint =
+                                val innerBorderPaint =
                                         Paint().apply {
                                                 color = borderColor
                                                 style = Paint.Style.STROKE
@@ -493,7 +640,7 @@ object ArtLayoutOverlayUtils {
                                         mapTop,
                                         mapLeft + mapWidth,
                                         mapTop + mapHeight,
-                                        borderPaint
+                                        innerBorderPaint
                                 )
 
                                 // High-res Ambient Occlusion (Inner Shadow)
@@ -526,9 +673,9 @@ object ArtLayoutOverlayUtils {
                                 // Global Color Tint
                                 val tintColor =
                                         when (uiState.polaroidFrameStyle) {
-                                                "ACOUSTIC_WOOD" -> Color.argb(13, 255, 152, 0)
-                                                "CYBER_GLITCH" -> Color.argb(8, 0, 242, 255)
-                                                "HEAVY_MECHANICAL" -> Color.argb(13, 144, 164, 174)
+                                                "ACOUSTIC_WOOD" -> Color.argb(15, 255, 152, 0)
+                                                "CYBER_GLITCH" -> Color.argb(15, 0, 255, 255)
+                                                "HEAVY_MECHANICAL" -> Color.argb(15, 144, 164, 174)
                                                 else -> Color.TRANSPARENT
                                         }
                                 if (tintColor != Color.TRANSPARENT) {
@@ -538,7 +685,7 @@ object ArtLayoutOverlayUtils {
                                 // 5. Canvas Grain Overlay (Noise on map)
                                 if (uiState.canvasGrain > 0f) {
                                         val grainAlpha = (40 * uiState.canvasGrain).toInt()
-                                        val noisePaint =
+                                        val mapNoisePaint =
                                                 Paint().apply {
                                                         color = Color.BLACK
                                                         alpha = grainAlpha
@@ -552,16 +699,16 @@ object ArtLayoutOverlayUtils {
                                                 mapTop,
                                                 mapLeft + mapWidth,
                                                 mapBottom,
-                                                noisePaint
+                                                mapNoisePaint
                                         )
                                 }
 
                                 val titleColor =
                                         when (uiState.polaroidFrameStyle) {
                                                 "CLASSIC_BLACK", "HEAVY_MECHANICAL" -> Color.WHITE
-                                                "CYBER_GLITCH" -> Color.parseColor("#00F2FF")
+                                                "CYBER_GLITCH" -> Color.parseColor("#00FFFF")
                                                 "ACOUSTIC_WOOD" -> Color.parseColor("#3E2723")
-                                                else -> Color.BLACK
+                                                else -> textCValue
                                         }
                                 textPaint.color = titleColor
                                 textPaint.textSize = 240f * scale.toFloat()
@@ -579,14 +726,21 @@ object ArtLayoutOverlayUtils {
                                 subtitlePaint.textSize = 48f * scale.toFloat()
 
                                 val titleStrRaw = uiState.artAuthorName.ifBlank { "My Journey" }
-                                val titleStr = if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") "[ $titleStrRaw ]" else titleStrRaw
+                                val titleStr =
+                                        if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL")
+                                                "[ $titleStrRaw ]"
+                                        else titleStrRaw
                                 val textWidth = textPaint.measureText(titleStr)
-                                
-                                val exportDateRange = if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") dateRangeStr.replace(".", "-") else dateRangeStr
-                                val exportSubtitleStr = if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") {
-                                        "$exportDateRange · ${String.format("%.2f", totalDistanceKm)} KM"
-                                } else subtitleStr
-                                
+
+                                val exportDateRange =
+                                        if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL")
+                                                dateRangeStr.replace(".", "-")
+                                        else dateRangeStr
+                                val exportSubtitleStr =
+                                        if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") {
+                                                "$exportDateRange · ${String.format("%.2f", totalDistanceKm)} KM"
+                                        } else subtitleStr
+
                                 val subWidth = subtitlePaint.measureText(exportSubtitleStr)
 
                                 val x_title = (bitmap.width - textWidth) / 2f
@@ -594,13 +748,13 @@ object ArtLayoutOverlayUtils {
                                 val y_base = bitmap.height - (180f * scale.toFloat())
 
                                 if (uiState.artTextBorder) {
-                                        val borderPaint =
+                                        val textBorderPaint =
                                                 Paint(textPaint).apply {
                                                         style = Paint.Style.STROKE
                                                         strokeWidth = 6f * scale.toFloat()
                                                         color = Color.argb(50, 0, 0, 0)
                                                 }
-                                        canvas.drawText(titleStr, x_title, y_base, borderPaint)
+                                        canvas.drawText(titleStr, x_title, y_base, textBorderPaint)
                                 }
 
                                 // Laser Engraving Effect for Acoustic Wood
@@ -620,13 +774,14 @@ object ArtLayoutOverlayUtils {
                                         canvas.drawText(titleStr, x_title, y_base, engravingPaint)
                                 } else {
                                         if (uiState.polaroidFrameStyle == "HEAVY_MECHANICAL") {
-                                                val borderPaint = Paint().apply {
-                                                        color = titleColor
-                                                        alpha = 80
-                                                        style = Paint.Style.STROKE
-                                                        strokeWidth = 2f * scale.toFloat()
-                                                        isAntiAlias = true
-                                                }
+                                                val mechanicalTextBorderPaint =
+                                                        Paint().apply {
+                                                                color = titleColor
+                                                                alpha = 80
+                                                                style = Paint.Style.STROKE
+                                                                strokeWidth = 2f * scale.toFloat()
+                                                                isAntiAlias = true
+                                                        }
                                                 val rectPadding = 40f * scale.toFloat()
                                                 canvas.drawRoundRect(
                                                         x_title - rectPadding,
@@ -635,7 +790,7 @@ object ArtLayoutOverlayUtils {
                                                         y_base + 10f * scale.toFloat(),
                                                         40f * scale.toFloat(),
                                                         40f * scale.toFloat(),
-                                                        borderPaint
+                                                        mechanicalTextBorderPaint
                                                 )
                                         }
                                         canvas.drawText(titleStr, x_title, y_base, textPaint)
@@ -669,6 +824,15 @@ object ArtLayoutOverlayUtils {
                                 }
                         }
                         ArtLayout.GEEK_STATS -> {
+                                val woodBaseColor =
+                                        when (uiState.woodType) {
+                                                com.footprint.ui.screens.art.WoodType.ASH ->
+                                                        Color.parseColor("#E5D3B3")
+                                                com.footprint.ui.screens.art.WoodType.WALNUT ->
+                                                        Color.parseColor("#5D4037")
+                                                com.footprint.ui.screens.art.WoodType.VINTAGE_OAK ->
+                                                        Color.parseColor("#D2B48C")
+                                        }
                                 val density = context.resources.displayMetrics.density
                                 val margin = 16f * density * scale.toFloat()
                                 val padding = 16f * density * scale.toFloat()
@@ -696,7 +860,27 @@ object ArtLayoutOverlayUtils {
                                 val boxLeft = bitmap.width.toFloat() - margin - boxWidth
                                 val boxTop = margin
 
-                                val boxPaint = Paint().apply { color = Color.argb(178, 0, 0, 0) }
+                                val boxPaint =
+                                        Paint().apply {
+                                                color =
+                                                        when (uiState.polaroidFrameStyle) {
+                                                                "ACOUSTIC_WOOD" -> woodBaseColor
+                                                                "HEAVY_MECHANICAL" ->
+                                                                        Color.parseColor("#263238")
+                                                                "CYBER_GLITCH" -> Color.BLACK
+                                                                "LIQUID_GLASS" ->
+                                                                        Color.argb(
+                                                                                120,
+                                                                                255,
+                                                                                255,
+                                                                                255
+                                                                        )
+                                                                "CLASSIC_BLACK" ->
+                                                                        Color.parseColor("#1A1A1A")
+                                                                else -> Color.argb(178, 0, 0, 0)
+                                                        }
+                                        }
+
                                 val cornerRadius = 8f * density * scale.toFloat()
                                 canvas.drawRoundRect(
                                         boxLeft,
@@ -708,10 +892,133 @@ object ArtLayoutOverlayUtils {
                                         boxPaint
                                 )
 
+                                // Theme specific box details
+                                when (uiState.polaroidFrameStyle) {
+                                        "ACOUSTIC_WOOD" -> {
+                                                val woodBoxBorderPaint =
+                                                        Paint().apply {
+                                                                color = Color.BLACK
+                                                                alpha = 40
+                                                                style = Paint.Style.STROKE
+                                                                strokeWidth = 1f * scale.toFloat()
+                                                        }
+                                                canvas.drawRoundRect(
+                                                        boxLeft,
+                                                        boxTop,
+                                                        boxLeft + boxWidth,
+                                                        boxTop + boxHeight,
+                                                        cornerRadius,
+                                                        cornerRadius,
+                                                        woodBoxBorderPaint
+                                                )
+                                        }
+                                        "CYBER_GLITCH" -> {
+                                                val cyberBoxBorderPaint =
+                                                        Paint().apply {
+                                                                color = Color.parseColor("#00FFFF")
+                                                                style = Paint.Style.STROKE
+                                                                strokeWidth = 2f * scale.toFloat()
+                                                                setShadowLayer(
+                                                                        8f * scale.toFloat(),
+                                                                        0f,
+                                                                        0f,
+                                                                        Color.parseColor("#00FFFF")
+                                                                )
+                                                        }
+                                                canvas.drawRoundRect(
+                                                        boxLeft,
+                                                        boxTop,
+                                                        boxLeft + boxWidth,
+                                                        boxTop + boxHeight,
+                                                        cornerRadius,
+                                                        cornerRadius,
+                                                        cyberBoxBorderPaint
+                                                )
+                                        }
+                                        "HEAVY_MECHANICAL" -> {
+                                                val heavyBoxBorderPaint =
+                                                        Paint().apply {
+                                                                color = Color.WHITE
+                                                                alpha = 50
+                                                                style = Paint.Style.STROKE
+                                                                strokeWidth = 1f * scale.toFloat()
+                                                        }
+                                                canvas.drawRoundRect(
+                                                        boxLeft,
+                                                        boxTop,
+                                                        boxLeft + boxWidth,
+                                                        boxTop + boxHeight,
+                                                        cornerRadius,
+                                                        cornerRadius,
+                                                        heavyBoxBorderPaint
+                                                )
+                                                // Mini rivets
+                                                val r = 2f * scale.toFloat()
+                                                val rP =
+                                                        Paint().apply {
+                                                                color = Color.BLACK
+                                                                alpha = 100
+                                                        }
+                                                canvas.drawCircle(
+                                                        boxLeft + 6f * scale.toFloat(),
+                                                        boxTop + 6f * scale.toFloat(),
+                                                        r,
+                                                        rP
+                                                )
+                                                canvas.drawCircle(
+                                                        boxLeft + boxWidth - 6f * scale.toFloat(),
+                                                        boxTop + 6f * scale.toFloat(),
+                                                        r,
+                                                        rP
+                                                )
+                                                canvas.drawCircle(
+                                                        boxLeft + 6f * scale.toFloat(),
+                                                        boxTop + boxHeight - 6f * scale.toFloat(),
+                                                        r,
+                                                        rP
+                                                )
+                                                canvas.drawCircle(
+                                                        boxLeft + boxWidth - 6f * scale.toFloat(),
+                                                        boxTop + boxHeight - 6f * scale.toFloat(),
+                                                        r,
+                                                        rP
+                                                )
+                                        }
+                                }
+
+                                val statsTextColor =
+                                        when (uiState.polaroidFrameStyle) {
+                                                "ACOUSTIC_WOOD" -> Color.parseColor("#3E2723")
+                                                "CYBER_GLITCH" -> Color.parseColor("#00FFFF")
+                                                "HEAVY_MECHANICAL" -> Color.WHITE
+                                                "CLASSIC_WHITE" -> Color.BLACK
+                                                else -> Color.WHITE
+                                        }
+
+                                textPaint.apply {
+                                        color = statsTextColor
+                                        if (uiState.polaroidFrameStyle == "CYBER_GLITCH") {
+                                                setShadowLayer(
+                                                        10f * scale.toFloat(),
+                                                        0f,
+                                                        0f,
+                                                        Color.parseColor("#00FFFF")
+                                                )
+                                        } else {
+                                                clearShadowLayer()
+                                        }
+                                }
+                                subtitlePaint.apply {
+                                        color = statsTextColor
+                                        alpha = 200
+                                }
+
                                 val tx = boxLeft + padding
                                 var ty = boxTop + padding + textPaint.textSize * 0.8f
 
-                                if (uiState.artTextBorder) {
+                                if (uiState.artTextBorder &&
+                                                uiState.polaroidFrameStyle != "CYBER_GLITCH"
+                                ) {
                                         val borderPaint =
                                                 Paint(textPaint).apply {
                                                         style = Paint.Style.STROKE
@@ -731,10 +1038,38 @@ object ArtLayoutOverlayUtils {
                                 // Decorative corner brackets
                                 val bracketPaint =
                                         Paint().apply {
-                                                color = Color.WHITE
+                                                val borderColor =
+                                                        when (uiState.polaroidFrameStyle) {
+                                                                "CLASSIC_BLACK", "CYBER_GLITCH" ->
+                                                                        Color.argb(
+                                                                                51,
+                                                                                255,
+                                                                                255,
+                                                                                255
+                                                                        )
+                                                                "HEAVY_MECHANICAL" ->
+                                                                        Color.parseColor("#B0BEC5")
+                                                                "ACOUSTIC_WOOD" ->
+                                                                        Color.argb(
+                                                                                102,
+                                                                                141,
+                                                                                110,
+                                                                                99
+                                                                        )
+                                                                else -> Color.argb(38, 0, 0, 0)
+                                                        }
+                                                color = borderColor
                                                 alpha = 128
                                                 style = Paint.Style.STROKE
                                                 strokeWidth = 2f * density * scale.toFloat()
+                                                if (uiState.polaroidFrameStyle == "CYBER_GLITCH") {
+                                                        setShadowLayer(
+                                                                8f * scale.toFloat(),
+                                                                0f,
+                                                                0f,
+                                                                Color.parseColor("#00FFFF")
+                                                        )
+                                                }
                                         }
                                 val bLen = 40f * density * scale.toFloat()
                                 // Top Left

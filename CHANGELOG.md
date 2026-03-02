@@ -1,5 +1,24 @@
 # 更新日志 (Changelog)
 
+### 2026-03-02: UI 视觉归一化与构建系统升级 (v3.3.0)
+
+#### ✨ 核心特性 (Features)
+- **视觉风格去“液态”化**:
+  - 彻底移除了“液态玻璃” (Liquid Glass) 艺术风格。
+  - 艺术工坊、时空热力图及 3D 漫游模块统一回归现代简洁 UI，提升视觉专业感与一致性。
+- **UI 细节打磨**:
+  - **核心色调选择器**: 修正了颜色选中态对号图标的居中问题，视觉更加平衡。
+  - **组件色彩同步**: 确保日期、海报布局、书法字体等模块的颜色深度适配当前主题，与核心色调解耦。
+  - **核心色调专注化**: 核心色调现在仅控制地图足迹颜色，UI 元素保持其独立的主题色彩。
+
+#### 🔧 构建与稳定性 (Build & Stability)
+- **Android SDK 36 全量适配**:
+  - 将 `compileSdk` 与 `targetSdk` 提升至 **36**，适配最新的 Android 特性。
+  - 修复了由于 SDK 版本过低导致的 `Execution failed for task ':app:checkDebugAarMetadata'` 冲突问题。
+- **编译错误修复**:
+  - 彻底清理了代码中残存的 `glassTint`、`frostRadius` 等失效引用。
+  - 修复了 `GenerativeArtScreen.kt` 及 `ArtLayoutOverlayUtils.kt` 中的类型不匹配与引用缺失问题。
+
 ### 2026-03-01: 功能完善与体验优化 (v3.2.3)
 
 #### ✨ 核心特性 (Features)

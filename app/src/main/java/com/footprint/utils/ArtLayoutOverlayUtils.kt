@@ -101,60 +101,12 @@ object ArtLayoutOverlayUtils {
                 val frameColor =
                         when (uiState.polaroidFrameStyle) {
                             "CLASSIC_BLACK" -> android.graphics.Color.parseColor("#1A1A1A")
-                            "LIQUID_GLASS" -> {
-                                when (uiState.glassTint) {
-                                    "Cyan" -> android.graphics.Color.argb(40, 0, 255, 255)
-                                    "Gold" -> android.graphics.Color.argb(40, 255, 215, 0)
-                                    "Rose" -> android.graphics.Color.argb(40, 255, 182, 193)
-                                    else -> android.graphics.Color.argb(30, 255, 255, 255)
-                                }
-                            }
                             else -> android.graphics.Color.parseColor("#FAFAFA")
                         }
 
                 val paperPaint = Paint().apply { color = frameColor }
 
                 // 2. Draw Frame
-                if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                    val blurR = (uiState.frostRadius * scale).toInt().coerceIn(1, 100)
-                    val blurredMap = blurBitmap(bitmap, blurR)
-
-                    // Draw blurred map in the frame area (Top, Bottom, Left, Right)
-                    // We use the same RectF for both src and dst (relative to coordinate system)
-                    // since blurredMap is same size as original map bitmap.
-
-                    // Top segment
-                    canvas.drawBitmap(
-                            blurredMap,
-                            Rect(0, 0, bitmap.width, mapTop.toInt()),
-                            RectF(0f, 0f, width, mapTop),
-                            null
-                    )
-
-                    // Bottom segment
-                    canvas.drawBitmap(
-                            blurredMap,
-                            Rect(0, mapBottom.toInt(), bitmap.width, bitmap.height),
-                            RectF(0f, mapBottom, width, height),
-                            null
-                    )
-
-                    // Left segment (middle part)
-                    canvas.drawBitmap(
-                            blurredMap,
-                            Rect(0, mapTop.toInt(), mapLeft.toInt(), mapBottom.toInt()),
-                            RectF(0f, mapTop, mapLeft, mapBottom),
-                            null
-                    )
-
-                    // Right segment (middle part)
-                    canvas.drawBitmap(
-                            blurredMap,
-                            Rect(mapRight.toInt(), mapTop.toInt(), bitmap.width, mapBottom.toInt()),
-                            RectF(mapRight, mapTop, width, mapBottom),
-                            null
-                    )
-                }
 
                 canvas.drawRect(0f, 0f, width, mapTop, paperPaint) // Top Tint
                 canvas.drawRect(0f, mapBottom, width, height, paperPaint) // Bottom Tint
@@ -170,39 +122,6 @@ object ArtLayoutOverlayUtils {
                                 color =
                                         if (uiState.polaroidFrameStyle == "CLASSIC_BLACK") {
                                             Color.White.copy(alpha = 0.2f).toArgb()
-                                        } else if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                                            val tintColor =
-                                                    when (uiState.glassTint) {
-                                                        "Cyan" ->
-                                                                android.graphics.Color.argb(
-                                                                        180,
-                                                                        0,
-                                                                        255,
-                                                                        255
-                                                                )
-                                                        "Gold" ->
-                                                                android.graphics.Color.argb(
-                                                                        180,
-                                                                        255,
-                                                                        215,
-                                                                        0
-                                                                )
-                                                        "Rose" ->
-                                                                android.graphics.Color.argb(
-                                                                        180,
-                                                                        255,
-                                                                        182,
-                                                                        193
-                                                                )
-                                                        else ->
-                                                                android.graphics.Color.argb(
-                                                                        150,
-                                                                        255,
-                                                                        255,
-                                                                        255
-                                                                )
-                                                    }
-                                            tintColor
                                         } else {
                                             Color.Black.copy(alpha = 0.15f).toArgb()
                                         }
@@ -250,44 +169,18 @@ object ArtLayoutOverlayUtils {
                 val metaPaint =
                         Paint(Paint.ANTI_ALIAS_FLAG).apply {
                             textSize = (11f * scale).toFloat()
-                            color =
-                                    if (uiState.polaroidFrameStyle == "LIQUID_GLASS")
-                                            android.graphics.Color.BLACK
-                                    else secondaryTextColor
-                            alpha = if (uiState.polaroidFrameStyle == "LIQUID_GLASS") 150 else 255
+                            color = secondaryTextColor
+                            alpha = 255
                             textAlign = Paint.Align.LEFT
                             typeface = customTypeface
                         }
                 canvas.drawText(dateRange, mapLeft, metaY, metaPaint)
 
-                if (uiState.polaroidFrameStyle == "LIQUID_GLASS") {
-                    val now = java.time.LocalTime.now()
-                    val timeStr =
-                            now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-                    metaPaint.apply {
-                        textSize = (8f * scale).toFloat()
-                        typeface = Typeface.MONOSPACE
-                        alpha = 100
-                    }
-                    canvas.drawText(
-                            "TIMESTAMP: $timeStr",
-                            mapLeft,
-                            metaY + (12f * scale).toFloat(),
-                            metaPaint
-                    )
-                }
 
-                metaPaint.apply {
-                    textSize = (8f * scale).toFloat()
-                    typeface = Typeface.MONOSPACE
-                    alpha = if (uiState.polaroidFrameStyle == "LIQUID_GLASS") 180 else 150
-                }
                 canvas.drawText(
                         "TOTAL DISTANCE: %.2f KM".format(totalDistanceKm),
                         mapLeft,
-                        metaY +
-                                (if (uiState.polaroidFrameStyle == "LIQUID_GLASS") 24f else 15f) *
-                                        scale.toFloat(),
+                        metaY + (15f * scale).toFloat(),
                         metaPaint
                 )
 

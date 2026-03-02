@@ -211,19 +211,6 @@ class FlutterMapView(
                 fogOverlay.invalidate()
                 result.success(true)
             }
-            "setTrackingPath" -> {
-                val points = call.arguments as? List<Map<String, Any>>
-                currentPathPoints =
-                        points?.mapNotNull { pt ->
-                            val lat = (pt["lat"] as? Number)?.toDouble()
-                            val lng = (pt["lng"] as? Number)?.toDouble()
-                            if (lat != null && lng != null) LatLng(lat, lng) else null
-                        }
-                                ?: emptyList()
-                updateLivePolyline()
-                fogOverlay.invalidate()
-                result.success(true)
-            }
             "centerLocation" -> {
                 // 优先使用 Flutter 传入的坐标
                 val args = call.arguments

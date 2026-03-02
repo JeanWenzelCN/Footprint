@@ -71,9 +71,6 @@ class FootprintViewModel(
     private val armorType = MutableStateFlow(preferenceManager.armorType)
     private val mechanicalSeams = MutableStateFlow(preferenceManager.mechanicalSeams)
     private val hasHazardStriping = MutableStateFlow(preferenceManager.hasHazardStriping)
-    private val frostRadius = MutableStateFlow(preferenceManager.frostRadius)
-    private val chromaticAberration = MutableStateFlow(preferenceManager.chromaticAberration)
-    private val glassTint = MutableStateFlow(preferenceManager.glassTint)
     private val _amapKey = MutableStateFlow(ApiKeyManager.getApiKey(application) ?: "")
     val amapKey: StateFlow<String> = _amapKey.asStateFlow()
 
@@ -114,9 +111,6 @@ class FootprintViewModel(
             val armorType: com.footprint.ui.screens.art.ArmorType,
             val mechanicalSeams: Float,
             val hasHazardStriping: Boolean,
-            val frostRadius: Float,
-            val chromaticAberration: Float,
-            val glassTint: String
     )
 
     // 强类型合并流
@@ -162,9 +156,6 @@ class FootprintViewModel(
                     armorType,
                     mechanicalSeams,
                     hasHazardStriping,
-                    frostRadius,
-                    chromaticAberration,
-                    glassTint
             ) { args: Array<Any?> ->
                 val style = args[0] as String
                 val padding = args[1] as Float
@@ -175,13 +166,10 @@ class FootprintViewModel(
                 val aType = args[6] as com.footprint.ui.screens.art.ArmorType
                 val mSeams = args[7] as Float
                 val hHazard = args[8] as Boolean
-                val fRadius = args[9] as Float
-                val cAberration = args[10] as Float
-                val gTint = args[11] as String
                 Triple(
                         Triple(style, padding, border),
-                        Triple(wType, eDepth, cGrain) to Triple(aType, mSeams, hHazard),
-                        Triple(fRadius, cAberration, gTint)
+                        Triple(wType, eDepth, cGrain),
+                        Triple(aType, mSeams, hHazard)
                 )
             }
 
@@ -194,8 +182,7 @@ class FootprintViewModel(
                     artCombined,
                     polCombined ->
                 val (artBase, artText) = artCombined
-                val (polBase, polExtras, polLiquid) = polCombined
-                val (polWood, polMech) = polExtras
+                val (polBase, polWood, polMech) = polCombined
                 PrefsGroup(
                         theme = appearance.first,
                         style = appearance.second,
@@ -217,10 +204,7 @@ class FootprintViewModel(
                         canvasGrain = polWood.third,
                         armorType = polMech.first,
                         mechanicalSeams = polMech.second,
-                        hasHazardStriping = polMech.third,
-                        frostRadius = polLiquid.first,
-                        chromaticAberration = polLiquid.second,
-                        glassTint = polLiquid.third
+                        hasHazardStriping = polMech.third
                 )
             }
 
@@ -309,9 +293,6 @@ class FootprintViewModel(
                                 armorType = prefs.armorType,
                                 mechanicalSeams = prefs.mechanicalSeams,
                                 hasHazardStriping = prefs.hasHazardStriping,
-                                frostRadius = prefs.frostRadius,
-                                chromaticAberration = prefs.chromaticAberration,
-                                glassTint = prefs.glassTint,
                                 randomMemory = randomMemory,
                                 memoryQuote = memoryQuote,
                                 isLoading = false
@@ -338,11 +319,7 @@ class FootprintViewModel(
                                                     preferenceManager.polaroidInnerBorder,
                                             woodType = preferenceManager.woodType,
                                             engravingDepth = preferenceManager.engravingDepth,
-                                            canvasGrain = preferenceManager.canvasGrain,
-                                            frostRadius = preferenceManager.frostRadius,
-                                            chromaticAberration =
-                                                    preferenceManager.chromaticAberration,
-                                            glassTint = preferenceManager.glassTint
+                                            canvasGrain = preferenceManager.canvasGrain
                                     )
                     )
 
@@ -884,30 +861,6 @@ class FootprintViewModel(
         preferenceManager.mechanicalSeams = seams
         hasHazardStriping.value = hazard
         preferenceManager.hasHazardStriping = hazard
-    }
-
-    fun updateLiquidGlassSettings(radius: Float, aberration: Float, tint: String) {
-        frostRadius.value = radius
-        preferenceManager.frostRadius = radius
-        chromaticAberration.value = aberration
-        preferenceManager.chromaticAberration = aberration
-        glassTint.value = tint
-        preferenceManager.glassTint = tint
-    }
-
-    fun setFrostRadius(radius: Float) {
-        frostRadius.value = radius
-        preferenceManager.frostRadius = radius
-    }
-
-    fun setChromaticAberration(aberration: Float) {
-        chromaticAberration.value = aberration
-        preferenceManager.chromaticAberration = aberration
-    }
-
-    fun setGlassTint(tint: String) {
-        glassTint.value = tint
-        preferenceManager.glassTint = tint
     }
 
     companion object {

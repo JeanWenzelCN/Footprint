@@ -2,6 +2,7 @@ package com.footprint.ui.screens
 
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.footprint.FootprintViewModel
 import com.footprint.data.local.TrackPointEntity
-import com.footprint.ui.components.LiquidGlassCard
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,9 +81,24 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                         }
 
                         // Controls
-                        LiquidGlassCard(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                shape = RoundedCornerShape(24.dp)
+                        Card(
+                                modifier =
+                                        Modifier.padding(16.dp)
+                                                .fillMaxWidth(),
+                                shape = RoundedCornerShape(28.dp),
+                                colors =
+                                        CardDefaults.cardColors(
+                                                containerColor =
+                                                        MaterialTheme.colorScheme.surfaceVariant
+                                                                .copy(alpha = 0.8f)
+                                        ),
+                                border =
+                                        BorderStroke(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.outlineVariant.copy(
+                                                        alpha = 0.5f
+                                                )
+                                        )
                         ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                         Text("艺术风格", style = MaterialTheme.typography.labelLarge)

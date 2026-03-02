@@ -18,8 +18,7 @@ enum class PolaroidFrameStyle {
     CLASSIC_BLACK, // 纯黑 (原暗房黑)
     ACOUSTIC_WOOD, // 原木刻录 (Acoustic Wood)
     HEAVY_MECHANICAL, // 重装机甲 (Heavy Mechanical)
-    CYBER_GLITCH, // 赛博霓虹 (Cyber Glitch)
-    LIQUID_GLASS // 液态毛玻璃
+    CYBER_GLITCH // 赛博霓虹 (Cyber Glitch)
 }
 
 enum class WoodType {

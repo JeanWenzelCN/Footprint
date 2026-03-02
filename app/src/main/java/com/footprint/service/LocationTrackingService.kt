@@ -31,10 +31,6 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private lateinit var repository: com.footprint.data.repository.FootprintRepository
     private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var notificationManager: NotificationManager
-
-    private var _totalDistanceTraveled = MutableStateFlow(0.0f)
-    private var _lastLocation: AMapLocation? = null
-    private var _sessionStartTime: Long = 0
     private var _notificationUpdateJob: Job? = null
 
     // Rate limiting for IO / UI updates
@@ -58,6 +54,14 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
         private val _sharedCurrentLocation = MutableStateFlow<AMapLocation?>(null)
         val currentLocation: StateFlow<AMapLocation?> = _sharedCurrentLocation.asStateFlow()
+
+        private val _totalDistanceTraveled = MutableStateFlow(0.0f)
+        val totalDistance: StateFlow<Float> = _totalDistanceTraveled.asStateFlow()
+
+        private var _sessionStartTime: Long = 0
+        val sessionStartTime: Long get() = _sessionStartTime
+
+        private var _lastLocation: AMapLocation? = null
 
         private val _sharedTrackingPath = MutableStateFlow<List<AMapLocation>>(emptyList())
         val trackingPath: StateFlow<List<AMapLocation>> = _sharedTrackingPath.asStateFlow()
@@ -94,8 +98,15 @@ class LocationTrackingService : Service(), AMapLocationListener {
         repository = (application as com.footprint.FootprintApplication).repository
         notificationManager = getSystemService(NotificationManager::class.java)
         createNotificationChannel()
-
-        // SDK initialization is now deferred to onStartCommand for better stability
+        
+        // Recover persistent state if needed
+        val prefs = getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("is_tracking", false)) {
+            Log.d("FootprintLoc", "Recovering tracking state from prefs")
+            _sharedIsTracking.value = true
+            _totalDistanceTraveled.value = prefs.getFloat("total_distance", 0.0f)
+            _sessionStartTime = prefs.getLong("session_start", System.currentTimeMillis())
+        }
     }
 
     private fun createNotificationChannel() {
@@ -137,62 +148,42 @@ class LocationTrackingService : Service(), AMapLocationListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        if (intent == null || intent.action == null) {
+            // System restart (START_STICKY)
+            if (_sharedIsTracking.value) {
+                Log.d("FootprintLoc", "Restoring tracking after system kill")
+                resumeTrackingFlow()
+            }
+            return START_STICKY
+        }
+
+        when (intent.action) {
             ACTION_START_TRACKING -> {
                 _totalDistanceTraveled.value = 0.0f
                 _lastLocation = null
                 _sessionStartTime = System.currentTimeMillis()
                 _sharedTrackingPath.value = emptyList() // Reset path for new session
+                
+                // Persist start state
+                getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE).edit()
+                    .putBoolean("is_tracking", true)
+                    .putFloat("total_distance", 0.0f)
+                    .putLong("session_start", _sessionStartTime)
+                    .apply()
 
-                // Acquire WakeLock
-                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-                wakeLock =
-                        powerManager.newWakeLock(
-                                        PowerManager.PARTIAL_WAKE_LOCK,
-                                        "Footprint:TrackingWakeLock"
-                                )
-                                .apply { acquire() }
-
-                // Android 14+ requires runtime permission check before calling startForeground with
-                // location type
-                if (ActivityCompat.checkSelfPermission(
-                                this,
-                                android.Manifest.permission.ACCESS_FINE_LOCATION
-                        ) != PackageManager.PERMISSION_GRANTED &&
-                                ActivityCompat.checkSelfPermission(
-                                        this,
-                                        android.Manifest.permission.ACCESS_COARSE_LOCATION
-                                ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    Log.e(
-                            "FootprintLoc",
-                            "Cannot start foreground service: Location permission missing"
-                    )
-                    stopSelf()
-                    return START_NOT_STICKY
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(
-                            NOTIFICATION_ID,
-                            buildNotification(0, 0f, ""),
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                    )
-                } else {
-                    startForeground(NOTIFICATION_ID, buildNotification(0, 0f, ""))
-                }
-
-                // Initialize AMap after promoting to foreground
-                initLocationClient()
-                locationClient?.startLocation()
-                _sharedIsTracking.value = true
-                startNotificationUpdates()
+                resumeTrackingFlow()
                 Log.d("FootprintLoc", "定位服务已启动, Session start: $_sessionStartTime")
             }
+            // ...
             ACTION_STOP_TRACKING -> {
                 locationClient?.stopLocation()
                 _sharedIsTracking.value = false
                 _notificationUpdateJob?.cancel()
+                
+                // Clear persistence
+                getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE).edit()
+                    .putBoolean("is_tracking", false)
+                    .apply()
 
                 // Release WakeLock
                 if (wakeLock?.isHeld == true) {
@@ -246,6 +237,13 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 } else {
                                     isValidPoint = true
                                     _totalDistanceTraveled.value += distance.toFloat()
+                                    
+                                    // Update persistence every 10 meters to avoid overkill but keep current
+                                    if (_totalDistanceTraveled.value % 10 < 1.0) {
+                                        getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE).edit()
+                                            .putFloat("total_distance", _totalDistanceTraveled.value)
+                                            .apply()
+                                    }
                                 }
                             }
                         }
@@ -381,6 +379,60 @@ class LocationTrackingService : Service(), AMapLocationListener {
         val minutes = (ms / (1000 * 60)) % 60
         val hours = (ms / (1000 * 60 * 60))
         return "%02d:%02d:%02d".format(hours, minutes, seconds)
+    }
+
+    private fun resumeTrackingFlow() {
+        // Acquire WakeLock
+        if (wakeLock == null) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock =
+                    powerManager.newWakeLock(
+                                    PowerManager.PARTIAL_WAKE_LOCK,
+                                    "Footprint:TrackingWakeLock"
+                            )
+                            .apply { acquire() }
+        }
+
+        // Start Foreground
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED
+        ) {
+            val notification = buildNotification(_totalDistanceTraveled.value.toInt(), 0f, "")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        }
+
+        initLocationClient()
+        locationClient?.startLocation()
+        _sharedIsTracking.value = true
+
+        // Recover points from database to restore the trace line
+        serviceScope.launch {
+            try {
+                val points =
+                        repository.getTrackPointsOnce(_sessionStartTime, System.currentTimeMillis())
+                _sharedTrackingPath.value =
+                        points.map {
+                            AMapLocation("").apply {
+                                latitude = it.latitude
+                                longitude = it.longitude
+                                time = it.timestamp
+                            }
+                        }
+                Log.d("FootprintLoc", "Recovered ${_sharedTrackingPath.value.size} points from DB")
+            } catch (e: Exception) {
+                Log.e("FootprintLoc", "Failed to recover points: ${e.message}")
+            }
+        }
+
+        startNotificationUpdates()
     }
 
     private fun updateAdaptiveInterval(speedMs: Float) {

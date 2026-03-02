@@ -43,7 +43,6 @@ import com.footprint.FootprintViewModel
 import com.footprint.utils.HolographicExportUtils
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -319,9 +318,7 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                 scaffoldState = scaffoldState,
                 sheetPeekHeight = 240.dp,
                 sheetContainerColor = MaterialTheme.colorScheme.surface,
-                sheetDragHandle = {
-                        androidx.compose.material3.BottomSheetDefaults.DragHandle()
-                },
+                sheetDragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle() },
                 sheetContent = {
                         if (showControls) {
                                 ArtStyleControls(
@@ -508,14 +505,6 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         it
                                                 )
                                         },
-                                        frostRadius = uiState.frostRadius,
-                                        onFrostRadiusChange = { viewModel.setFrostRadius(it) },
-                                        chromaticAberration = uiState.chromaticAberration,
-                                        onChromaticAberrationChange = {
-                                                viewModel.setChromaticAberration(it)
-                                        },
-                                        glassTint = uiState.glassTint,
-                                        onGlassTintChange = { viewModel.setGlassTint(it) }
                                 )
                         }
                 }
@@ -550,9 +539,6 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 mechanicalSeams = uiState.mechanicalSeams,
                                 hasHazardStriping = uiState.hasHazardStriping,
                                 userNickname = uiState.userNickname,
-                                frostRadius = uiState.frostRadius,
-                                chromaticAberration = uiState.chromaticAberration,
-                                glassTint = uiState.glassTint,
                                 hazeState = hazeState
                         )
 
@@ -1169,9 +1155,6 @@ fun ArtLayoutOverlay(
         mechanicalSeams: Float = 0.5f,
         hasHazardStriping: Boolean = false,
         userNickname: String = "旅行者",
-        frostRadius: Float = 20f,
-        chromaticAberration: Float = 0.5f,
-        glassTint: String = "Clear",
         hazeState: HazeState? = null
 ) {
         val fontFamily =
@@ -1219,13 +1202,37 @@ fun ArtLayoutOverlay(
                         }
                 }
 
+        val themeContentColor =
+                when (polaroidFrameStyle) {
+                        "ACOUSTIC_WOOD" -> Color(0xFF3E2723)
+                        "CYBER_GLITCH" -> Color(0xFF00FFFF)
+                        "HEAVY_MECHANICAL", "CLASSIC_BLACK" -> Color.White
+                        "CLASSIC_WHITE" -> Color.Black
+                        else -> Color.White
+                }
+
         val actualTextColor =
                 when (textColor) {
                         "Black" -> Color.Black
                         "Gold" -> Color(0xFFFFCC00)
                         "Deep Blue" -> Color(0xFF007AFF)
                         "White" -> Color.White
-                        else -> Color.White
+                        "Match Core" -> themeContentColor
+                        else -> themeContentColor
+                }
+
+        val woodBaseColor =
+                when (woodType) {
+                        WoodType.ASH -> Color(0xFFE5D3B3)
+                        WoodType.WALNUT -> Color(0xFF5D4037)
+                        WoodType.VINTAGE_OAK -> Color(0xFFD2B48C)
+                }
+
+        val armorColor =
+                when (armorType) {
+                        ArmorType.GUNMETAL -> Color(0xFF455A64)
+                        ArmorType.CARBON_FIBER -> Color(0xFF212121)
+                        ArmorType.WORN_OLIVE -> Color(0xFF556B2F)
                 }
 
         val fontStyle =
@@ -1302,7 +1309,7 @@ fun ArtLayoutOverlay(
                                         Text(
                                                 "$dateRange • %.2f KM".format(distanceKm),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = Color.White.copy(alpha = 0.7f),
+                                                color = actualTextColor.copy(alpha = 0.8f),
                                                 letterSpacing = 1.sp,
                                                 fontFamily = fontFamily
                                         )
@@ -1329,112 +1336,16 @@ fun ArtLayoutOverlay(
                                 val mapRight = mapLeft + mapWidth
                                 val mapBottom = mapTop + mapHeight
 
-                                if (polaroidFrameStyle == "LIQUID_GLASS" && hazeState != null) {
-                                        // Blurred Frame Background
-                                        Box(
-                                                modifier =
-                                                        Modifier.fillMaxSize()
-                                                                .hazeChild(
-                                                                        state = hazeState,
-                                                                        blurRadius = frostRadius.dp,
-                                                                        shape =
-                                                                                object :
-                                                                                        androidx.compose.ui.graphics.Shape {
-                                                                                        override fun createOutline(
-                                                                                                size:
-                                                                                                        androidx.compose.ui.geometry.Size,
-                                                                                                layoutDirection:
-                                                                                                        androidx.compose.ui.unit.LayoutDirection,
-                                                                                                density:
-                                                                                                        androidx.compose.ui.unit.Density
-                                                                                        ): androidx.compose.ui.graphics.Outline {
-                                                                                                val path =
-                                                                                                        androidx.compose
-                                                                                                                .ui
-                                                                                                                .graphics
-                                                                                                                .Path()
-                                                                                                                .apply {
-                                                                                                                        addRect(
-                                                                                                                                androidx.compose
-                                                                                                                                        .ui
-                                                                                                                                        .geometry
-                                                                                                                                        .Rect(
-                                                                                                                                                0f,
-                                                                                                                                                0f,
-                                                                                                                                                size.width,
-                                                                                                                                                size.height
-                                                                                                                                        )
-                                                                                                                        )
-                                                                                                                        addRect(
-                                                                                                                                androidx.compose
-                                                                                                                                        .ui
-                                                                                                                                        .geometry
-                                                                                                                                        .Rect(
-                                                                                                                                                mapLeft,
-                                                                                                                                                mapTop,
-                                                                                                                                                mapRight,
-                                                                                                                                                mapBottom
-                                                                                                                                        )
-                                                                                                                        )
-                                                                                                                        fillType =
-                                                                                                                                androidx.compose
-                                                                                                                                        .ui
-                                                                                                                                        .graphics
-                                                                                                                                        .PathFillType
-                                                                                                                                        .EvenOdd
-                                                                                                                }
-                                                                                                return androidx.compose
-                                                                                                        .ui
-                                                                                                        .graphics
-                                                                                                        .Outline
-                                                                                                        .Generic(
-                                                                                                                path
-                                                                                                        )
-                                                                                        }
-                                                                                }
-                                                                )
-                                        )
-                                }
-
                                 // 1. Map Frame & Material logic
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                         // Material Colors
-                                        val woodBaseColor =
-                                                when (woodType) {
-                                                        WoodType.ASH -> Color(0xFFE5D3B3)
-                                                        WoodType.WALNUT -> Color(0xFF5D4037)
-                                                        WoodType.VINTAGE_OAK -> Color(0xFFD2B48C)
-                                                }
 
                                         val frameColor =
                                                 when (polaroidFrameStyle) {
                                                         "CLASSIC_BLACK" -> Color(0xFF1A1A1A)
-                                                        "LIQUID_GLASS" -> {
-                                                                when (glassTint) {
-                                                                        "Cyan" ->
-                                                                                Color.Cyan.copy(
-                                                                                        alpha =
-                                                                                                0.15f
-                                                                                )
-                                                                        "Gold" ->
-                                                                                Color(0xFFFFD700)
-                                                                                        .copy(
-                                                                                                alpha =
-                                                                                                        0.15f
-                                                                                        )
-                                                                        "Rose" ->
-                                                                                Color(0xFFFFB6C1)
-                                                                                        .copy(
-                                                                                                alpha =
-                                                                                                        0.15f
-                                                                                        )
-                                                                        else ->
-                                                                                Color.White.copy(
-                                                                                        alpha =
-                                                                                                0.15f
-                                                                                )
-                                                                }
-                                                        }
+                                                        "ACOUSTIC_WOOD" -> woodBaseColor
+                                                        "HEAVY_MECHANICAL" -> armorColor
+                                                        "CYBER_GLITCH" -> Color(0xFF0F0F0F)
                                                         else -> Color(0xFFFAFAFA)
                                                 }
 
@@ -1959,21 +1870,36 @@ fun ArtLayoutOverlay(
                                                 "CYBER_GLITCH" -> {
                                                         // Neon Accent lines
                                                         drawRect(
-                                                                color =
-                                                                        Color(0xFF00F2FF)
-                                                                                .copy(alpha = 0.6f),
+                                                                color = artColor,
                                                                 topLeft =
                                                                         Offset(
-                                                                                mapLeft - 2f,
-                                                                                mapTop - 2f
+                                                                                mapLeft - 4f,
+                                                                                mapTop - 4f
                                                                         ),
                                                                 size =
                                                                         androidx.compose.ui.geometry
                                                                                 .Size(
                                                                                         mapWidth +
-                                                                                                4f,
+                                                                                                8f,
                                                                                         mapHeight +
-                                                                                                4f
+                                                                                                8f
+                                                                                ),
+                                                                style = Stroke(width = 2f)
+                                                        )
+                                                        drawRect(
+                                                                color = artColor.copy(alpha = 0.2f),
+                                                                topLeft =
+                                                                        Offset(
+                                                                                mapLeft - 1f,
+                                                                                mapTop - 1f
+                                                                        ),
+                                                                size =
+                                                                        androidx.compose.ui.geometry
+                                                                                .Size(
+                                                                                        mapWidth +
+                                                                                                2f,
+                                                                                        mapHeight +
+                                                                                                2f
                                                                                 ),
                                                                 style = Stroke(width = 1f)
                                                         )
@@ -2047,8 +1973,7 @@ fun ArtLayoutOverlay(
                                                                 Color(0xFFFF9800)
                                                                         .copy(alpha = 0.05f)
                                                         "CYBER_GLITCH" ->
-                                                                Color(0xFF00F2FF)
-                                                                        .copy(alpha = 0.03f)
+                                                                artColor.copy(alpha = 0.05f)
                                                         "HEAVY_MECHANICAL" ->
                                                                 Color(0xFF90A4AE)
                                                                         .copy(alpha = 0.05f)
@@ -2095,13 +2020,13 @@ fun ArtLayoutOverlay(
                                                 when (polaroidFrameStyle) {
                                                         "CLASSIC_BLACK", "HEAVY_MECHANICAL" ->
                                                                 Color.White.copy(alpha = 0.9f)
-                                                        "CYBER_GLITCH" -> Color(0xFF00F2FF)
+                                                        "CYBER_GLITCH" -> artColor
                                                         "ACOUSTIC_WOOD" ->
                                                                 Color(0xFF3E2723)
                                                                         .copy(
                                                                                 alpha = 0.8f
                                                                         ) // Burnt wood color
-                                                        else -> Color.Black.copy(alpha = 0.8f)
+                                                        else -> actualTextColor
                                                 }
                                         val titleStyle =
                                                 MaterialTheme.typography.headlineSmall.copy(
@@ -2295,9 +2220,49 @@ fun ArtLayoutOverlay(
                                         modifier =
                                                 Modifier.align(Alignment.TopEnd)
                                                         .background(
-                                                                Color.Black.copy(alpha = 0.7f),
+                                                                when (polaroidFrameStyle) {
+                                                                        "ACOUSTIC_WOOD" ->
+                                                                                woodBaseColor
+                                                                        "HEAVY_MECHANICAL" ->
+                                                                                Color(0xFF263238)
+                                                                        "CYBER_GLITCH" ->
+                                                                                Color.Black
+                                                                        "CLASSIC_BLACK" ->
+                                                                                Color(0xFF1A1A1A)
+                                                                        else ->
+                                                                                Color.Black.copy(
+                                                                                        alpha = 0.7f
+                                                                                )
+                                                                },
                                                                 RoundedCornerShape(8.dp)
                                                         )
+                                                        .run {
+                                                                if (polaroidFrameStyle ==
+                                                                                "CYBER_GLITCH"
+                                                                ) {
+                                                                        border(
+                                                                                2.dp,
+                                                                                artColor,
+                                                                                RoundedCornerShape(
+                                                                                        8.dp
+                                                                                )
+                                                                        )
+                                                                } else if (polaroidFrameStyle ==
+                                                                                "HEAVY_MECHANICAL"
+                                                                ) {
+                                                                        border(
+                                                                                1.dp,
+                                                                                Color.White.copy(
+                                                                                        alpha = 0.3f
+                                                                                ),
+                                                                                RoundedCornerShape(
+                                                                                        8.dp
+                                                                                )
+                                                                        )
+                                                                } else {
+                                                                        this
+                                                                }
+                                                        }
                                                         .padding(16.dp)
                                 ) {
                                         val baseStyle =
@@ -2307,8 +2272,19 @@ fun ArtLayoutOverlay(
                                                                 else FontWeight.Bold,
                                                         letterSpacing = 2.sp
                                                 )
+                                        val statsTextColor =
+                                                when (polaroidFrameStyle) {
+                                                        "ACOUSTIC_WOOD" -> Color(0xFF3E2723)
+                                                        "CYBER_GLITCH" -> artColor
+                                                        "HEAVY_MECHANICAL" -> Color.White
+                                                        "CLASSIC_WHITE" -> Color.Black
+                                                        else -> Color.White
+                                                }
+
                                         Box {
-                                                if (hasBorder) {
+                                                if (hasBorder &&
+                                                                polaroidFrameStyle != "CYBER_GLITCH"
+                                                ) {
                                                         Text(
                                                                 artName.uppercase().ifBlank {
                                                                         "DATA VISUALIZATION"
@@ -2347,7 +2323,7 @@ fun ArtLayoutOverlay(
                                                         },
                                                         style =
                                                                 baseStyle.copy(
-                                                                        color = actualTextColor
+                                                                        color = statsTextColor
                                                                 ),
                                                         fontFamily = fontFamily,
                                                         fontStyle = fontStyle
@@ -2356,13 +2332,13 @@ fun ArtLayoutOverlay(
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
                                                 "DATE: $dateRange • %.2f KM".format(distanceKm),
-                                                color = Color.White,
+                                                color = statsTextColor,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontFamily = fontFamily
                                         )
                                         Text(
                                                 "MODE: TRACKING",
-                                                color = Color.White,
+                                                color = statsTextColor,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontFamily =
                                                         androidx.compose.ui.text.font.FontFamily
@@ -2372,24 +2348,41 @@ fun ArtLayoutOverlay(
 
                                 // Decorative elements
                                 Canvas(modifier = Modifier.fillMaxSize()) {
-                                        val color = artColor.copy(alpha = 0.5f)
+                                        val decorColor =
+                                                when (polaroidFrameStyle) {
+                                                        "CYBER_GLITCH" -> artColor
+                                                        "ACOUSTIC_WOOD" -> Color(0xFF3E2723)
+                                                        "HEAVY_MECHANICAL" -> Color.White
+                                                        else -> artColor
+                                                }.copy(alpha = 0.5f)
+
                                         // Corner brackets
                                         val length = 40.dp.toPx()
                                         val stroke = 2.dp.toPx()
 
                                         // Top Left
-                                        drawLine(color, Offset(0f, 0f), Offset(length, 0f), stroke)
-                                        drawLine(color, Offset(0f, 0f), Offset(0f, length), stroke)
+                                        drawLine(
+                                                decorColor,
+                                                Offset(0f, 0f),
+                                                Offset(length, 0f),
+                                                stroke
+                                        )
+                                        drawLine(
+                                                decorColor,
+                                                Offset(0f, 0f),
+                                                Offset(0f, length),
+                                                stroke
+                                        )
 
                                         // Bottom Right
                                         drawLine(
-                                                color,
+                                                decorColor,
                                                 Offset(size.width, size.height),
                                                 Offset(size.width - length, size.height),
                                                 stroke
                                         )
                                         drawLine(
-                                                color,
+                                                decorColor,
                                                 Offset(size.width, size.height),
                                                 Offset(size.width, size.height - length),
                                                 stroke
