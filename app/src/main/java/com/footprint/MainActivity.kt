@@ -295,6 +295,52 @@ class MainActivity : FlutterActivity() {
                             startActivity(intent)
                             result.success(true)
                         }
+                        "saveFootprint" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    val json = call.arguments as String
+                                    val entry = gson.fromJson(json, com.footprint.data.model.FootprintEntry::class.java)
+                                    repository.saveEntry(entry)
+                                    withContext(Dispatchers.Main) { result.success(true) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { result.error("SAVE_FAILED", e.message, null) }
+                                }
+                            }
+                        }
+                        "deleteFootprint" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    val id = (call.arguments as Number).toLong()
+                                    repository.deleteEntry(id)
+                                    withContext(Dispatchers.Main) { result.success(true) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { result.error("DELETE_FAILED", e.message, null) }
+                                }
+                            }
+                        }
+                        "saveGoal" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    val json = call.arguments as String
+                                    val goal = gson.fromJson(json, com.footprint.data.model.TravelGoal::class.java)
+                                    repository.saveGoal(goal)
+                                    withContext(Dispatchers.Main) { result.success(true) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { result.error("SAVE_FAILED", e.message, null) }
+                                }
+                            }
+                        }
+                        "deleteGoal" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    val id = (call.arguments as Number).toLong()
+                                    repository.deleteGoal(id)
+                                    withContext(Dispatchers.Main) { result.success(true) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { result.error("DELETE_FAILED", e.message, null) }
+                                }
+                            }
+                        }
                         else -> result.notImplemented()
                     }
                 }

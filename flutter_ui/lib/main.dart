@@ -322,7 +322,50 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
           ),
           const SizedBox(height: 32),
           FilledButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+              // Map UI mood to Kotlin/Internal Mood
+              String mappedMood = "RELAXED";
+              if (selectedMood == "激情" || selectedMood == "兴奋" || selectedMood == "惊喜") mappedMood = "EXCITED";
+              else if (selectedMood == "探索") mappedMood = "CURIOUS";
+              else if (selectedMood == "思考" || selectedMood == "疲惫" || selectedMood == "失落") mappedMood = "REFLECTIVE";
+              else mappedMood = "RELAXED";
+
+              // Map Transport
+              String mappedTransport = "UNKNOWN";
+              switch(selectedTransport) {
+                case "步行": mappedTransport = "WALK"; break;
+                case "骑行": mappedTransport = "BIKE"; break;
+                case "自驾": mappedTransport = "CAR"; break;
+                case "铁路": mappedTransport = "TRAIN"; break;
+                case "航空": mappedTransport = "PLANE"; break;
+              }
+
+              final entryData = {
+                "id": widget.initialEntry?['id'] ?? 0,
+                "title": _titleController.text,
+                "location": _locationController.text,
+                "detail": _detailController.text,
+                "mood": mappedMood,
+                "tags": _tagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                "distanceKm": double.tryParse(_distanceController.text) ?? 5.0,
+                "photos": photos.map((e) => e.path).toList(),
+                "photoPaths": photos.map((e) => e.path).toList(), // For compatibility
+                "energyLevel": energyLevel.toInt(),
+                "happenedOn": "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
+                "icon": selectedIcon,
+                "weather": selectedWeather,
+                "temperature": double.tryParse(_tempController.text),
+                "altitude": double.tryParse(_altController.text),
+                "transportType": mappedTransport,
+              };
+
+              try {
+                await const MethodChannel('com.footprint/data').invokeMethod('saveFootprint', jsonEncode(entryData));
+                if (mounted) Navigator.pop(context, true);
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("保存失败: $e")));
+              }
+            },
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
             child: Text(widget.initialEntry == null ? "记录足迹" : "保存修改", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
@@ -356,26 +399,47 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
 }
 
 class AddGoalPage extends StatefulWidget {
-  const AddGoalPage({super.key});
+  final dynamic initialGoal;
+  const AddGoalPage({super.key, this.initialGoal});
 
   @override
   State<AddGoalPage> createState() => _AddGoalPageState();
 }
 
 class _AddGoalPageState extends State<AddGoalPage> {
-  final _titleController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _notesController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _locationController;
+  late TextEditingController _notesController;
   DateTime _selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    final g = widget.initialGoal;
+    _titleController = TextEditingController(text: g?['title'] ?? '');
+    _locationController = TextEditingController(text: g?['targetLocation'] ?? '');
+    _notesController = TextEditingController(text: g?['notes'] ?? '');
+    if (g?['targetDate'] != null) {
+      try { _selectedDate = DateTime.parse(g['targetDate']); } catch(_) {}
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _locationController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('新增旅行目标', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(widget.initialGoal == null ? '新增旅行目标' : '编辑旅行目标', style: const TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -405,7 +469,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
               final picked = await showDatePicker(
                 context: context,
                 initialDate: _selectedDate,
-                firstDate: DateTime.now(),
+                firstDate: DateTime(2000),
                 lastDate: DateTime(2030),
                 locale: const Locale('zh'),
               );
@@ -435,17 +499,35 @@ class _AddGoalPageState extends State<AddGoalPage> {
           ),
           const SizedBox(height: 32),
           FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("目标已添加")),
-              );
+            onPressed: () async {
+              final goalData = {
+                "id": widget.initialGoal?['id'] ?? 0,
+                "title": _titleController.text,
+                "targetLocation": _locationController.text,
+                "targetDate": "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
+                "notes": _notesController.text,
+                "isCompleted": widget.initialGoal?['isCompleted'] ?? false,
+                "progress": widget.initialGoal?['progress'] ?? 0,
+                "icon": widget.initialGoal?['icon'] ?? "Flag",
+              };
+
+              try {
+                await const MethodChannel('com.footprint/data').invokeMethod('saveGoal', jsonEncode(goalData));
+                if (mounted) {
+                  Navigator.pop(context, true);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(widget.initialGoal == null ? "目标已添加" : "修改已保存")),
+                  );
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("保存失败: $e")));
+              }
             },
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
-            child: const Text("保存目标", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(widget.initialGoal == null ? "保存目标" : "保存修改", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
@@ -923,11 +1005,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showDetail(dynamic entryData) {
-    Navigator.push(
+  Future<void> _showDetail(dynamic entryData) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => FootprintDetailPage(entry: entryData)),
     );
+    if (result == true) {
+      _loadEntries();
+    }
   }
 
   void _showStatDetail(BuildContext context, String title, String type, List<dynamic> entriesToList) {
@@ -1075,9 +1160,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       _sBox(cs, tt, "足迹", "${allEntries.length}", onTap: () => _showStatDetail(context, "所有足迹 (${allEntries.length})", "footprint", allEntries)),
                       const SizedBox(width: 8),
-                      _sBox(cs, tt, "里程", totalDistance.toStringAsFixed(3), u: "km", onTap: () {
+                      _sBox(cs, tt, "里程", totalDistance.toStringAsFixed(1), u: "km", onTap: () {
                         final sorted = List.of(allEntries)..sort((a,b) => ((b['distanceKm'] as num?)?.toDouble() ?? 0.0).compareTo((a['distanceKm'] as num?)?.toDouble() ?? 0.0));
-                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(3)} km)", "distance", sorted);
+                        _showStatDetail(context, "年度总里程 (${totalDistance.toStringAsFixed(1)} km)", "distance", sorted);
                       }),
                       const SizedBox(width: 8),
                       _sBox(cs, tt, "地点", "$uniquePlacesLength", onTap: () {
@@ -1368,21 +1453,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: Text(
-                      "新建 +",
-                      style: TextStyle(
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  InkWell(
+                    onTap: () {
+                      if (widget.hapticEnabled) HapticFeedback.mediumImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AddFootprintPage()),
+                      ).then((_) => widget.onSettingsChanged());
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.outlineVariant),
+                      ),
+                      child: Text(
+                        "新建 +",
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
@@ -1398,10 +1493,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 110),
         child: FloatingActionButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddFootprintPage()),
-          ),
+          onPressed: () {
+            if (widget.hapticEnabled) HapticFeedback.mediumImpact();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddFootprintPage()),
+            ).then((_) => widget.onSettingsChanged()); // Refresh data
+          },
           backgroundColor: cs.primary,
           child: const Icon(Icons.add, color: Colors.white, size: 32),
         ),
@@ -1627,7 +1725,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
               
               final dist = (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
-              final rDist = dist.toStringAsFixed(3);
+              final rDist = dist.toStringAsFixed(1);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12, left: 8),

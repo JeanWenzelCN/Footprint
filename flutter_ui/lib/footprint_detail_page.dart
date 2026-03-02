@@ -150,13 +150,16 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.edit),
-                    onPressed: () {
-                      Navigator.push(
+                    onPressed: () async {
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => AddFootprintPage(initialEntry: widget.entry),
                         ),
                       );
+                      if (result == true) {
+                        Navigator.pop(context, true); // Pop to list and refresh
+                      }
                     },
                   ),
                 ],
@@ -232,7 +235,11 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                                 children: [
                                   Icon(Icons.wb_sunny, size: 20, color: Colors.orange), // hologram placeholder
                                   const SizedBox(width: 8),
-                                  Text(weather, style: tt.labelLarge?.copyWith(color: Colors.orange)),
+                                  Text(_mapWeatherToChinese(weather), style: tt.labelLarge?.copyWith(color: Colors.orange)),
+                                  const SizedBox(width: 8),
+                                  Text("•", style: TextStyle(color: Colors.orange.withOpacity(0.5))),
+                                  const SizedBox(width: 8),
+                                  Text(date, style: tt.labelLarge?.copyWith(color: Colors.orange)),
                                 ],
                               ),
                             )
@@ -251,12 +258,12 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _statDrop("里程", "${distance.toStringAsFixed(3)} KM", Icons.directions_walk, cs, tt),
+                        _statDrop("里程", "${distance.toStringAsFixed(1)} KM", Icons.directions_walk, cs, tt),
                         _statDrop("能量", "$energy", Icons.bolt, cs, tt),
                         if (entry['latitude'] != null && entry['longitude'] != null)
-                          _statDrop("坐标", "${(entry['latitude'] as num).toDouble().toStringAsFixed(3)}, ${(entry['longitude'] as num).toDouble().toStringAsFixed(3)}", Icons.location_on, cs, tt)
+                          _statDrop("坐标", "${(entry['latitude'] as num).toDouble().toStringAsFixed(2)}, ${(entry['longitude'] as num).toDouble().toStringAsFixed(2)}", Icons.location_on, cs, tt)
                         else
-                          _statDrop("天气", weather, Icons.wb_sunny, cs, tt),
+                          _statDrop("天气", _mapWeatherToChinese(weather), Icons.wb_sunny, cs, tt),
                         _statDrop("心情", mood, Icons.mood, cs, tt),
                       ],
                     ),
@@ -347,6 +354,20 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
         ],
       ),
     );
+  }
+
+  String _mapWeatherToChinese(String englishWeather) {
+    if (englishWeather.contains(RegExp(r'[\u4e00-\u9fa5]'))) return englishWeather;
+    final w = (englishWeather).toUpperCase();
+    if (w.contains("SUNNY")) return "晴天";
+    if (w.contains("CLOUDY")) return "多云";
+    if (w.contains("RAIN")) return "雨天";
+    if (w.contains("SNOW")) return "雪天";
+    if (w.contains("WIND")) return "大风";
+    if (w.contains("MIST") || w.contains("FOG")) return "薄雾";
+    if (w.contains("PARTLY")) return "晴间多云";
+    if (w.contains("THUNDER")) return "雷阵雨";
+    return englishWeather;
   }
 
   Widget _statDrop(String label, String value, IconData icon, ColorScheme cs, TextTheme tt) {
