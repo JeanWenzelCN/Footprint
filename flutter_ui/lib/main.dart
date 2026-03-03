@@ -102,7 +102,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
         try { selectedDate = DateTime.parse(dateStr); } catch (_) {}
       }
 
-      final ps = e['photoPaths'] as List<dynamic>?;
+      final ps = (e['photos'] ?? e['photoPaths']) as List<dynamic>?;
       if (ps != null) {
         photos.addAll(ps.where((p) => p != null).map((p) => File(p.toString())));
       }
