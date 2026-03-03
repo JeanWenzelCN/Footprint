@@ -33,9 +33,11 @@ android {
         }
 
         ndk {
-            // 仅保留主流手机架构，移除 x86 架构能显著减小体积
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            // 仅保留主流手机 64位 架构，移除 32位 和 x86 架构能显著减小体积
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
         }
+        resourceConfigurations.addAll(listOf("zh", "zh-rCN", "en", "xxhdpi"))
     }
 
     buildTypes {
@@ -50,7 +52,8 @@ android {
             matchingFallbacks += listOf("release")
             
             ndk {
-                abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+                abiFilters.clear()
+                abiFilters.add("arm64-v8a")
             }
         }
         debug {
@@ -161,7 +164,6 @@ val buildRustTask = tasks.register<Exec>("buildRust") {
     workingDir = file("rust")
     commandLine(
         "cargo", "ndk",
-        "-t", "armeabi-v7a",
         "-t", "arm64-v8a",
         "-o", "../src/main/jniLibs",
         "build", "--release"
