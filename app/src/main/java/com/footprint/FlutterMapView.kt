@@ -129,12 +129,21 @@ class FlutterMapView(
         livePolyline?.remove()
         livePolyline = null
         if (currentPathPoints.isNotEmpty()) {
+            val prefs = com.footprint.utils.PreferenceManager(context)
+            val liveColorHex =
+                    when (prefs.artColorStyle) {
+                        "Deep Blue" -> "#007AFF"
+                        "Cyber Pink" -> "#FF2D55"
+                        "Neon Green" -> "#00FF9F"
+                        "Gold" -> "#FFCC00"
+                        else -> "#00FF9F"
+                    }
             livePolyline =
                     map.addPolyline(
                             PolylineOptions()
                                     .addAll(currentPathPoints)
                                     .width(18f)
-                                    .color(Color.parseColor("#00FF9F"))
+                                    .color(Color.parseColor(liveColorHex))
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                     .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
                                     .zIndex(100f)
@@ -240,14 +249,21 @@ class FlutterMapView(
                 historyPolyline = null
 
                 if (latLngPoints.isNotEmpty()) {
+                    val prefs = com.footprint.utils.PreferenceManager(context)
+                    val historyColorHex =
+                            when (prefs.artColorStyle) {
+                                "Deep Blue" -> "#007AFF"
+                                "Cyber Pink" -> "#FF2D55"
+                                "Neon Green" -> "#00FF9F"
+                                "Gold" -> "#FFCC00"
+                                else -> "#42A5F5"
+                            }
                     historyPolyline =
                             aMap?.addPolyline(
                                     PolylineOptions()
                                             .addAll(latLngPoints)
                                             .width(18f)
-                                            .color(
-                                                    Color.parseColor("#42A5F5")
-                                            ) // Blue colour for historical tracks
+                                            .color(Color.parseColor(historyColorHex))
                                             .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                             .lineJoinType(
                                                     PolylineOptions.LineJoinType.LineJoinRound

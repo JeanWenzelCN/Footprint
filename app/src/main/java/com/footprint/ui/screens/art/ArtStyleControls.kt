@@ -236,7 +236,8 @@ fun ArtStyleControls(
                                                 colors =
                                                         FilterChipDefaults.filterChipColors(
                                                                 selectedContainerColor =
-                                                                        accentColor,
+                                                                        MaterialTheme.colorScheme
+                                                                                .primary,
                                                                 selectedLabelColor =
                                                                         MaterialTheme.colorScheme
                                                                                 .onPrimary
