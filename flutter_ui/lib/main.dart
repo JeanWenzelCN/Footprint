@@ -122,10 +122,18 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> images = await picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      setState(() => photos.addAll(images.map((img) => File(img.path))));
+    try {
+      final ImagePicker picker = ImagePicker();
+      final List<XFile> images = await picker.pickMultiImage();
+      debugPrint("Picked ${images.length} images");
+      if (images.isNotEmpty) {
+        setState(() => photos.addAll(images.map((img) => File(img.path))));
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("未选择照片")));
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("选取照片出错: $e")));
     }
   }
 
@@ -306,7 +314,20 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
                   padding: const EdgeInsets.only(right: 12),
                   child: Stack(
                     children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(f, width: 80, height: 80, fit: BoxFit.cover)),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12), 
+                        child: Image.file(
+                          f, 
+                          width: 80, height: 80, fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            debugPrint("Error loading image ${f.path}: $error");
+                            return Container(
+                              width: 80, height: 80, color: Colors.red,
+                              child: const Icon(Icons.error, color: Colors.white),
+                            );
+                          }
+                        )
+                      ),
                       Positioned(
                         right: 0, top: 0,
                         child: GestureDetector(
