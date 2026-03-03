@@ -191,8 +191,8 @@ class FlutterMapView(
                 markerList.clear()
 
                 entries?.forEach { entry ->
-                    val lat = entry["latitude"] as? Double
-                    val lng = entry["longitude"] as? Double
+                    val lat = (entry["latitude"] as? Number)?.toDouble()
+                    val lng = (entry["longitude"] as? Number)?.toDouble()
                     val id = (entry["id"] as? Number)?.toLong()
                     val title = entry["title"] as? String ?: "足迹"
 

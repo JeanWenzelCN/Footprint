@@ -378,6 +378,8 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
                 "temperature": double.tryParse(_tempController.text),
                 "altitude": double.tryParse(_altController.text),
                 "transportType": mappedTransport,
+                "latitude": widget.initialEntry?['latitude'],
+                "longitude": widget.initialEntry?['longitude'],
               };
 
               try {
