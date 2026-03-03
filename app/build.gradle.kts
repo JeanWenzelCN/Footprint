@@ -10,7 +10,7 @@ plugins {
 android {
     namespace = "com.footprint"
     compileSdk = 36
-    // layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("app_new_build"))
+    layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("app_new_build"))
 
     val localProperties = Properties().apply {
         val file = rootProject.file("local.properties")

@@ -342,25 +342,41 @@ class MainActivity : FlutterActivity() {
                                             )
 
                                     val processedPhotos =
-                                            entry.photos.map { path ->
-                                                // 如果图片已经在应用内部存诸（即原本就存在的老图片），直接保留
-                                                if (path.startsWith(filesDir.absolutePath)) {
+                                            entry.photos?.mapNotNull { path ->
+                                                try {
+                                                    val originalFile = java.io.File(path)
+                                                    if (!originalFile.exists())
+                                                            return@mapNotNull path
+
+                                                    val appImagesDir =
+                                                            java.io.File(
+                                                                    filesDir,
+                                                                    "footprint_images"
+                                                            )
+                                                    if (!appImagesDir.exists())
+                                                            appImagesDir.mkdirs()
+
+                                                    if (path.startsWith(appImagesDir.absolutePath)
+                                                    ) {
+                                                        path
+                                                    } else {
+                                                        val destFile =
+                                                                java.io.File(
+                                                                        appImagesDir,
+                                                                        "footprint_${java.util.UUID.randomUUID()}.jpg"
+                                                                )
+                                                        originalFile.copyTo(
+                                                                destFile,
+                                                                overwrite = true
+                                                        )
+                                                        destFile.absolutePath
+                                                    }
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
                                                     path
-                                                } else {
-                                                    // 否则属于新选取的图片（比如来自 ImagePicker 的
-                                                    // cache），需要拷贝到私有目录持久化保存
-                                                    val uri =
-                                                            android.net.Uri.fromFile(
-                                                                    java.io.File(path)
-                                                            )
-                                                    com.footprint.utils.ImageUtils
-                                                            .saveFootprintImage(
-                                                                    this@MainActivity,
-                                                                    uri
-                                                            )
-                                                            ?: path
                                                 }
                                             }
+                                                    ?: emptyList()
                                     val finalEntry = entry.copy(photos = processedPhotos)
 
                                     repository.saveEntry(finalEntry)
