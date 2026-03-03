@@ -14,8 +14,7 @@ description: "A new Flutter module project."
 #
 # This version is used _only_ for the Runner app, which is used if you just do
 # a `flutter run`. It has no impact on any other native host app that you embed
-# your Flutter project into.
-version: 3.3.0+36
+version: 3.3.1+37
 
 environment:
   sdk: ^3.11.0

@@ -1986,7 +1986,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
               const Center(
                 child: Text(
-                  "Footprint v3.2.2",
+                  "Footprint v3.3.1",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ),
