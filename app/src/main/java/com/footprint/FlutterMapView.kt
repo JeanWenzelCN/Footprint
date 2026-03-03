@@ -212,6 +212,15 @@ class FlutterMapView(
                         marker?.let { markerList.add(it) }
                     }
                 }
+                
+                // Automatically register all map entries as historical locations to dispel fog
+                historyPoints = entries?.mapNotNull { 
+                    val lat = (it["latitude"] as? Number)?.toDouble()
+                    val lng = (it["longitude"] as? Number)?.toDouble()
+                    if (lat != null && lng != null) LatLng(lat, lng) else null
+                } ?: emptyList()
+                
+                fogOverlay.invalidate()
                 result.success(true)
             }
             "setHistoryPoints" -> {
@@ -355,46 +364,125 @@ class FlutterMapView(
         mapView.onDestroy()
     }
 
-    // --- 高性能迷雾渲染类 ---
+    // --- 基于程序化纹理的体积云迷雾系统 (Procedural Volumetric Fog) ---
     inner class FogOverlayView(context: Context) : View(context) {
-        private val fogPaint =
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.parseColor("#E60F172A") // 90% 透明度的深蓝色迷雾
-                }
+        private var isAnimating = false
+        private val cloudMatrix1 = Matrix()
+        private val cloudMatrix2 = Matrix()
+        private var fogGradientShader: LinearGradient? = null
 
-        private val holePaint =
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
-                    style = Paint.Style.STROKE
-                    strokeCap = Paint.Cap.ROUND
-                    strokeJoin = Paint.Join.ROUND
-                }
+        private val baseFogPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val cloudPaint1 = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val cloudPaint2 = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        private val circlePaint =
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
-                    style = Paint.Style.FILL
+        private val pathEraserPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            maskFilter = BlurMaskFilter(60f, BlurMaskFilter.Blur.NORMAL)
+            alpha = 200
+        }
+
+        private val spotEraserPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+            style = Paint.Style.FILL
+        }
+
+        init {
+            // 初始化生成两层无缝云雾柏林噪声纹理 (利用不同种子和缩放创建差值，产生翻滚感)
+            val tex1 = createSeamlessCloudTexture(512, 42L, "#55E2E8F0") // 浅蓝亮部
+            val tex2 = createSeamlessCloudTexture(512, 108L, "#4094A3B8") // 灰蓝暗部
+
+            cloudPaint1.shader = BitmapShader(tex1, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+            cloudPaint2.shader = BitmapShader(tex2, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+        }
+
+        private fun createSeamlessCloudTexture(size: Int, seed: Long, colorHex: String): Bitmap {
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.color = Color.parseColor(colorHex)
+            paint.maskFilter = BlurMaskFilter(size / 6f, BlurMaskFilter.Blur.NORMAL)
+
+            val rnd = java.util.Random(seed)
+            for (i in 0 until 50) {
+                val cx = rnd.nextFloat() * size
+                val cy = rnd.nextFloat() * size
+                val r = rnd.nextFloat() * (size / 4f) + (size / 10f)
+
+                // 9宫格绘制保证边缘纹理无缝拼接 (Seamless Tiling)
+                for (dx in listOf(-size, 0, size)) {
+                    for (dy in listOf(-size, 0, size)) {
+                        canvas.drawCircle(cx + dx.toFloat(), cy + dy.toFloat(), r, paint)
+                    }
                 }
+            }
+            return bitmap
+        }
+
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            isAnimating = true
+            postInvalidateOnAnimation()
+        }
+
+        override fun onDetachedFromWindow() {
+            super.onDetachedFromWindow()
+            isAnimating = false
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            if (w == 0 || h == 0) return
+
+            // 基础深空背景光照
+            fogGradientShader = LinearGradient(0f, 0f, 0f, h.toFloat(),
+                intArrayOf(Color.parseColor("#E60F172A"), Color.parseColor("#F21E293B")),
+                null, Shader.TileMode.CLAMP)
+            baseFogPaint.shader = fogGradientShader
+        }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val map = aMap ?: return
             val projection = map.projection ?: return
 
-            // 使用离屏缓冲实现 DstOut 混合效果
+            if (width == 0 || height == 0) return
+
+            val time = System.currentTimeMillis()
+            
+            // 矩阵偏移计算，使云层移动
+            val offset1X = (time % 120000L) / 120000f * 512f
+            val offset1Y = (time % 150000L) / 150000f * 512f
+            cloudMatrix1.reset()
+            cloudMatrix1.setScale(2.5f, 2.5f) // 放大云朵细节
+            cloudMatrix1.postTranslate(-offset1X, -offset1Y)
+            cloudPaint1.shader.setLocalMatrix(cloudMatrix1)
+
+            val offset2X = (time % 180000L) / 180000f * 512f
+            val offset2Y = (time % 100000L) / 100000f * 512f
+            cloudMatrix2.reset()
+            cloudMatrix2.setScale(3.5f, 3.5f) // 第二层云不同比例，交叉混合产生涌动(Churning)
+            cloudMatrix2.postTranslate(offset2X, -offset2Y)
+            cloudPaint2.shader.setLocalMatrix(cloudMatrix2)
+
+            // 使用离屏缓冲实现各种叠加及挖洞
             val sc = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
 
-            // 1. 画背景迷雾
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fogPaint)
+            // 1. 绘制底层基础迷雾环境
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), baseFogPaint)
 
-            // 2. 计算动态挖洞半径 (根据缩放等级调整)
+            // 2. 叠加体积云纹理层 (利用透明度混合出真正的体积云质感)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint1)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint2)
+
             val zoom = map.cameraPosition.zoom
-            val radius = (zoom * 2.0).coerceIn(20.0, 150.0).toFloat()
+            val baseRadius = (zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
 
-            holePaint.strokeWidth = radius * 1.5f
-
-            // 3. 绘制实时轨迹路径挖洞
+            // 3. 实时轨迹的高斯边缘消除 (物理侵蚀感)
             if (currentPathPoints.isNotEmpty()) {
+                pathEraserPaint.strokeWidth = baseRadius * 1.8f
                 val path = Path()
                 var first = true
                 currentPathPoints.forEach { latLng ->
@@ -406,21 +494,44 @@ class FlutterMapView(
                         path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
                     }
                 }
-                canvas.drawPath(path, holePaint)
+                canvas.drawPath(path, pathEraserPaint)
             }
 
-            // 4. 绘制历史点（使用圆点打洞）
+            // 4. 计算探索掩码的动态驱散 (Dynamic Erosion)
             historyPoints.forEach { latLng ->
                 val screenPos = projection.toScreenLocation(latLng)
-                canvas.drawCircle(
+                // 只渲染视野内部的点
+                if (screenPos.x >= -baseRadius*4 && screenPos.x <= width + baseRadius*4 &&
+                    screenPos.y >= -baseRadius*4 && screenPos.y <= height + baseRadius*4) {
+                    
+                    // 利用坐标Hash和时间计算独立呼吸波长，让边缘呈现动态侵蚀涌动效果
+                    val phase = latLng.latitude * 1000.0 + latLng.longitude * 1000.0
+                    val breatheErosion = Math.sin(time / 1500.0 + phase).toFloat() * 0.15f
+                    val dynamicRadius = baseRadius * 4.0f * (1.0f + breatheErosion)
+
+                    spotEraserPaint.shader = RadialGradient(
+                        screenPos.x.toFloat(), screenPos.y.toFloat(), dynamicRadius,
+                        intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT),
+                        floatArrayOf(0f, 0.35f, 1f),
+                        Shader.TileMode.CLAMP
+                    )
+                    
+                    canvas.drawCircle(
                         screenPos.x.toFloat(),
                         screenPos.y.toFloat(),
-                        radius * 2.0f,
-                        circlePaint
-                )
+                        dynamicRadius,
+                        spotEraserPaint
+                    )
+                }
             }
 
             canvas.restoreToCount(sc)
+
+            if (isAnimating && visibility == VISIBLE) {
+                postInvalidateOnAnimation() // 以显示器刷新率循环重绘实现60fps动画
+            }
         }
     }
+
+
 }
