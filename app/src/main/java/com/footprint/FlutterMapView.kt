@@ -63,7 +63,7 @@ class FlutterMapView(
                 isRotateGesturesEnabled = true
                 isTiltGesturesEnabled = false
             }
-            isMyLocationEnabled = true
+            isMyLocationEnabled = false
             // 默认设置为夜间模式以配合液态玻璃风格
             mapType = AMap.MAP_TYPE_NIGHT
 

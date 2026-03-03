@@ -2050,6 +2050,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   // === 定位状态管理 ===
   bool _isLocating = false;    // 是否正在执行单次定位
   bool _isMapActive = true;    // 当前是否在地图 tab
+  bool _userRequestedLocation = false; // 是否手动点击了定位
 
   // === 追踪状态 (Flutter 实现，匹配原 Kotlin LocationTrackingService) ===
   bool _isTracking = false;
@@ -2089,6 +2090,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         if (data['type'] == 'status') {
           setState(() {
             _isTracking = data['isTracking'];
+            _updateNativeLocationState();
             if (!_isTracking) {
               _durationStr = '00:00:00';
               _durationTimer?.cancel();
@@ -2166,23 +2168,29 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         state == AppLifecycleState.inactive) {
       // 应用进入后台，如果没有在记录足迹，停止定位
       _stopLocationIfIdle();
+      // 通知原生地图也关闭一直定位
+      _mapChannel?.invokeMethod('setLocationEnabled', false);
     } else if (state == AppLifecycleState.resumed) {
-      // 应用回到前台，如果在地图页且正在追踪，确保定位运行
+      // 应用回到前台，如果在地图页且正在追踪，确保事实定位运行
       if (_isMapActive && _isTracking) {
         _locationClient.startLocation();
       }
+      _updateNativeLocationState();
     }
   }
 
   /// Tab 切换离开地图页时调用
   void onTabDeselected() {
     _isMapActive = false;
+    _userRequestedLocation = false; // 重置点击定位状态以确保续航
     _stopLocationIfIdle();
+    _updateNativeLocationState();
   }
 
   /// Tab 切换进入地图页时调用
   void onTabActivated() {
     _isMapActive = true;
+    _updateNativeLocationState();
     // 如果正在追踪，确保定位活跃
     if (_isTracking) {
       _locationClient.startLocation();
@@ -2195,6 +2203,18 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       _locationSubscription?.cancel();
       _locationClient.stopLocation();
     }
+  }
+
+  void _updateNativeLocationState() {
+    // 只有在点击定位时并且当前界面是地图界面时才会定位 -> (_userRequestedLocation && _isMapActive)
+    // 开始记录足迹后，只要没有停止记录足迹，不管在前后台都会一直定位 (由服务控制)。为保持地图篮点显示，跟踪时也开启
+    bool shouldEnable = false;
+    if (_isTracking) {
+      shouldEnable = _isMapActive;
+    } else {
+      shouldEnable = _userRequestedLocation && _isMapActive;
+    }
+    _mapChannel?.invokeMethod('setLocationEnabled', shouldEnable);
   }
 
   @override
@@ -2258,8 +2278,10 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       }
 
       // === 策略1：直接让原生地图居中到它自己已知的蓝点位置 ===
-      // 原生地图的 isMyLocationEnabled=true 有独立的定位能力
-      // 不需要通过 Flutter 定位 SDK 中转坐标
+      // 原生地图的 isMyLocationEnabled 开启后有独立的定位能力
+      _userRequestedLocation = true;
+      _updateNativeLocationState();
+
       try {
         final nativeResult = await _mapChannel?.invokeMethod('centerLocation', {'zoom': 17.0});
         if (nativeResult == true) {
