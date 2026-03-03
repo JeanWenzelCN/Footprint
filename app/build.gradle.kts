@@ -81,6 +81,12 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "**/rust/**"
+            excludes += "**/target/**"
+        }
+        jniLibs {
+            excludes += "**/libVkLayer_khronos_validation.so"
+            excludes += "**/libflutter.so.debug"
         }
     }
 
@@ -152,12 +158,12 @@ dependencies {
 }
 
 val buildRustTask = tasks.register<Exec>("buildRust") {
-    workingDir = file("src/main/rust")
+    workingDir = file("rust")
     commandLine(
         "cargo", "ndk",
         "-t", "armeabi-v7a",
         "-t", "arm64-v8a",
-        "-o", "../jniLibs",
+        "-o", "../src/main/jniLibs",
         "build", "--release"
     )
 }

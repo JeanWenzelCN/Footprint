@@ -44,6 +44,7 @@ class FlutterMapView(
     private var historyPoints: List<LatLng> = emptyList()
 
     private var livePolyline: Polyline? = null
+    private var historyPolyline: Polyline? = null
     private val markerList = mutableListOf<Marker>()
 
     init {
@@ -206,9 +207,54 @@ class FlutterMapView(
             }
             "setHistoryPoints" -> {
                 // 用于加载历史数据的接口 (迷雾挖洞)
-                val points = call.arguments as? List<Map<String, Double>>
-                historyPoints = points?.map { LatLng(it["lat"]!!, it["lng"]!!) } ?: emptyList()
+                val points = call.arguments as? List<Map<String, Any>>
+                historyPoints =
+                        points?.mapNotNull {
+                            val lat =
+                                    (it["lat"] as? Number)?.toDouble()
+                                            ?: (it["latitude"] as? Number)?.toDouble()
+                            val lng =
+                                    (it["lng"] as? Number)?.toDouble()
+                                            ?: (it["longitude"] as? Number)?.toDouble()
+                            if (lat != null && lng != null) LatLng(lat, lng) else null
+                        }
+                                ?: emptyList()
                 fogOverlay.invalidate()
+                result.success(true)
+            }
+            "setTrackingPath" -> {
+                val points = call.arguments as? List<Map<String, Any>>
+                val latLngPoints =
+                        points?.mapNotNull {
+                            val lat =
+                                    (it["lat"] as? Number)?.toDouble()
+                                            ?: (it["latitude"] as? Number)?.toDouble()
+                            val lng =
+                                    (it["lng"] as? Number)?.toDouble()
+                                            ?: (it["longitude"] as? Number)?.toDouble()
+                            if (lat != null && lng != null) LatLng(lat, lng) else null
+                        }
+                                ?: emptyList()
+
+                historyPolyline?.remove()
+                historyPolyline = null
+
+                if (latLngPoints.isNotEmpty()) {
+                    historyPolyline =
+                            aMap?.addPolyline(
+                                    PolylineOptions()
+                                            .addAll(latLngPoints)
+                                            .width(18f)
+                                            .color(
+                                                    Color.parseColor("#42A5F5")
+                                            ) // Blue colour for historical tracks
+                                            .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                            .lineJoinType(
+                                                    PolylineOptions.LineJoinType.LineJoinRound
+                                            )
+                                            .zIndex(90f)
+                            )
+                }
                 result.success(true)
             }
             "centerLocation" -> {

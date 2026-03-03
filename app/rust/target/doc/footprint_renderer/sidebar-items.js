@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["Java_com_footprint_utils_NativeRenderer_generateGigapixelMap"]};
