@@ -236,8 +236,7 @@ fun ArtStyleControls(
                                                 colors =
                                                         FilterChipDefaults.filterChipColors(
                                                                 selectedContainerColor =
-                                                                        MaterialTheme.colorScheme
-                                                                                .primary,
+                                                                        accentColor,
                                                                 selectedLabelColor =
                                                                         MaterialTheme.colorScheme
                                                                                 .onPrimary
@@ -640,8 +639,7 @@ fun ArtStyleControls(
                                                 colors =
                                                         FilterChipDefaults.filterChipColors(
                                                                 selectedContainerColor =
-                                                                        MaterialTheme.colorScheme
-                                                                                .primary,
+                                                                        accentColor,
                                                                 selectedLabelColor =
                                                                         MaterialTheme.colorScheme
                                                                                 .onPrimary
@@ -778,8 +776,7 @@ fun ArtStyleControls(
                                                 colors =
                                                         FilterChipDefaults.filterChipColors(
                                                                 selectedContainerColor =
-                                                                        MaterialTheme.colorScheme
-                                                                                .primary,
+                                                                        accentColor,
                                                                 selectedLabelColor =
                                                                         MaterialTheme.colorScheme
                                                                                 .onPrimary

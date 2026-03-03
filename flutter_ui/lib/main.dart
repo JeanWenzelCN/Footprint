@@ -1706,115 +1706,156 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          if (isExpanded)
-            ...monthEntries.map((entry) {
-              final String dateStr = entry['happenedOn'] ?? '';
-              final fragments = dateStr.split('-');
-              final String displayDate = fragments.length >= 3 ? "${fragments[1]}-${fragments[2].substring(0,2)}" : dateStr;
-              
-              String? thumbPath;
-              final photos = entry['photoPaths'] as List<dynamic>?;
-              if (photos != null && photos.isNotEmpty && photos[0] is String) {
-                thumbPath = photos[0];
-              }
+          AnimatedSize(
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.elasticOut,
+            child: isExpanded
+                ? Column(
+                    children: monthEntries.map((entry) {
+                      final String dateStr = entry['happenedOn'] ?? '';
+                      final fragments = dateStr.split('-');
+                      final String displayDate = fragments.length >= 3
+                          ? "${fragments[1]}-${fragments[2].substring(0, 2)}"
+                          : dateStr;
 
-              final iconStr = entry['icon'] as String? ?? '';
-              IconData iconData = Icons.location_on;
-              switch (iconStr) {
-                case "Restaurant": iconData = Icons.restaurant; break;
-                case "LocalCafe": iconData = Icons.local_cafe; break;
-                case "Park": iconData = Icons.park; break;
-                case "Flight": iconData = Icons.flight; break;
-                case "Train": iconData = Icons.train; break;
-                case "DirectionsBike": iconData = Icons.directions_bike; break;
-                case "ShoppingBag": iconData = Icons.shopping_bag; break;
-                case "CameraAlt": iconData = Icons.camera_alt; break;
-              }
-              
-              final dist = (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
-              final rDist = dist.toStringAsFixed(1);
+                      String? thumbPath;
+                      final photos = entry['photoPaths'] as List<dynamic>?;
+                      if (photos != null &&
+                          photos.isNotEmpty &&
+                          photos[0] is String) {
+                        thumbPath = photos[0];
+                      }
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12, left: 8),
-                child: InkWell(
-                  onTap: () => _showDetail(entry),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Card(
-                    elevation: 0,
-                    margin: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: cs.primaryContainer,
-                            child: Icon(iconData, color: cs.onPrimaryContainer, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  entry['title'] ?? '未知足迹',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Builder(
-                                  builder: (context) {
-                                    String loc = entry['location'] ?? '未知地点';
-                                    final coordRegex = RegExp(r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
-                                    final match = coordRegex.firstMatch(loc);
-                                    if (match != null) {
-                                      try {
-                                        double lat = double.parse(match.group(1)!);
-                                        double lng = double.parse(match.group(2)!);
-                                        loc = "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
-                                      } catch (_) {}
-                                    }
-                                    return Text(
-                                      '$displayDate · $loc',
-                                      style: const TextStyle(fontSize: 12),
-                                    );
-                                  }
-                                ),
-                              ],
+                      final iconStr = entry['icon'] as String? ?? '';
+                      IconData iconData = Icons.location_on;
+                      switch (iconStr) {
+                        case "Restaurant":
+                          iconData = Icons.restaurant;
+                          break;
+                        case "LocalCafe":
+                          iconData = Icons.local_cafe;
+                          break;
+                        case "Park":
+                          iconData = Icons.park;
+                          break;
+                        case "Flight":
+                          iconData = Icons.flight;
+                          break;
+                        case "Train":
+                          iconData = Icons.train;
+                          break;
+                        case "DirectionsBike":
+                          iconData = Icons.directions_bike;
+                          break;
+                        case "ShoppingBag":
+                          iconData = Icons.shopping_bag;
+                          break;
+                        case "CameraAlt":
+                          iconData = Icons.camera_alt;
+                          break;
+                      }
+
+                      final dist =
+                          (entry['distanceKm'] as num?)?.toDouble() ?? 0.0;
+                      final rDist = dist.toStringAsFixed(1);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12, left: 8),
+                        child: InkWell(
+                          onTap: () => _showDetail(entry),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Card(
+                            elevation: 0,
+                            margin: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                  color: cs.outlineVariant
+                                      .withValues(alpha: 0.5)),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: cs.primaryContainer,
+                                    child: Icon(iconData,
+                                        color: cs.onPrimaryContainer, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          entry['title'] ?? '未知足迹',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Builder(builder: (context) {
+                                          String loc =
+                                              entry['location'] ?? '未知地点';
+                                          final coordRegex = RegExp(
+                                              r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
+                                          final match =
+                                              coordRegex.firstMatch(loc);
+                                          if (match != null) {
+                                            try {
+                                              double lat =
+                                                  double.parse(match.group(1)!);
+                                              double lng =
+                                                  double.parse(match.group(2)!);
+                                              loc =
+                                                  "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
+                                            } catch (_) {}
+                                          }
+                                          return Text(
+                                            '$displayDate · $loc',
+                                            style:
+                                                const TextStyle(fontSize: 12),
+                                          );
+                                        }),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (thumbPath != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        File(thumbPath),
+                                        width: 40,
+                                        height: 40,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => Icon(
+                                            Icons.image_not_supported,
+                                            size: 40,
+                                            color: cs.outline),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      '$rDist km',
+                                      style: TextStyle(
+                                        color: cs.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          if (thumbPath != null)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                File(thumbPath),
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
-                                errorBuilder: (c,e,s) => Icon(Icons.image_not_supported, size: 40, color: cs.outline),
-                              ),
-                            )
-                          else
-                            Text(
-                              '$rDist km',
-                              style: TextStyle(
-                                color: cs.primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
+                        ),
+                      );
+                    }).toList(),
+                  )
+                : const SizedBox(width: double.infinity, height: 0),
+          ),
           const SizedBox(height: 8),
         ],
       );
