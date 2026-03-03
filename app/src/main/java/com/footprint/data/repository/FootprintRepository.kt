@@ -84,6 +84,11 @@ class FootprintRepository(
                 return trackPointDao.getPointsInRangeOnce(startTime, endTime)
         }
 
+        /** Get all de-duplicated location points for fog exploration mask */
+        suspend fun getAllDistinctLocations(): List<com.footprint.data.local.TrackPointEntity> {
+                return trackPointDao.getAllDistinctLocations()
+        }
+
         suspend fun getTrackPointCount(year: Int, month: Int? = null): Int {
                 val (start, end) = getRangeForYearMonth(year, month)
                 return trackPointDao.getCountInRange(start, end)

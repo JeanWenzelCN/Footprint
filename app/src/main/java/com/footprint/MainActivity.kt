@@ -109,6 +109,33 @@ class MainActivity : FlutterActivity() {
                                 }
                             }
                         }
+                        // 获取所有去重位置点（用于迷雾探索掩码）
+                        "getAllFogPoints" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    // 1. 从 track_points 表获取去重后的坐标
+                                    val trackLocations = repository.getAllDistinctLocations()
+                                    // 2. 从 footprints 表获取足迹坐标
+                                    val entries = repository.getAllEntries()
+                                    
+                                    // 合并两个数据源
+                                    val allPoints = mutableListOf<Map<String, Double>>()
+                                    trackLocations.forEach {
+                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude))
+                                    }
+                                    entries.filter { it.latitude != null && it.longitude != null }.forEach {
+                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!))
+                                    }
+                                    
+                                    val json = gson.toJson(allPoints)
+                                    withContext(Dispatchers.Main) { result.success(json) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        result.error("QUERY_FAILED", e.message, null)
+                                    }
+                                }
+                            }
+                        }
                         "getTrackingState" -> {
                             val service = com.footprint.service.LocationTrackingService
                             val state =

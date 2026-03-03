@@ -2246,11 +2246,15 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _updateNativeMap();
   }
 
+  List<dynamic> _fogPoints = [];
+
   Future<void> _loadEntries() async {
     try {
       final String jsonStr = await dataChannel.invokeMethod('getAllEntries');
+      final String fogPointsJson = await dataChannel.invokeMethod('getAllFogPoints');
       setState(() {
         _allEntries = jsonDecode(jsonStr);
+        _fogPoints = jsonDecode(fogPointsJson);
       });
       _updateNativeMap();
     } catch (e) {
