@@ -104,6 +104,7 @@ class FlutterMapView(
         scope.launch {
             LocationTrackingService.trackingPath.collectLatest { locations ->
                 currentPathPoints = locations.map { LatLng(it.latitude, it.longitude) }
+                fogOverlay.updateLivePathMercatorCache()
                 updateLivePolyline()
                 fogOverlay.invalidate()
             }
@@ -232,6 +233,7 @@ class FlutterMapView(
                             if (lat != null && lng != null) LatLng(lat, lng) else null
                         }
                                 ?: emptyList()
+                fogOverlay.updateHistoryMercatorCache()
                 fogOverlay.invalidate()
                 result.success(true)
             }
@@ -411,6 +413,48 @@ class FlutterMapView(
         
         private var lastBlurRadius: Float = -1f
         private var cachedBlurFilter: BlurMaskFilter? = null
+        
+        // --- 高性能 C++ 矩阵映射缓存机制 ---
+        private val mercatorLivePath = Path()
+        private val scratchingScreenPath = Path()
+        private var historyMercatorCoords = FloatArray(0)
+        private var screenHistoryScratch = FloatArray(0)
+        private val mercatorToScreenMatrix = Matrix()
+        
+        private fun latLngToMercatorX(lng: Double): Float {
+            return (lng / 360.0 + 0.5).toFloat()
+        }
+
+        private fun latLngToMercatorY(lat: Double): Float {
+            val sinY = Math.sin(lat * Math.PI / 180.0).coerceIn(-0.9999, 0.9999)
+            return (0.5 - Math.log((1 + sinY) / (1 - sinY)) / (4 * Math.PI)).toFloat()
+        }
+
+        fun updateLivePathMercatorCache() {
+            mercatorLivePath.reset()
+            var first = true
+            currentPathPoints.forEach { pt ->
+                val mx = latLngToMercatorX(pt.longitude)
+                val my = latLngToMercatorY(pt.latitude)
+                if (first) {
+                    mercatorLivePath.moveTo(mx, my)
+                    first = false
+                } else {
+                    mercatorLivePath.lineTo(mx, my)
+                }
+            }
+        }
+
+        fun updateHistoryMercatorCache() {
+            if (historyMercatorCoords.size != historyPoints.size * 2) {
+                historyMercatorCoords = FloatArray(historyPoints.size * 2)
+            }
+            var i = 0
+            historyPoints.forEach { pt ->
+                historyMercatorCoords[i++] = latLngToMercatorX(pt.longitude)
+                historyMercatorCoords[i++] = latLngToMercatorY(pt.latitude)
+            }
+        }
 
         init {
             agslGradient = RadialGradient(
@@ -534,17 +578,27 @@ class FlutterMapView(
             ) {
                 // ---- AGSL SHADER PATH (Native Volumetric Cloud) ----
 
-                val bounds = projection.visibleRegion.latLngBounds
-                val latSpan = bounds.northeast.latitude - bounds.southwest.latitude
-                val lngSpan = bounds.northeast.longitude - bounds.southwest.longitude
-                // Use a large expansion factor to prevent paths from being disconnected at edges
-                val expandLat = latSpan * 1.5
-                val expandLng = lngSpan * 1.5
-                val minLat = bounds.southwest.latitude - expandLat
-                val maxLat = bounds.northeast.latitude + expandLat
-                val minLng = bounds.southwest.longitude - expandLng
-                val maxLng = bounds.northeast.longitude + expandLng
+                // 构建高精度仿射变换矩阵，1次计算全局映射
+                val center = map.cameraPosition.target
+                val offsetScale = Math.pow(2.0, (17.0 - map.cameraPosition.zoom).toDouble()).toFloat()
+                val offDeg = 0.001f * offsetScale
+                val p0 = projection.toScreenLocation(center)
+                val p1 = projection.toScreenLocation(LatLng(center.latitude + offDeg, center.longitude))
+                val p2 = projection.toScreenLocation(LatLng(center.latitude, center.longitude + offDeg))
+                
+                val src = floatArrayOf(
+                    latLngToMercatorX(center.longitude), latLngToMercatorY(center.latitude),
+                    latLngToMercatorX(center.longitude), latLngToMercatorY(center.latitude + offDeg),
+                    latLngToMercatorX(center.longitude + offDeg), latLngToMercatorY(center.latitude)
+                )
+                val dst = floatArrayOf(
+                    p0.x.toFloat(), p0.y.toFloat(),
+                    p1.x.toFloat(), p1.y.toFloat(),
+                    p2.x.toFloat(), p2.y.toFloat()
+                )
+                mercatorToScreenMatrix.setPolyToPoly(src, 0, dst, 0, 3)
 
+                // ---- AGSL SHADER PATH (Native Volumetric Cloud) ----
                 // 1. Prepare Exploration Mask
                 maskCanvas?.drawColor(Color.WHITE) // fully enshrouded
 
@@ -559,47 +613,36 @@ class FlutterMapView(
                 }
 
                 // Draw Path into Mask
-                if (currentPathPoints.isNotEmpty()) {
+                if (!mercatorLivePath.isEmpty) {
                     tempEraser.maskFilter = cachedBlurFilter
                     tempEraser.strokeWidth = baseRadius * 1.8f
-                    val path = Path()
-                    var first = true
-                    currentPathPoints.forEach { latLng ->
-                        if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
-                            val screenPos = projection.toScreenLocation(latLng)
-                            if (first) {
-                                path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
-                                first = false
-                            } else {
-                                path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
-                            }
-                        }
-                    }
-                    maskCanvas?.drawPath(path, tempEraser)
+                    scratchingScreenPath.reset()
+                    scratchingScreenPath.addPath(mercatorLivePath)
+                    scratchingScreenPath.transform(mercatorToScreenMatrix)
+                    maskCanvas?.drawPath(scratchingScreenPath, tempEraser)
                 }
 
                 // Draw History Spots into Mask
-                historyPoints.forEach { latLng ->
-                    if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
-                        val screenPos = projection.toScreenLocation(latLng)
-                        if (screenPos.x >= -dynamicRadius &&
-                                        screenPos.x <= width + dynamicRadius &&
-                                        screenPos.y >= -dynamicRadius &&
-                                        screenPos.y <= height + dynamicRadius
-                        ) {
+                if (historyMercatorCoords.isNotEmpty()) {
+                    if (screenHistoryScratch.size < historyMercatorCoords.size) {
+                        screenHistoryScratch = FloatArray(historyMercatorCoords.size)
+                    }
+                    mercatorToScreenMatrix.mapPoints(screenHistoryScratch, historyMercatorCoords)
+                    val count = historyPoints.size * 2
+                    var i = 0
+                    while (i < count) {
+                        val sx = screenHistoryScratch[i]
+                        val sy = screenHistoryScratch[i + 1]
+                        if (sx >= -dynamicRadius && sx <= width + dynamicRadius && sy >= -dynamicRadius && sy <= height + dynamicRadius) {
                             agslGradient?.let { grad ->
                                 agslGradientMatrix.setScale(dynamicRadius, dynamicRadius)
-                                agslGradientMatrix.postTranslate(screenPos.x.toFloat(), screenPos.y.toFloat())
+                                agslGradientMatrix.postTranslate(sx, sy)
                                 grad.setLocalMatrix(agslGradientMatrix)
                                 tempSpot.shader = grad
-                                maskCanvas?.drawCircle(
-                                        screenPos.x.toFloat(),
-                                        screenPos.y.toFloat(),
-                                        dynamicRadius,
-                                        tempSpot
-                                )
+                                maskCanvas?.drawCircle(sx, sy, dynamicRadius, tempSpot)
                             }
                         }
+                        i += 2
                     }
                 }
 
@@ -696,15 +739,25 @@ class FlutterMapView(
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint1)
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint2)
 
-                val bounds = projection.visibleRegion.latLngBounds
-                val latSpan = bounds.northeast.latitude - bounds.southwest.latitude
-                val lngSpan = bounds.northeast.longitude - bounds.southwest.longitude
-                val expandLat = latSpan * 1.5
-                val expandLng = lngSpan * 1.5
-                val minLat = bounds.southwest.latitude - expandLat
-                val maxLat = bounds.northeast.latitude + expandLat
-                val minLng = bounds.southwest.longitude - expandLng
-                val maxLng = bounds.northeast.longitude + expandLng
+                // 构建高精度仿射变换矩阵，1次计算全局映射
+                val center = map.cameraPosition.target
+                val offsetScale = Math.pow(2.0, (17.0 - zoom).toDouble()).toFloat()
+                val offDeg = 0.001f * offsetScale
+                val p0 = projection.toScreenLocation(center)
+                val p1 = projection.toScreenLocation(LatLng(center.latitude + offDeg, center.longitude))
+                val p2 = projection.toScreenLocation(LatLng(center.latitude, center.longitude + offDeg))
+                
+                val src = floatArrayOf(
+                    latLngToMercatorX(center.longitude), latLngToMercatorY(center.latitude),
+                    latLngToMercatorX(center.longitude), latLngToMercatorY(center.latitude + offDeg),
+                    latLngToMercatorX(center.longitude + offDeg), latLngToMercatorY(center.latitude)
+                )
+                val dst = floatArrayOf(
+                    p0.x.toFloat(), p0.y.toFloat(),
+                    p1.x.toFloat(), p1.y.toFloat(),
+                    p2.x.toFloat(), p2.y.toFloat()
+                )
+                mercatorToScreenMatrix.setPolyToPoly(src, 0, dst, 0, 3)
 
                 val baseRadius = (map.cameraPosition.zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
                 val requiredBlur = baseRadius * 1.8f
@@ -714,56 +767,44 @@ class FlutterMapView(
                 }
 
                 // 3. 实时轨迹的高斯边缘消除 (物理侵蚀感)
-                if (currentPathPoints.isNotEmpty()) {
+                if (!mercatorLivePath.isEmpty) {
                     pathEraserPaint.maskFilter = cachedBlurFilter
                     pathEraserPaint.strokeWidth = baseRadius * 1.8f
-                    val path = Path()
-                    var first = true
-                    currentPathPoints.forEach { latLng ->
-                        if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
-                            val screenPos = projection.toScreenLocation(latLng)
-                            if (first) {
-                                path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
-                                first = false
-                            } else {
-                                path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
-                            }
-                        }
-                    }
-                    canvas.drawPath(path, pathEraserPaint)
+                    scratchingScreenPath.reset()
+                    scratchingScreenPath.addPath(mercatorLivePath)
+                    scratchingScreenPath.transform(mercatorToScreenMatrix)
+                    canvas.drawPath(scratchingScreenPath, pathEraserPaint)
                 }
 
                 // 4. 计算探索掩码的动态驱散 (Dynamic Erosion)
-                historyPoints.forEach { latLng ->
-                    if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
-                        val screenPos = projection.toScreenLocation(latLng)
-                        val baseCheckR = baseRadius * 4.5f
-                        // 只渲染视野内部的点
-                        if (screenPos.x >= -baseCheckR &&
-                                        screenPos.x <= width + baseCheckR &&
-                                        screenPos.y >= -baseCheckR &&
-                                        screenPos.y <= height + baseCheckR
-                        ) {
-
-                            // 利用坐标Hash和时间计算独立呼吸波长，让边缘呈现动态侵蚀涌动效果
-                            val phase = latLng.latitude * 1000.0 + latLng.longitude * 1000.0
+                if (historyMercatorCoords.isNotEmpty()) {
+                    if (screenHistoryScratch.size < historyMercatorCoords.size) {
+                        screenHistoryScratch = FloatArray(historyMercatorCoords.size)
+                    }
+                    mercatorToScreenMatrix.mapPoints(screenHistoryScratch, historyMercatorCoords)
+                    val count = historyPoints.size * 2
+                    var i = 0
+                    val baseCheckR = baseRadius * 4.5f
+                    while (i < count) {
+                        val sx = screenHistoryScratch[i]
+                        val sy = screenHistoryScratch[i + 1]
+                        
+                        if (sx >= -baseCheckR && sx <= width + baseCheckR && sy >= -baseCheckR && sy <= height + baseCheckR) {
+                            // 由于使用了连续数组映射，我们无法直接获取经纬度来计算呼吸波浪。
+                            // 但我们可以通过简单的像素坐标计算出几乎相同的相位。
+                            val phase = (historyMercatorCoords[i] + historyMercatorCoords[i+1]) * 10000.0
                             val breatheErosion = Math.sin(time / 1500.0 + phase).toFloat() * 0.15f
                             val dynamicRadius = baseRadius * 4.0f * (1.0f + breatheErosion)
 
                             fallbackGradient?.let { grad ->
                                 fallbackGradientMatrix.setScale(dynamicRadius, dynamicRadius)
-                                fallbackGradientMatrix.postTranslate(screenPos.x.toFloat(), screenPos.y.toFloat())
+                                fallbackGradientMatrix.postTranslate(sx, sy)
                                 grad.setLocalMatrix(fallbackGradientMatrix)
                                 spotEraserPaint.shader = grad
-
-                                canvas.drawCircle(
-                                        screenPos.x.toFloat(),
-                                        screenPos.y.toFloat(),
-                                        dynamicRadius,
-                                        spotEraserPaint
-                                )
+                                canvas.drawCircle(sx, sy, dynamicRadius, spotEraserPaint)
                             }
                         }
+                        i += 2
                     }
                 }
 
