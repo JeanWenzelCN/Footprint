@@ -27,20 +27,8 @@ class BadgeWorker(
         try {
             Log.d("BadgeWorker", "Starting Cold Path Deep Mining...")
             
-            // Get all entries up to date
-            val allFootprints = application.repository.getAllEntries()
-            if (allFootprints.isEmpty()) return@withContext Result.success()
-
-            // You could simulate rule loading and offline matching for all historical events
-            // For example, finding the last time where a specific weather pattern was repeated 10 times
-            
-            // For MVP: let's pretend we pass each historical entry through an offline evaluator path
-            // to retroactively grant any missed badges.
-            val lastEntry = allFootprints.maxByOrNull { it.happenedOn } ?: allFootprints.first()
-            
-            // In a real scenario, we perform heavily optimized raw SQL window function reads,
-            // but for simplicity, we mock retroactively evaluating missed conditions.
-            Log.d("BadgeWorker", "Cold Path completed successfully. Processed ${allFootprints.size} records.")
+            // Retroactively evaluate all badges based on historical data
+            badgeEngine.evaluateColdPath()
             
             Result.success()
         } catch (e: Exception) {

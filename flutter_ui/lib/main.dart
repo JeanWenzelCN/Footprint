@@ -2041,7 +2041,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               IconButton(
                 icon: Icon(Icons.military_tech, color: cs.primary),
-                tooltip: "荣耀圣殿",
+                tooltip: "荣誉勋章",
                 onPressed: () async {
                   if (widget.hapticEnabled) HapticFeedback.mediumImpact();
                   try {
@@ -2050,11 +2050,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     final dictStr = await channel.invokeMethod<String>('getBadgeDictionary');
                     if (idsStr != null && dictStr != null && mounted) {
                         List<String> unlockedIds = List<String>.from(jsonDecode(idsStr));
-                        Map<String, dynamic> dict = jsonDecode(dictStr);
+                        final List<dynamic> rawList = jsonDecode(dictStr);
+                        
+                        // Group by category for the BadgeHallScreen's expected format
+                        final Map<String, List<dynamic>> dict = {};
+                        for (var item in rawList) {
+                            final cat = item['category'] ?? 'Other';
+                            dict.putIfAbsent(cat, () => []).add(item);
+                        }
+
                         Navigator.push(context, MaterialPageRoute(builder: (_) => BadgeHallScreen(badgeDictionary: dict, unlockedIds: unlockedIds)));
                     }
                   } catch (e) {
                     debugPrint("Badge screen error: $e");
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("无法打开勋章馆: $e"), backgroundColor: Theme.of(context).colorScheme.error),
+                      );
+                    }
                   }
                 },
               ),

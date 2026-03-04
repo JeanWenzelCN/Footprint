@@ -462,6 +462,10 @@ class MainActivity : FlutterActivity() {
                         "getUnlockedBadgeIds" -> {
                             lifecycleScope.launch(Dispatchers.IO) {
                                 try {
+                                    val app = application as FootprintApplication
+                                    // 触发追溯性检查逻辑 (Cold Path)
+                                    app.badgeEngine.evaluateColdPath()
+                                    
                                     val db = com.footprint.data.local.FootprintDatabase.getInstance(this@MainActivity)
                                     val ids = db.userBadgesDao().getAllUnlockedBadgeIds()
                                     withContext(Dispatchers.Main) { result.success(gson.toJson(ids)) }

@@ -52,8 +52,8 @@
         }
     },
     {
-        "badge_id": "badge_pioneer_beijing",
-        "title": "紫禁之巅",
+        "badge_id": "province_beijing",
+        "title": "京华烟云",
         "description": "在北京市留下足迹",
         "category": "Geographic",
         "condition_key": "adcode",
@@ -61,12 +61,12 @@
         "visual_meta": {
             "material": "liquid_glass",
             "color": "#D32F2F",
-            "icon": "baseline_account_balance_24"
+            "icon": "beijing_icon"
         }
     },
     {
-        "badge_id": "badge_pioneer_shanghai",
-        "title": "魔都漫步",
+        "badge_id": "province_shanghai",
+        "title": "海上繁花",
         "description": "在上海市留下足迹",
         "category": "Geographic",
         "condition_key": "adcode",
@@ -74,33 +74,423 @@
         "visual_meta": {
             "material": "cyber_neon",
             "color": "#00BCD4",
-            "icon": "baseline_business_24"
+            "icon": "shanghai_icon"
         }
     },
     {
-        "badge_id": "badge_pioneer_guangzhou",
-        "title": "花城寻迹",
-        "description": "在广州市留下足迹",
+        "badge_id": "province_tianjin",
+        "title": "津门印象",
+        "description": "在天津市留下足迹",
         "category": "Geographic",
         "condition_key": "adcode",
-        "target_value": "440100",
+        "target_value": "120000",
         "visual_meta": {
             "material": "glass",
-            "color": "#4CAF50",
-            "icon": "baseline_local_florist_24"
+            "color": "#0288D1",
+            "icon": "tianjin_icon"
         }
     },
     {
-        "badge_id": "badge_pioneer_shenzhen",
-        "title": "鹏城展翅",
-        "description": "在深圳市留下足迹",
+        "badge_id": "province_chongqing",
+        "title": "巴山蜀水",
+        "description": "在重庆市留下足迹",
         "category": "Geographic",
         "condition_key": "adcode",
-        "target_value": "440300",
+        "target_value": "500000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#FF5722",
+            "icon": "chongqing_icon"
+        }
+    },
+    {
+        "badge_id": "province_hebei",
+        "title": "燕赵豪情",
+        "description": "在河北省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "130000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#795548",
+            "icon": "hebei_icon"
+        }
+    },
+    {
+        "badge_id": "province_shanxi",
+        "title": "表里山河",
+        "description": "在山西省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "140000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#8D6E63",
+            "icon": "shanxi_icon"
+        }
+    },
+    {
+        "badge_id": "province_liaoning",
+        "title": "辽沈大地",
+        "description": "在辽宁省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "210000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#1565C0",
+            "icon": "liaoning_icon"
+        }
+    },
+    {
+        "badge_id": "province_jilin",
+        "title": "白山黑水",
+        "description": "在吉林省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "220000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#E3F2FD",
+            "icon": "jilin_icon"
+        }
+    },
+    {
+        "badge_id": "province_heilongjiang",
+        "title": "林海雪原",
+        "description": "在黑龙江省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "230000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#B0BEC5",
+            "icon": "heilongjiang_icon"
+        }
+    },
+    {
+        "badge_id": "province_jiangsu",
+        "title": "水韵江苏",
+        "description": "在江苏省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "320000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#4FC3F7",
+            "icon": "jiangsu_icon"
+        }
+    },
+    {
+        "badge_id": "province_zhejiang",
+        "title": "诗画浙江",
+        "description": "在浙江省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "330000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#1DE9B6",
+            "icon": "zhejiang_icon"
+        }
+    },
+    {
+        "badge_id": "province_anhui",
+        "title": "徽韵江淮",
+        "description": "在安徽省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "340000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#546E7A",
+            "icon": "anhui_icon"
+        }
+    },
+    {
+        "badge_id": "province_fujian",
+        "title": "清新福建",
+        "description": "在福建省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "350000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#2E7D32",
+            "icon": "fujian_icon"
+        }
+    },
+    {
+        "badge_id": "province_jiangxi",
+        "title": "赣鄱风情",
+        "description": "在江西省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "360000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#43A047",
+            "icon": "jiangxi_icon"
+        }
+    },
+    {
+        "badge_id": "province_shandong",
+        "title": "齐鲁大地",
+        "description": "在山东省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "370000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#1976D2",
+            "icon": "shandong_icon"
+        }
+    },
+    {
+        "badge_id": "province_henan",
+        "title": "中原逐鹿",
+        "description": "在河南省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "410000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#FFA726",
+            "icon": "henan_icon"
+        }
+    },
+    {
+        "badge_id": "province_hubei",
+        "title": "荆楚风云",
+        "description": "在湖北省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "420000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#0277BD",
+            "icon": "hubei_icon"
+        }
+    },
+    {
+        "badge_id": "province_hunan",
+        "title": "潇湘雨露",
+        "description": "在湖南省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "430000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#E53935",
+            "icon": "hunan_icon"
+        }
+    },
+    {
+        "badge_id": "province_guangdong",
+        "title": "玲珑南粤",
+        "description": "在广东省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "440000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#009688",
+            "icon": "guangdong_icon"
+        }
+    },
+    {
+        "badge_id": "province_hainan",
+        "title": "天涯海角",
+        "description": "在海南省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "460000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#00B0FF",
+            "icon": "hainan_icon"
+        }
+    },
+    {
+        "badge_id": "province_sichuan",
+        "title": "天府之国",
+        "description": "在四川省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "510000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#43A047",
+            "icon": "sichuan_icon"
+        }
+    },
+    {
+        "badge_id": "province_guizhou",
+        "title": "多彩黔行",
+        "description": "在贵州省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "520000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#6D4C41",
+            "icon": "guizhou_icon"
+        }
+    },
+    {
+        "badge_id": "province_yunnan",
+        "title": "彩云之南",
+        "description": "在云南省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "530000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#AB47BC",
+            "icon": "yunnan_icon"
+        }
+    },
+    {
+        "badge_id": "province_shaanxi",
+        "title": "秦风汉韵",
+        "description": "在陕西省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "610000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#A1887F",
+            "icon": "shaanxi_icon"
+        }
+    },
+    {
+        "badge_id": "province_gansu",
+        "title": "陇上飞沙",
+        "description": "在甘肃省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "620000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#D4E157",
+            "icon": "gansu_icon"
+        }
+    },
+    {
+        "badge_id": "province_qinghai",
+        "title": "源启青海",
+        "description": "在青海省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "630000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#26C6DA",
+            "icon": "qinghai_icon"
+        }
+    },
+    {
+        "badge_id": "province_taiwan",
+        "title": "宝岛风华",
+        "description": "在台湾省留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "710000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#4DB6AC",
+            "icon": "taiwan_icon"
+        }
+    },
+    {
+        "badge_id": "region_neimenggu",
+        "title": "草原辽阔",
+        "description": "在内蒙古自治区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "150000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#66BB6A",
+            "icon": "neimenggu_icon"
+        }
+    },
+    {
+        "badge_id": "region_guangxi",
+        "title": "桂林山水",
+        "description": "在广西壮族自治区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "450000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#26A69A",
+            "icon": "guangxi_icon"
+        }
+    },
+    {
+        "badge_id": "region_xizang",
+        "title": "世界屋脊",
+        "description": "在西藏自治区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "540000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#FFFFFF",
+            "icon": "xizang_icon"
+        }
+    },
+    {
+        "badge_id": "region_ningxia",
+        "title": "塞上江南",
+        "description": "在宁夏回族自治区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "640000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#FFCC80",
+            "icon": "ningxia_icon"
+        }
+    },
+    {
+        "badge_id": "region_xinjiang",
+        "title": "西域胜景",
+        "description": "在新疆维吾尔自治区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "650000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#FFF176",
+            "icon": "xinjiang_icon"
+        }
+    },
+    {
+        "badge_id": "sar_hongkong",
+        "title": "东方珠光",
+        "description": "在香港特别行政区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "810000",
         "visual_meta": {
             "material": "cyber_neon",
-            "color": "#3F51B5",
-            "icon": "baseline_memory_24"
+            "color": "#F06292",
+            "icon": "hongkong_icon"
+        }
+    },
+    {
+        "badge_id": "sar_macau",
+        "title": "濠江霓虹",
+        "description": "在澳门特别行政区留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "820000",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#00897B",
+            "icon": "macau_icon"
         }
     },
     {
