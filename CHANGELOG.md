@@ -1,6 +1,11 @@
 # 更新日志 (Changelog)
 
-### 2026-03-03: 续航提升与极简瘦身 (v3.3.1)
+### 2026-03-04: 迷雾探索终极卡顿优化 (v3.3.2)
+
+#### ✨ 核心优化 (Performance Optimizations)
+- **底层渲染矩阵投影映射**: 彻底废弃 Java/JNI 一帧内高达千万次的 `Lat/Lng -> Screen Px` 重度死循环转换。采用前置 **Web墨卡托缓存 (Web Mercator offline caching)** 和纯正的高阶 Skia `Path.transform`，使得每帧万点开销由极慢的深层代码栈穿透直接降频为 O(1) 的纯 `Matrix` 加成映射。实现无论是多广的数据量或者是滑动拖拽如何快，都稳住丝滑体验。
+- **渲染对象生命周期重构**: 剥离 `BlurMaskFilter` 和 `RadialGradient` 对象在重绘环节中的实时频繁析构重分配，利用全局缓存单例复用配合 `setLocalMatrix` 实现真正意义上的高阶内存友好绘制，大幅降低 GC 带来的卡顿震荡。
+- **动态视野屏幕剔除 (Viewport Culling)**: 通过经纬度象限包裹盒子技术 (`latLngBounds`) 严格计算扩张系数，彻底舍弃视野屏幕区域外的无效绘制。### 2026-03-03: 续航提升与极简瘦身 (v3.3.1)
 
 #### ✨ 核心优化 (Optimizations)
 - **APK 安装包极简瘦身 (APK Size Optimization)**:
