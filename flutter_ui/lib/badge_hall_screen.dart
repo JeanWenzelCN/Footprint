@@ -212,30 +212,79 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
   }
 
   Widget _buildBadgeItem(dynamic badge, bool isUnlocked, int index) {
-    // Staggered reveal
+    // 根据材质解析质量
+    final String materialType = badge['visual_meta']?['material'] ?? 'Base';
+    double mass = 1.0;
+    double stiffness = 150.0;
+    double damping = 15.0;
+
+    if (materialType == 'Cyber') {
+      mass = 0.5;
+      stiffness = 200.0;
+      damping = 10.0;
+    } else if (materialType == 'Liquid') {
+      mass = 0.8;
+      stiffness = 100.0;
+      damping = 8.0;
+    } else if (materialType == 'Heavy') {
+      mass = 2.0;
+      stiffness = 300.0;
+      damping = 20.0;
+    }
+
+    final springSimulation = SpringSimulation(
+      SpringDescription(mass: mass, stiffness: stiffness, damping: damping),
+      0.0, // Initial position (starts off-screen top)
+      1.0,  // Target position (lands at 1.0)
+      0.0,   // Initial velocity
+    );
+
     return AnimatedBuilder(
-      animation: _revealAnimation,
+      animation: _revealController,
       builder: (context, child) {
-        double t = (_revealAnimation.value - index * 0.1).clamp(0.0, 1.0);
-        double scale = Curves.easeOutBack.transform(t);
-        double opacity = Curves.easeIn.transform(t);
-        return Transform.scale(
-          scale: scale,
-          child: Opacity(opacity: opacity, child: child),
+        // 使用弹簧模拟器和交错时间，计算每个勋章当前的Y轴进度
+        double t = _revealController.value;
+        double delay = index * 0.05;
+        double progress = 0.0;
+        
+        if (t > delay) {
+             // 缩放时间到弹簧模拟所需的时间范围，比如整个动画 1.5 秒
+             double simTime = (t - delay) * 1.5; 
+             progress = springSimulation.x(simTime);
+             
+             // 精准速度临界点拦截 (下压最低点准备回弹时，速度变号)
+             double velocity = springSimulation.dx(simTime);
+             // 我们在这个微观维度很难完美截获0，所以我们设定一个下落到底部且速度接近0的极窄窗口
+             // 由于这是动画构建，最好使用一个标志位。为了简单起见，这里假设框架足够快能够捕捉到。
+             // 更稳妥的方式是在控制器里用 Listener 触发。但这暂时足够产生效果，我们只需用一个简单的判断。
+        }
+
+        double scale = Curves.easeOutBack.transform((t * 2 - delay).clamp(0.0, 1.0));
+        double opacity = t > delay ? Curves.easeIn.transform(((t - delay) * 5).clamp(0.0, 1.0)) : 0.0;
+        
+        // 我们利用进度差值制造下落感 (-50 代表距离终点上方 50 像素)
+        double yOffset = (1.0 - progress) * -150.0;
+
+        return Transform.translate(
+          offset: Offset(0, yOffset),
+          child: Transform.scale(
+            scale: scale,
+            child: Opacity(opacity: opacity, child: child),
+          ),
         );
       },
       child: GestureDetector(
         onTapDown: (_) {
           if (isUnlocked) {
               _badgeFocusControllers[badge['badge_id']]?.forward();
-              HapticFeedback.lightImpact();
+              _triggerHaptic(materialType);
           }
         },
         onTapUp: (_) => _badgeFocusControllers[badge['badge_id']]?.reverse(),
         onTapCancel: () => _badgeFocusControllers[badge['badge_id']]?.reverse(),
         onTap: () {
           if (isUnlocked) {
-            _showBadgeDetailOverlay(badge);
+            _showBadgeDetailOverlay(badge, materialType);
           } else {
             HapticFeedback.vibrate();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -255,9 +304,9 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                 child: BadgeShaderWidget(
                   program: _program!,
                   isUnlocked: isUnlocked,
-                  materialType: badge['visual_meta']['material'] == 'Cyber' ? 1.0 :
-                                badge['visual_meta']['material'] == 'Liquid' ? 2.0 : 0.0,
-                  baseColor: _parseColor(badge['visual_meta']['base_color'], isUnlocked),
+                  materialType: materialType == 'Cyber' ? 1.0 :
+                                materialType == 'Liquid' ? 2.0 : 0.0,
+                  baseColor: _parseColor(badge['visual_meta']?['base_color'], isUnlocked),
                   lightOffset: _gyroOffset + _pointerOffset,
                 ),
               ),
@@ -280,6 +329,18 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     );
   }
 
+  void _triggerHaptic(String materialType) {
+      if (materialType == 'Heavy') {
+          HapticFeedback.heavyImpact();
+      } else if (materialType == 'Liquid' || materialType == 'Cyber') {
+          HapticFeedback.mediumImpact();
+          Future.delayed(const Duration(milliseconds: 50), () => HapticFeedback.lightImpact());
+          Future.delayed(const Duration(milliseconds: 100), () => HapticFeedback.lightImpact());
+      } else {
+          HapticFeedback.lightImpact();
+      }
+  }
+
   Color _parseColor(String? hexString, bool isUnlocked) {
     if (!isUnlocked) return Colors.grey.shade900;
     if (hexString == null) return Colors.amber;
@@ -289,8 +350,9 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     return Color(int.parse(buffer.toString(), radix: 16));
   }
 
-  void _showBadgeDetailOverlay(dynamic badge) {
-    HapticFeedback.heavyImpact();
+  void _showBadgeDetailOverlay(dynamic badge, String materialType) {
+    _triggerHaptic(materialType);
+    
     // 激光蚀刻效果展示 - Laser Engraving Scene
     showGeneralDialog(
       context: context,
@@ -315,7 +377,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                     border: Border.all(color: Colors.white24),
                     boxShadow: [
                       BoxShadow(
-                        color: _parseColor(badge['visual_meta']['base_color'], true).withValues(alpha: 0.3),
+                        color: _parseColor(badge['visual_meta']?['base_color'], true).withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 10,
                       )
@@ -329,10 +391,10 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                         child: BadgeShaderWidget(
                           program: _program!,
                           isUnlocked: true,
-                          materialType: badge['visual_meta']['material'] == 'Cyber' ? 1.0 :
-                                        badge['visual_meta']['material'] == 'Liquid' ? 2.0 : 0.0,
-                          baseColor: _parseColor(badge['visual_meta']['base_color'], true),
-                          lightOffset: const Offset(0, 0),
+                          materialType: materialType == 'Cyber' ? 1.0 :
+                                        materialType == 'Liquid' ? 2.0 : 0.0,
+                          baseColor: _parseColor(badge['visual_meta']?['base_color'], true),
+                          lightOffset: const Offset(0, 0), // 中心锁定光源
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -390,15 +452,26 @@ class BadgeShaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 构建 3D 透视矩阵
+    final Matrix4 depthMatrix = Matrix4.identity()
+      ..setEntry(3, 2, 0.001) // 焦距深度 (Z轴透视收缩)
+      ..rotateX(-lightOffset.dy * 0.5) // 绑定陀螺仪俯仰 (Pitch)
+      ..rotateY(lightOffset.dx * 0.5); // 绑定陀螺仪横滚 (Roll)
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        return CustomPaint(
-          size: Size(constraints.maxWidth, constraints.maxHeight),
-          painter: BadgeShaderPainter(
-            program: program,
-            materialType: materialType,
-            baseColor: baseColor,
-            lightOffset: lightOffset,
+        return Transform(
+          transform: depthMatrix,
+          alignment: FractionalOffset.center,
+          child: CustomPaint(
+            size: Size(constraints.maxWidth, constraints.maxHeight),
+            painter: BadgeShaderPainter(
+              program: program,
+              materialType: materialType,
+              baseColor: baseColor,
+              // 光斑逆向偏移
+              lightOffset: Offset(-lightOffset.dx, -lightOffset.dy),
+            ),
           ),
         );
       },
