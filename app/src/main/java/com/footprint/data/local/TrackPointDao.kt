@@ -37,14 +37,15 @@ interface TrackPointDao {
         suspend fun insertAll(points: List<TrackPointEntity>)
 
         /**
-         * Get all distinct location points for fog exploration mask.
-         * Grid-snaps to ~100m resolution (3 decimal places ≈ 111m) to reduce point count.
+         * Get all distinct location points for fog exploration mask. Grid-snaps to ~100m resolution
+         * (3 decimal places ≈ 111m) to reduce point count.
          */
         @Query(
                 """
         SELECT ROUND(latitude, 3) as latitude, ROUND(longitude, 3) as longitude, 
-               MIN(id) as id, MIN(timestamp) as timestamp, 
-               0.0 as speed, 0.0 as accuracy, 0.0 as altitude
+               MIN(id) as id, MIN(timestamp) as timestamp,
+               0.0 as speed, 0.0 as accuracy, 0.0 as altitude,
+               NULL as adcode
         FROM track_points 
         GROUP BY ROUND(latitude, 3), ROUND(longitude, 3)
         """

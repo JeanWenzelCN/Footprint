@@ -20,6 +20,8 @@ class FootprintRepository(
         private val travelGoalDao: TravelGoalDao,
         private val trackPointDao: com.footprint.data.local.TrackPointDao,
         private val timeCapsuleDao: com.footprint.data.local.TimeCapsuleDao,
+        private val userStatsDao: com.footprint.data.local.UserStatsDao,
+        private val userBadgesDao: com.footprint.data.local.UserBadgesDao,
         private val preferenceManager: com.footprint.utils.PreferenceManager
 ) {
 
@@ -45,7 +47,8 @@ class FootprintRepository(
                                 timestamp = location.time,
                                 speed = location.speed,
                                 accuracy = location.accuracy,
-                                altitude = location.altitude
+                                altitude = location.altitude,
+                                adcode = location.adCode
                         )
                 trackPointDao.insert(entity)
         }
@@ -56,7 +59,8 @@ class FootprintRepository(
                 altitude: Double,
                 accuracy: Float,
                 speed: Float,
-                timestamp: Long
+                timestamp: Long,
+                adcode: String? = null
         ) {
                 val entity =
                         com.footprint.data.local.TrackPointEntity(
@@ -65,7 +69,8 @@ class FootprintRepository(
                                 timestamp = timestamp,
                                 speed = speed,
                                 accuracy = accuracy,
-                                altitude = altitude
+                                altitude = altitude,
+                                adcode = adcode
                         )
                 trackPointDao.insert(entity)
         }
@@ -167,6 +172,7 @@ class FootprintRepository(
 
         suspend fun saveEntry(entry: FootprintEntry) {
                 footprintDao.upsert(entry.toEntity())
+                userStatsDao.incrementStats(entry.distanceKm)
         }
 
         suspend fun deleteEntry(id: Long) = footprintDao.deleteById(id)

@@ -1,0 +1,132 @@
+[
+    {
+        "badge_id": "badge_milestone_10k",
+        "title": "初学乍练",
+        "description": "累计探索距离达到10公里",
+        "category": "Milestone",
+        "condition_key": "total_mileage",
+        "target_value": "10",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#42A5F5",
+            "icon": "baseline_directions_run_24"
+        }
+    },
+    {
+        "badge_id": "badge_milestone_100k",
+        "title": "百公里行者",
+        "description": "累计探索距离达到100公里",
+        "category": "Milestone",
+        "condition_key": "total_mileage",
+        "target_value": "100",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#1E88E5",
+            "icon": "baseline_explore_24"
+        }
+    },
+    {
+        "badge_id": "badge_milestone_1000k",
+        "title": "千里之行",
+        "description": "累计探索距离达到1000公里",
+        "category": "Milestone",
+        "condition_key": "total_mileage",
+        "target_value": "1000",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#FF2D55",
+            "icon": "baseline_flight_takeoff_24"
+        }
+    },
+    {
+        "badge_id": "badge_milestone_10000k",
+        "title": "传奇旅行家",
+        "description": "累计探索距离达到10000公里",
+        "category": "Milestone",
+        "condition_key": "total_mileage",
+        "target_value": "10000",
+        "visual_meta": {
+            "material": "gold",
+            "color": "#FFCC00",
+            "icon": "baseline_diamond_24"
+        }
+    },
+    {
+        "badge_id": "badge_pioneer_beijing",
+        "title": "紫禁之巅",
+        "description": "在北京市留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "110000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#D32F2F",
+            "icon": "baseline_account_balance_24"
+        }
+    },
+    {
+        "badge_id": "badge_pioneer_shanghai",
+        "title": "魔都漫步",
+        "description": "在上海市留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "310000",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#00BCD4",
+            "icon": "baseline_business_24"
+        }
+    },
+    {
+        "badge_id": "badge_pioneer_guangzhou",
+        "title": "花城寻迹",
+        "description": "在广州市留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "440100",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#4CAF50",
+            "icon": "baseline_local_florist_24"
+        }
+    },
+    {
+        "badge_id": "badge_pioneer_shenzhen",
+        "title": "鹏城展翅",
+        "description": "在深圳市留下足迹",
+        "category": "Geographic",
+        "condition_key": "adcode",
+        "target_value": "440300",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#3F51B5",
+            "icon": "baseline_memory_24"
+        }
+    },
+    {
+        "badge_id": "badge_emotion_rainy_10",
+        "title": "雨中曲",
+        "description": "在雨天记录10次足迹",
+        "category": "Emotion",
+        "condition_key": "weather_rainy_count",
+        "target_value": "10",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#5C6BC0",
+            "icon": "baseline_umbrella_24"
+        }
+    },
+    {
+        "badge_id": "badge_emotion_sunny_50",
+        "title": "追日者",
+        "description": "在晴天记录50次足迹",
+        "category": "Emotion",
+        "condition_key": "weather_sunny_count",
+        "target_value": "50",
+        "visual_meta": {
+            "material": "gold",
+            "color": "#FFA000",
+            "icon": "baseline_wb_sunny_24"
+        }
+    }
+]

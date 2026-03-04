@@ -36,6 +36,8 @@ class FootprintApplication : Application() {
                         database.travelGoalDao(),
                         database.trackPointDao(),
                         database.timeCapsuleDao(),
+                        database.userStatsDao(),
+                        database.userBadgesDao(),
                         preferenceManager
                 )
     }

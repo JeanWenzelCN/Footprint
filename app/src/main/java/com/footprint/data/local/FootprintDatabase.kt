@@ -14,8 +14,10 @@ import androidx.room.TypeConverters
                         BadgeEntity::class,
                         PrivacyFenceEntity::class,
                         TrackPointEntity::class,
-                        TimeCapsuleEntity::class],
-        version = 9,
+                        TimeCapsuleEntity::class,
+                        UserBadgeEntity::class,
+                        UserStatsEntity::class],
+        version = 10,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -25,6 +27,8 @@ abstract class FootprintDatabase : RoomDatabase() {
         abstract fun premiumDao(): PremiumDao
         abstract fun trackPointDao(): TrackPointDao
         abstract fun timeCapsuleDao(): TimeCapsuleDao
+        abstract fun userStatsDao(): UserStatsDao
+        abstract fun userBadgesDao(): UserBadgesDao
 
         companion object {
                 @Volatile private var instance: FootprintDatabase? = null
@@ -146,6 +150,59 @@ abstract class FootprintDatabase : RoomDatabase() {
                                 }
                         }
 
+                val MIGRATION_9_10 =
+                        object : androidx.room.migration.Migration(9, 10) {
+                                override fun migrate(
+                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        // Add adcode to track_points
+                                        try {
+                                                database.execSQL(
+                                                        "ALTER TABLE track_points ADD COLUMN adcode TEXT"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+
+                                        // Create User Badges table
+                                        database.execSQL(
+                                                """
+                    CREATE TABLE IF NOT EXISTS `user_badges` (
+                        `badgeId` TEXT NOT NULL,
+                        `unlockDate` INTEGER NOT NULL,
+                        `unlockLat` REAL,
+                        `unlockLng` REAL,
+                        `unlockWeather` TEXT,
+                        `unlockMileage` REAL,
+                        PRIMARY KEY(`badgeId`)
+                    )
+                """
+                                        )
+
+                                        // Create User Stats table
+                                        database.execSQL(
+                                                """
+                    CREATE TABLE IF NOT EXISTS `user_stats` (
+                        `id` INTEGER NOT NULL,
+                        `totalMileage` REAL NOT NULL,
+                        `totalDays` INTEGER NOT NULL,
+                        `citiesVisitedCount` INTEGER NOT NULL,
+                        `totalFootprints` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """
+                                        )
+
+                                        // Ensure a single row exists
+                                        database.execSQL(
+                                                """
+                    INSERT OR IGNORE INTO user_stats (id, totalMileage, totalDays, citiesVisitedCount, totalFootprints)
+                    VALUES (1, 0.0, 0, 0, 0)
+                """
+                                        )
+                                }
+                        }
+
                 fun getInstance(context: Context): FootprintDatabase =
                         instance
                                 ?: synchronized(this) {
@@ -159,6 +216,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         "footprint-db"
                                 )
                                 .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                                .addMigrations(MIGRATION_9_10)
                                 .fallbackToDestructiveMigration()
                                 .build()
         }
