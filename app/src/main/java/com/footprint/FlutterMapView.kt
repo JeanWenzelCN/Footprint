@@ -494,25 +494,35 @@ class FlutterMapView(
 
             val time = System.currentTimeMillis()
 
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && runtimeShader != null && maskCanvas != null && maskBitmap != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                            runtimeShader != null &&
+                            maskCanvas != null &&
+                            maskBitmap != null
+            ) {
                 // ---- AGSL SHADER PATH (Native Volumetric Cloud) ----
-                
+
                 // 1. Prepare Exploration Mask
                 maskCanvas?.drawColor(Color.WHITE) // fully enshrouded
-                
+
                 val zoom = map.cameraPosition.zoom
                 val baseRadius = (zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
+                val dynamicRadius = baseRadius * 4.5f
 
                 // Draw Path into Mask
                 if (currentPathPoints.isNotEmpty()) {
-                    val tempEraser = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeCap = Paint.Cap.ROUND
-                        strokeJoin = Paint.Join.ROUND
-                        maskFilter = BlurMaskFilter(60f, BlurMaskFilter.Blur.NORMAL)
-                        color = Color.BLACK // BLACK = explored
-                        strokeWidth = baseRadius * 1.8f
-                    }
+                    val tempEraser =
+                            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                style = Paint.Style.STROKE
+                                strokeCap = Paint.Cap.ROUND
+                                strokeJoin = Paint.Join.ROUND
+                                maskFilter =
+                                        BlurMaskFilter(
+                                                baseRadius * 1.8f,
+                                                BlurMaskFilter.Blur.NORMAL
+                                        )
+                                color = Color.BLACK
+                                strokeWidth = baseRadius * 1.8f
+                            }
                     val path = Path()
                     var first = true
                     currentPathPoints.forEach { latLng ->
@@ -528,30 +538,74 @@ class FlutterMapView(
                 }
 
                 // Draw History Spots into Mask
-                val tempSpot = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+                val tempSpot =
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            style = Paint.Style.FILL
+                            xfermode = PorterDuffXfermode(PorterDuff.Mode.DARKEN)
+                        }
                 historyPoints.forEach { latLng ->
                     val screenPos = projection.toScreenLocation(latLng)
-                    if (screenPos.x >= -baseRadius * 4 && screenPos.x <= width + baseRadius * 4 &&
-                        screenPos.y >= -baseRadius * 4 && screenPos.y <= height + baseRadius * 4
+                    if (screenPos.x >= -dynamicRadius &&
+                                    screenPos.x <= width + dynamicRadius &&
+                                    screenPos.y >= -dynamicRadius &&
+                                    screenPos.y <= height + dynamicRadius
                     ) {
-                        tempSpot.shader = RadialGradient(
-                                screenPos.x.toFloat(), screenPos.y.toFloat(), baseRadius * 4.0f,
-                                intArrayOf(Color.BLACK, Color.BLACK, Color.WHITE), // Black inside, White outside
-                                floatArrayOf(0f, 0.35f, 1f),
-                                Shader.TileMode.CLAMP
+                        tempSpot.shader =
+                                RadialGradient(
+                                        screenPos.x.toFloat(),
+                                        screenPos.y.toFloat(),
+                                        dynamicRadius,
+                                        intArrayOf(
+                                                Color.BLACK,
+                                                Color.rgb(150, 150, 150),
+                                                Color.WHITE
+                                        ), // Opaque gradient
+                                        floatArrayOf(0f, 0.45f, 1f),
+                                        Shader.TileMode.CLAMP
+                                )
+                        maskCanvas?.drawCircle(
+                                screenPos.x.toFloat(),
+                                screenPos.y.toFloat(),
+                                dynamicRadius,
+                                tempSpot
                         )
-                        maskCanvas?.drawCircle(screenPos.x.toFloat(), screenPos.y.toFloat(), baseRadius * 4.0f, tempSpot)
                     }
                 }
 
                 // 2. Configure Shader Uniforms
-                val maskShader = BitmapShader(maskBitmap!!, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                val maskShader =
+                        BitmapShader(maskBitmap!!, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
                 runtimeShader?.setInputShader("maskTexture", maskShader)
                 runtimeShader?.setFloatUniform("uResolution", width.toFloat(), height.toFloat())
                 runtimeShader?.setFloatUniform("uTime", (time % 10000000L).toFloat() / 1000f)
-                runtimeShader?.setFloatUniform("uWindOffset", 0f, 0f)
+
+                val zoomFactor =
+                        Math.pow(2.0, (17.0 - map.cameraPosition.zoom).toDouble()).toFloat()
+                val target = map.cameraPosition.target
+                val mercatorX = target.longitude / 360.0 + 0.5
+                val sinY = Math.sin(target.latitude * Math.PI / 180.0).coerceIn(-0.9999, 0.9999)
+                val mercatorY = 0.5 - 0.25 * Math.log((1.0 + sinY) / (1.0 - sinY)) / Math.PI
+                val worldPxX = mercatorX * 256.0 * Math.pow(2.0, map.cameraPosition.zoom.toDouble())
+                val worldPxY = mercatorY * 256.0 * Math.pow(2.0, map.cameraPosition.zoom.toDouble())
+
+                val aspectRatio = width.toFloat() / height.toFloat()
+                val mapScaleX = 3.5f * zoomFactor
+                val mapScaleY = (3.5f / aspectRatio) * zoomFactor
+
+                val noiseOffsetX = (worldPxX * mapScaleX / width).toFloat()
+                val noiseOffsetY = (worldPxY * mapScaleY / height).toFloat()
+
+                val timeWindX = (time % 10000000L).toFloat() / 80000f
+                val timeWindY = (time % 10000000L).toFloat() / 120000f
+
+                runtimeShader?.setFloatUniform("uMapScale", mapScaleX, mapScaleY)
+                runtimeShader?.setFloatUniform(
+                        "uWindOffset",
+                        noiseOffsetX + timeWindX,
+                        noiseOffsetY + timeWindY
+                )
                 runtimeShader?.setFloatUniform("uFogDensity", 0.95f)
-                
+
                 runtimeShader?.setFloatUniform("uFogColorBright", 0.89f, 0.91f, 0.94f)
                 runtimeShader?.setFloatUniform("uFogColorMid", 0.68f, 0.73f, 0.80f)
                 runtimeShader?.setFloatUniform("uFogColorDark", 0.15f, 0.18f, 0.25f)
@@ -559,22 +613,46 @@ class FlutterMapView(
 
                 // 3. Draw onto Screen
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), agslPaint)
-                
             } else {
                 // ---- FALLBACK BITMAP MASK PATH (Older Devices) ----
-                // 矩阵偏移计算，使云层移动
+                val zoom = map.cameraPosition.zoom
+                val zoomFactor = Math.pow(2.0, (17.0 - zoom).toDouble()).toFloat()
+                val target = map.cameraPosition.target
+                val mercatorX = target.longitude / 360.0 + 0.5
+                val sinY = Math.sin(target.latitude * Math.PI / 180.0).coerceIn(-0.9999, 0.9999)
+                val mercatorY = 0.5 - 0.25 * Math.log((1.0 + sinY) / (1.0 - sinY)) / Math.PI
+                val worldPxX = mercatorX * 256.0 * Math.pow(2.0, zoom.toDouble())
+                val worldPxY = mercatorY * 256.0 * Math.pow(2.0, zoom.toDouble())
+
+                // 矩阵偏移计算，使云层移动和缩放
+                val currentScale1 = 2.5f / zoomFactor
+                val texWorldW1 = 512f * currentScale1
+                val shiftX1 = (worldPxX.toFloat() % texWorldW1)
+                val shiftY1 = (worldPxY.toFloat() % texWorldW1)
+
                 val offset1X = (time % 120000L) / 120000f * 512f
                 val offset1Y = (time % 150000L) / 150000f * 512f
                 cloudMatrix1.reset()
-                cloudMatrix1.setScale(2.5f, 2.5f) // 放大云朵细节
-                cloudMatrix1.postTranslate(-offset1X, -offset1Y)
+                cloudMatrix1.setScale(currentScale1, currentScale1)
+                cloudMatrix1.postTranslate(
+                        width / 2f - shiftX1 - offset1X,
+                        height / 2f - shiftY1 - offset1Y
+                )
                 cloudPaint1.shader.setLocalMatrix(cloudMatrix1)
+
+                val currentScale2 = 3.5f / zoomFactor
+                val texWorldW2 = 512f * currentScale2
+                val shiftX2 = (worldPxX.toFloat() % texWorldW2)
+                val shiftY2 = (worldPxY.toFloat() % texWorldW2)
 
                 val offset2X = (time % 180000L) / 180000f * 512f
                 val offset2Y = (time % 100000L) / 100000f * 512f
                 cloudMatrix2.reset()
-                cloudMatrix2.setScale(3.5f, 3.5f) // 第二层云不同比例，交叉混合产生涌动(Churning)
-                cloudMatrix2.postTranslate(offset2X, -offset2Y)
+                cloudMatrix2.setScale(currentScale2, currentScale2) // 第二层云不同比例，交叉混合产生涌动(Churning)
+                cloudMatrix2.postTranslate(
+                        width / 2f - shiftX2 + offset2X,
+                        height / 2f - shiftY2 - offset2Y
+                )
                 cloudPaint2.shader.setLocalMatrix(cloudMatrix2)
 
                 // 使用离屏缓冲实现各种叠加及挖洞
@@ -587,8 +665,7 @@ class FlutterMapView(
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint1)
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint2)
 
-                val zoom = map.cameraPosition.zoom
-                val baseRadius = (zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
+                val baseRadius = (map.cameraPosition.zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
 
                 // 3. 实时轨迹的高斯边缘消除 (物理侵蚀感)
                 if (currentPathPoints.isNotEmpty()) {

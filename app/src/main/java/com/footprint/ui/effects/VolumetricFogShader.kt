@@ -19,186 +19,148 @@ import org.intellij.lang.annotations.Language
 const val VOLUMETRIC_FOG_SHADER =
         """
     // --- Uniforms ---
-    uniform shader maskTexture;      // Exploration mask: white=fog, black=explored
+    uniform shader maskTexture;      // Exploration mask: white(1.0)=fog, black(0.0)=explored
     uniform float2 uResolution;      // View dimensions in px
-    uniform float  uTime;            // Elapsed time in seconds (for animation)
-    uniform float2 uWindOffset;      // Overall wind drift offset (slow global movement)
-    uniform float  uFogDensity;      // Overall fog density multiplier [0.0 - 1.0], default 0.92
+    uniform float  uTime;            // Elapsed time in seconds
+    uniform float2 uWindOffset;      // Map center in noise space + slow wind drift
+    uniform float2 uMapScale;        // Scale factor for zoom
+    uniform float  uFogDensity;      // Overall fog density multiplier
     
-    // --- Color palette for the cloud ---
-    uniform float3 uFogColorBright;  // Pearl white highlight  e.g. (0.89, 0.91, 0.94)
-    uniform float3 uFogColorMid;     // Mid-tone grey-blue     e.g. (0.68, 0.73, 0.80)
-    uniform float3 uFogColorDark;    // Deep shadow            e.g. (0.15, 0.18, 0.25)
-    uniform float3 uLightDir;        // Normalized light direction (e.g. (-0.5, -0.6, 0.8))
+    // --- Palette ---
+    uniform float3 uFogColorBright;  // Pearl white highlight
+    uniform float3 uFogColorMid;     // Mid-tone grey-blue
+    uniform float3 uFogColorDark;    // Deep shadow
+    uniform float3 uLightDir;        // Normalized light direction
     
     // ============================================================
-    // Hash & Noise Functions (GPU-friendly, no texture lookups)
+    // Hash & Noise Functions (GPU-fast)
     // ============================================================
-    
-    // Fast 2D hash -> pseudo-random float in [0,1]
     float hash21(float2 p) {
         float3 p3 = fract(float3(p.x, p.y, p.x) * 0.1031);
-        p3 += dot(p3, float3(p3.y, p3.z, p3.x) + 33.33);
+        p3 += dot(p3, p3.yzx + 33.33);
         return fract((p3.x + p3.y) * p3.z);
     }
     
-    // Smooth Value Noise 2D
     float valueNoise(float2 p) {
         float2 i = floor(p);
         float2 f = fract(p);
-        // Quintic Hermite interpolation (smoother than cubic)
         float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-        
         float a = hash21(i + float2(0.0, 0.0));
         float b = hash21(i + float2(1.0, 0.0));
         float c = hash21(i + float2(0.0, 1.0));
         float d = hash21(i + float2(1.0, 1.0));
-        
         return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
     }
     
-    // Multi-octave Fractal Brownian Motion (fBM)
-    // 4 octaves for cloud detail
+    // Procedural multi-octave noise for rich clouds (Unrolled for strict AGSL compliance)
     float fbm(float2 p) {
         float val = 0.0;
         float amp = 0.5;
-        float freq = 1.0;
-        // Rotation matrix to reduce grid-aligned artifacts between octaves
         float2x2 rot = float2x2(0.8, 0.6, -0.6, 0.8);
         
-        // Octave 1
-        val += amp * valueNoise(p * freq);
-        p = rot * p;
-        amp *= 0.5;
-        freq *= 2.0;
-        
-        // Octave 2
-        val += amp * valueNoise(p * freq);
-        p = rot * p;
-        amp *= 0.5;
-        freq *= 2.0;
-        
-        // Octave 3
-        val += amp * valueNoise(p * freq);
-        p = rot * p;
-        amp *= 0.5;
-        freq *= 2.0;
-        
-        // Octave 4
-        val += amp * valueNoise(p * freq);
+        val += amp * valueNoise(p); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * valueNoise(p); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * valueNoise(p); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * valueNoise(p); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * valueNoise(p);
         
         return val;
     }
     
-    // Turbulence variant for erosion edges
+    // Turbulence for dynamic erosion and fire-like edges
     float turbulence(float2 p) {
         float val = 0.0;
         float amp = 0.5;
-        float freq = 1.0;
         float2x2 rot = float2x2(0.8, 0.6, -0.6, 0.8);
         
-        val += amp * abs(valueNoise(p * freq) * 2.0 - 1.0);
-        p = rot * p; amp *= 0.5; freq *= 2.0;
-        val += amp * abs(valueNoise(p * freq) * 2.0 - 1.0);
-        p = rot * p; amp *= 0.5; freq *= 2.0;
-        val += amp * abs(valueNoise(p * freq) * 2.0 - 1.0);
+        val += amp * abs(valueNoise(p) * 2.0 - 1.0); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * abs(valueNoise(p) * 2.0 - 1.0); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * abs(valueNoise(p) * 2.0 - 1.0); p = rot * (p * 2.0); amp *= 0.5;
+        val += amp * abs(valueNoise(p) * 2.0 - 1.0);
         
         return val;
     }
+
+    // Comprehensive density function
+    float getDensity(float2 p) {
+        float n1 = fbm(p);
+        float n2 = fbm(p + float2(5.2, 1.3));
+        return smoothstep(0.15, 0.85, n1 * 0.7 + n2 * 0.3);
+    }
     
     // ============================================================
-    // Main Fragment Shader
+    // MAIN
     // ============================================================
     float4 main(float2 fragCoord) {
         float2 uv = fragCoord / uResolution;
         
-        // --- 1) Read Exploration Mask ---
-        // maskTexture: white(1.0) = unexplored/fog, black(0.0) = explored/clear
+        // 1. Read Mask (Opaque logic: R channel. White=1=>fog, Black=0=>explored)
         float maskVal = maskTexture.eval(fragCoord).r;
+        if (maskVal < 0.01) return float4(0.0);
         
-        // Early exit: fully explored area -> show pure map
-        if (maskVal < 0.01) {
-            return float4(0.0);
-        }
+        // 2. Coords anchored to real map scale + wind drift
+        float2 centeredUV = uv - 0.5;
+        float2 baseCloudUV = centeredUV * uMapScale + uWindOffset;
         
-        // --- 2) Generate Dynamic Cloud Noise ---
-        // Scale UV to get cloud-appropriate frequency
-        float2 cloudUV = uv * 3.5 + uWindOffset;
+        // Time based churning / internal drift
+        float timeWarp = uTime * 0.04;
+        float2 churnOffset = float2(
+            fbm(baseCloudUV * 0.5 + timeWarp),
+            fbm(baseCloudUV * 0.5 - timeWarp)
+        ) * 0.6;
         
-        // Churning: time-varying offset for internal turbulence
-        float churnSpeed = 0.08;
-        float2 churn = float2(
-            sin(uTime * churnSpeed * 0.7) * 0.3,
-            cos(uTime * churnSpeed * 1.1) * 0.2
-        );
+        float2 cloudUV = baseCloudUV * 0.8 + churnOffset;
         
-        // Primary cloud density from fBM
-        float cloudDensity = fbm(cloudUV + churn);
+        // 3. Volumetric Density
+        float density = getDensity(cloudUV);
+        float core = smoothstep(0.4, 0.9, density); // Deep inner cloud
         
-        // Secondary layer at different scale for non-uniform detail
-        float detailNoise = fbm(cloudUV * 2.3 - churn * 1.5 + float2(5.2, 1.3));
+        // 4. Lighting & Normal Estimation
+        float eps = 0.02; // sampling dist for normals
+        float dx = getDensity(cloudUV + float2(eps, 0.0)) - density;
+        float dy = getDensity(cloudUV + float2(0.0, eps)) - density;
         
-        // Combine: main shape + detail variation
-        float combinedCloud = cloudDensity * 0.65 + detailNoise * 0.35;
+        // Pseudo 3D normal derived from density slope
+        float3 normal = normalize(float3(-dx, -dy, eps * 0.8));
+        float3 lightDir = normalize(uLightDir);
         
-        // Remap to create more contrast (dense cores, thin edges)
-        combinedCloud = smoothstep(0.15, 0.85, combinedCloud);
+        // Diffuse factor
+        float ndotl = max(dot(normal, lightDir), 0.0);
+        float diffuse = mix(0.4, 1.0, ndotl); // 0.4 ambient light
         
-        // --- 3) Volumetric Lighting (Pseudo-3D) ---
-        // Compute gradient of the noise field for normal estimation
-        float eps = 0.005;
-        float nx = fbm(cloudUV + churn + float2(eps, 0.0)) - fbm(cloudUV + churn - float2(eps, 0.0));
-        float ny = fbm(cloudUV + churn + float2(0.0, eps)) - fbm(cloudUV + churn - float2(0.0, eps));
+        // Fake subsurface scattering / backlighting on thin edges
+        float scatter = smoothstep(0.7, 0.1, density) * max(dot(normal, -lightDir), 0.0);
         
-        // Surface normal from height field
-        float3 normal = normalize(float3(-nx * 8.0, -ny * 8.0, 1.0));
+        // 5. Coloring
+        // Base color transition from shadow mapping
+        float3 col = mix(uFogColorDark, uFogColorMid, smoothstep(0.0, 0.6, density));
+        col = mix(col, uFogColorBright, diffuse * density);
         
-        // Diffuse lighting
-        float diffuse = max(dot(normal, normalize(uLightDir)), 0.0);
-        diffuse = diffuse * 0.6 + 0.4; // Ambient floor
+        // Apply back-scattering rim light
+        col += uFogColorBright * scatter * 1.5;
         
-        // Specular highlight (subtle)
-        float3 viewDir = float3(0.0, 0.0, 1.0);
-        float3 halfVec = normalize(normalize(uLightDir) + viewDir);
-        float spec = pow(max(dot(normal, halfVec), 0.0), 24.0) * 0.3;
+        // Deep shadow for thick cores
+        col = mix(col, uFogColorDark * 0.8, core * 0.5);
         
-        // --- 4) Cloud Coloring with Lighting ---
-        // Mix between dark (shadow), mid (ambient), bright (lit) based on density + lighting
-        float3 fogColor = mix(uFogColorDark, uFogColorMid, combinedCloud);
-        fogColor = mix(fogColor, uFogColorBright, diffuse * combinedCloud);
-        fogColor += spec * float3(1.0, 0.98, 0.95); // Warm specular
+        // 6. Natural Mask Softening & Dynamic Erosion
+        // Create an encroaching "fire edge" turbulence effect on the borders
+        float2 edgeUV = baseCloudUV * 2.5 + float2(uTime * 0.1, -uTime * 0.05);
+        float edgeErosion = turbulence(edgeUV);
         
-        // Subtle depth darkening at cloud cores
-        float coreIntensity = smoothstep(0.4, 0.9, combinedCloud);
-        fogColor = mix(fogColor, uFogColorDark * 1.1, coreIntensity * 0.2);
-        
-        // --- 5) Noise-Perturbed Exploration Edge (Dynamic Erosion) ---
-        // Instead of using maskVal directly, perturb it with turbulence noise
-        // This creates irregular, fire-like erosion edges
-        float2 erosionUV = uv * 8.0 + float2(uTime * 0.04, uTime * 0.03);
-        float erosionNoise = turbulence(erosionUV) * 0.35;
-        
-        // Warp the mask boundary: expand explored area slightly with noise
-        float perturbedMask = maskVal - erosionNoise;
+        // Perturb the mask significantly at the boundaries
+        float perturbedMask = maskVal - edgeErosion * 0.35;
         perturbedMask = clamp(perturbedMask, 0.0, 1.0);
         
-        // Non-linear ramp for softer transition at the boundary
-        // Use smoothstep to create a natural feathered edge 
-        float fogAlpha = smoothstep(0.0, 0.45, perturbedMask);
+        // Non-linear fade so edges look like dissipating vapor
+        float maskAlpha = smoothstep(0.0, 0.5, perturbedMask);
         
-        // Apply overall density control
-        fogAlpha *= uFogDensity * combinedCloud;
+        // 7. Final Composite
+        float finalAlpha = density * maskAlpha * uFogDensity;
+        finalAlpha = clamp(finalAlpha, 0.0, 0.98); // Never 100% opaque, let some map detail leak
         
-        // Clamp final alpha
-        fogAlpha = clamp(fogAlpha, 0.0, 0.95);
-        
-    // --- 6) Final Compositing ---
-        // float4 mapColor = mapContent.eval(fragCoord);
-        float4 fogFinal = float4(fogColor * fogAlpha, fogAlpha); // Premultiplied alpha
-        
-        return fogFinal;
+        return float4(col * finalAlpha, finalAlpha); // Premultiplied output
     }
-"""
+    """
 
 /**
  * Simplified fog shader fallback for devices without AGSL support (API < 33). Uses pre-generated

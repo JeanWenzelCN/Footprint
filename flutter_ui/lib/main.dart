@@ -2288,6 +2288,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _mapChannel?.invokeMethod('setMapMode', mapMode);
     _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
     _mapChannel?.invokeMethod('setEntries', _allEntries);
+    if (_fogPoints.isNotEmpty) {
+      _mapChannel?.invokeMethod('setHistoryPoints', _fogPoints);
+    }
   }
 
   // === 定位按钮：直接使用原生地图的位置居中 ===
