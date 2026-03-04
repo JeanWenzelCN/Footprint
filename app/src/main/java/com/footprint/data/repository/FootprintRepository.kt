@@ -15,7 +15,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+import androidx.room.withTransaction
+
 class FootprintRepository(
+        private val database: com.footprint.data.local.FootprintDatabase,
         private val footprintDao: FootprintDao,
         private val travelGoalDao: TravelGoalDao,
         private val trackPointDao: com.footprint.data.local.TrackPointDao,
@@ -172,12 +175,31 @@ class FootprintRepository(
         // ----------------
 
         suspend fun saveEntry(entry: FootprintEntry) {
-                footprintDao.upsert(entry.toEntity())
-                userStatsDao.incrementStats(entry.distanceKm)
+                database.withTransaction {
+                        val existing = footprintDao.getById(entry.id)
+                        footprintDao.upsert(entry.toEntity())
+                        if (existing == null) {
+                                userStatsDao.incrementStats(entry.distanceKm)
+                        } else {
+                                // If it's an update, the distance might have changed.
+                                val diff = entry.distanceKm - existing.distanceKm
+                                if (diff != 0.0) {
+                                       userStatsDao.incrementStats(diff, 0)
+                                }
+                        }
+                }
                 badgeEngine.evaluateHotPath(entry)
         }
 
-        suspend fun deleteEntry(id: Long) = footprintDao.deleteById(id)
+        suspend fun deleteEntry(id: Long) {
+                database.withTransaction {
+                        val existing = footprintDao.getById(id)
+                        if (existing != null) {
+                                footprintDao.deleteById(id)
+                                userStatsDao.incrementStats(-existing.distanceKm, -1)
+                        }
+                }
+        }
 
         suspend fun saveGoal(goal: TravelGoal) {
                 travelGoalDao.upsert(goal.toEntity())

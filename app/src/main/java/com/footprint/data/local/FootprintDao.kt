@@ -21,11 +21,17 @@ interface FootprintDao {
     @Query("DELETE FROM footprints WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("SELECT * FROM footprints WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): FootprintEntity?
+
     @Query("SELECT COUNT(*) FROM footprints")
     suspend fun count(): Int
 
     @Query("SELECT * FROM footprints")
     suspend fun getAll(): List<FootprintEntity>
+
+    @Query("SELECT * FROM footprints ORDER BY happened_on ASC LIMIT :limit OFFSET :offset")
+    suspend fun getFootprintsPaged(limit: Int, offset: Int): List<FootprintEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entries: List<FootprintEntity>)

@@ -19,11 +19,11 @@ interface UserStatsDao {
             """
         UPDATE user_stats SET 
         totalMileage = totalMileage + :addedMileage,
-        totalFootprints = totalFootprints + 1
+        totalFootprints = totalFootprints + :addedFootprints
         WHERE id = 1
     """
     )
-    suspend fun incrementStats(addedMileage: Double)
+    suspend fun incrementStats(addedMileage: Double, addedFootprints: Int = 1)
 }
 
 @Dao

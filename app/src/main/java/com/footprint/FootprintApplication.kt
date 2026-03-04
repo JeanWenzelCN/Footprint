@@ -42,6 +42,7 @@ class FootprintApplication : Application() {
         
         repository =
                 FootprintRepository(
+                        database,
                         database.footprintDao(),
                         database.travelGoalDao(),
                         database.trackPointDao(),
@@ -64,10 +65,23 @@ class FootprintApplication : Application() {
         .setConstraints(constraints)
         .build()
         
-        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "ColdPathBadgeWorker",
-            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
-            badgeWorkRequest
+        val calibrationRequest = androidx.work.PeriodicWorkRequestBuilder<com.footprint.badge.StatsCalibrationWorker>(
+            1, java.util.concurrent.TimeUnit.DAYS
         )
+        .setConstraints(constraints)
+        .build()
+        
+        androidx.work.WorkManager.getInstance(this).apply {
+            enqueueUniquePeriodicWork(
+                "ColdPathBadgeWorker",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                badgeWorkRequest
+            )
+            enqueueUniquePeriodicWork(
+                "StatsCalibrationWorker",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                calibrationRequest
+            )
+        }
     }
 }
