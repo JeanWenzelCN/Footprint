@@ -87,6 +87,24 @@ Footprint 是一款以“地理探索、回忆沉淀与数字艺术再创造”�
   - 全局支持对任意时间地点的脚印属性调用编辑界面进行增删改。
   - 支持接入前沿端侧或者大语言模型 AI 的 `Story Writer Generative AI Dialog` 进行提示词智能扩写，免去繁杂的手动键盘游记记录。
 
+## 6. 全球成就勋章系统与 3D 跨维合成 (Achievement & 3D Compositing)
+
+- **全息收藏馆 (Holographic Vault)**
+  - 采用 **Matrix4 3D 投影变换** 结合 **陀螺仪 (Gyroscope)** 实时旋转反馈，构建具有深度错觉的虚拟展示柜。
+  - **物理语义化震动 (Semantic Haptics)**：根据勋章材质（重装、赛博、液态）触发不同波形的震动反馈，强化数字资产的“重量感”。
+  - **动态材质着色器 (AGSL Material Shaders)**：
+    - **Cyber Glow**: 霓虹流光溢影动效。
+    - **Liquid Glass**: 实时环境折射与色散模拟。
+    - **Heavy Metal**: 模拟激光蚀刻纹理边缘。
+
+- **3D 勋章烘焙系统 (3D Badge Baking Pipeline)**
+  - **离线姿态抓拍**: 在后台通过 `PictureRecorder` 自动锁定勋章的最佳等距黄金角度 (Isometric View) 并渲染为带透明通道的高速 PNG 资产。
+  - **底层原生合成 (Native Canvas Compositing)**: 将 抓拍到的 3D 勋章在 Android 原生层与 2D 海报底图进行深度融合。
+  - **高级光影演算**:
+    - **接触阴影 (Contact Shadow)**：高浓度窄距离投影，营造物体停留在纸面的真实感。
+    - **全局落影 (Drop Shadow)**：长距离模糊阴影，暗示物体的高度与体积。
+    - **破框渲染 (Out-of-bounds Rendering)**：通过巧妙的裁剪区域控制，使勋章视觉上“跃出”拍立得白框。
+
 ---
 
 > **本摘要文件 (PROJECT_SUMMARY.md) 定位：**
