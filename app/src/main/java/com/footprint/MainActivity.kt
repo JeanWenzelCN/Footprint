@@ -459,6 +459,28 @@ class MainActivity : FlutterActivity() {
                                 }
                             }
                         }
+                        "getUnlockedBadgeIds" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    val db = com.footprint.data.local.FootprintDatabase.getInstance(this@MainActivity)
+                                    val ids = db.userBadgesDao().getAllUnlockedBadgeIds()
+                                    withContext(Dispatchers.Main) { result.success(gson.toJson(ids)) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { result.error("DB_ERROR", e.message, null) }
+                                }
+                            }
+                        }
+                        "getBadgeDictionary" -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                try {
+                                    val input = assets.open("badges_config.json")
+                                    val jsonString = input.bufferedReader().use { it.readText() }
+                                    withContext(Dispatchers.Main) { result.success(jsonString) }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) { result.error("IO_ERROR", e.message, null) }
+                                }
+                            }
+                        }
                         else -> result.notImplemented()
                     }
                 }

@@ -13,6 +13,7 @@ import 'package:amap_flutter_location/amap_flutter_location.dart';
 import 'package:amap_flutter_location/amap_location_option.dart';
 import 'footprint_detail_page.dart';
 import 'goal_planner_page.dart';
+import 'badge_hall_screen.dart';
 
 Widget buildAvatar(String avatarId, {double radius = 24, Color? bgColor, Color? fgColor}) {
   if (avatarId.contains('/') || avatarId.contains('\\')) {
@@ -2037,6 +2038,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(Icons.military_tech, color: cs.primary),
+                tooltip: "荣耀圣殿",
+                onPressed: () async {
+                  if (widget.hapticEnabled) HapticFeedback.mediumImpact();
+                  try {
+                    const channel = MethodChannel('com.footprint/data');
+                    final idsStr = await channel.invokeMethod<String>('getUnlockedBadgeIds');
+                    final dictStr = await channel.invokeMethod<String>('getBadgeDictionary');
+                    if (idsStr != null && dictStr != null && mounted) {
+                        List<String> unlockedIds = List<String>.from(jsonDecode(idsStr));
+                        Map<String, dynamic> dict = jsonDecode(dictStr);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => BadgeHallScreen(badgeDictionary: dict, unlockedIds: unlockedIds)));
+                    }
+                  } catch (e) {
+                    debugPrint("Badge screen error: $e");
+                  }
+                },
               ),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: cs.onSurface),
