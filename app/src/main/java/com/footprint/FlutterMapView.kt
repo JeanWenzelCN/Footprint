@@ -382,7 +382,6 @@ class FlutterMapView(
                     style = Paint.Style.STROKE
                     strokeCap = Paint.Cap.ROUND
                     strokeJoin = Paint.Join.ROUND
-                    maskFilter = BlurMaskFilter(60f, BlurMaskFilter.Blur.NORMAL)
                     alpha = 200
                 }
 
@@ -392,7 +391,41 @@ class FlutterMapView(
                     style = Paint.Style.FILL
                 }
 
+        private var agslGradient: RadialGradient? = null
+        private val agslGradientMatrix = Matrix()
+
+        private var fallbackGradient: RadialGradient? = null
+        private val fallbackGradientMatrix = Matrix()
+
+        private val tempSpot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DARKEN)
+        }
+
+        private val tempEraser = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = Color.BLACK
+        }
+        
+        private var lastBlurRadius: Float = -1f
+        private var cachedBlurFilter: BlurMaskFilter? = null
+
         init {
+            agslGradient = RadialGradient(
+                0f, 0f, 1f,
+                intArrayOf(Color.BLACK, Color.rgb(150, 150, 150), Color.WHITE),
+                floatArrayOf(0f, 0.45f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            fallbackGradient = RadialGradient(
+                0f, 0f, 1f,
+                intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT),
+                floatArrayOf(0f, 0.35f, 1f),
+                Shader.TileMode.CLAMP
+            )
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 // Initialize AGSL Shader for API 33+
                 try {
@@ -501,6 +534,17 @@ class FlutterMapView(
             ) {
                 // ---- AGSL SHADER PATH (Native Volumetric Cloud) ----
 
+                val bounds = projection.visibleRegion.latLngBounds
+                val latSpan = bounds.northeast.latitude - bounds.southwest.latitude
+                val lngSpan = bounds.northeast.longitude - bounds.southwest.longitude
+                // Use a large expansion factor to prevent paths from being disconnected at edges
+                val expandLat = latSpan * 1.5
+                val expandLng = lngSpan * 1.5
+                val minLat = bounds.southwest.latitude - expandLat
+                val maxLat = bounds.northeast.latitude + expandLat
+                val minLng = bounds.southwest.longitude - expandLng
+                val maxLng = bounds.northeast.longitude + expandLng
+
                 // 1. Prepare Exploration Mask
                 maskCanvas?.drawColor(Color.WHITE) // fully enshrouded
 
@@ -508,67 +552,54 @@ class FlutterMapView(
                 val baseRadius = (zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
                 val dynamicRadius = baseRadius * 4.5f
 
+                val requiredBlur = baseRadius * 1.8f
+                if (Math.abs(lastBlurRadius - requiredBlur) > 2f) {
+                    cachedBlurFilter = BlurMaskFilter(requiredBlur, BlurMaskFilter.Blur.NORMAL)
+                    lastBlurRadius = requiredBlur
+                }
+
                 // Draw Path into Mask
                 if (currentPathPoints.isNotEmpty()) {
-                    val tempEraser =
-                            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                style = Paint.Style.STROKE
-                                strokeCap = Paint.Cap.ROUND
-                                strokeJoin = Paint.Join.ROUND
-                                maskFilter =
-                                        BlurMaskFilter(
-                                                baseRadius * 1.8f,
-                                                BlurMaskFilter.Blur.NORMAL
-                                        )
-                                color = Color.BLACK
-                                strokeWidth = baseRadius * 1.8f
-                            }
+                    tempEraser.maskFilter = cachedBlurFilter
+                    tempEraser.strokeWidth = baseRadius * 1.8f
                     val path = Path()
                     var first = true
                     currentPathPoints.forEach { latLng ->
-                        val screenPos = projection.toScreenLocation(latLng)
-                        if (first) {
-                            path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
-                            first = false
-                        } else {
-                            path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                        if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
+                            val screenPos = projection.toScreenLocation(latLng)
+                            if (first) {
+                                path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                                first = false
+                            } else {
+                                path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                            }
                         }
                     }
                     maskCanvas?.drawPath(path, tempEraser)
                 }
 
                 // Draw History Spots into Mask
-                val tempSpot =
-                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            style = Paint.Style.FILL
-                            xfermode = PorterDuffXfermode(PorterDuff.Mode.DARKEN)
-                        }
                 historyPoints.forEach { latLng ->
-                    val screenPos = projection.toScreenLocation(latLng)
-                    if (screenPos.x >= -dynamicRadius &&
-                                    screenPos.x <= width + dynamicRadius &&
-                                    screenPos.y >= -dynamicRadius &&
-                                    screenPos.y <= height + dynamicRadius
-                    ) {
-                        tempSpot.shader =
-                                RadialGradient(
+                    if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
+                        val screenPos = projection.toScreenLocation(latLng)
+                        if (screenPos.x >= -dynamicRadius &&
+                                        screenPos.x <= width + dynamicRadius &&
+                                        screenPos.y >= -dynamicRadius &&
+                                        screenPos.y <= height + dynamicRadius
+                        ) {
+                            agslGradient?.let { grad ->
+                                agslGradientMatrix.setScale(dynamicRadius, dynamicRadius)
+                                agslGradientMatrix.postTranslate(screenPos.x.toFloat(), screenPos.y.toFloat())
+                                grad.setLocalMatrix(agslGradientMatrix)
+                                tempSpot.shader = grad
+                                maskCanvas?.drawCircle(
                                         screenPos.x.toFloat(),
                                         screenPos.y.toFloat(),
                                         dynamicRadius,
-                                        intArrayOf(
-                                                Color.BLACK,
-                                                Color.rgb(150, 150, 150),
-                                                Color.WHITE
-                                        ), // Opaque gradient
-                                        floatArrayOf(0f, 0.45f, 1f),
-                                        Shader.TileMode.CLAMP
+                                        tempSpot
                                 )
-                        maskCanvas?.drawCircle(
-                                screenPos.x.toFloat(),
-                                screenPos.y.toFloat(),
-                                dynamicRadius,
-                                tempSpot
-                        )
+                            }
+                        }
                     }
                 }
 
@@ -665,20 +696,38 @@ class FlutterMapView(
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint1)
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cloudPaint2)
 
+                val bounds = projection.visibleRegion.latLngBounds
+                val latSpan = bounds.northeast.latitude - bounds.southwest.latitude
+                val lngSpan = bounds.northeast.longitude - bounds.southwest.longitude
+                val expandLat = latSpan * 1.5
+                val expandLng = lngSpan * 1.5
+                val minLat = bounds.southwest.latitude - expandLat
+                val maxLat = bounds.northeast.latitude + expandLat
+                val minLng = bounds.southwest.longitude - expandLng
+                val maxLng = bounds.northeast.longitude + expandLng
+
                 val baseRadius = (map.cameraPosition.zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
+                val requiredBlur = baseRadius * 1.8f
+                if (Math.abs(lastBlurRadius - requiredBlur) > 2f) {
+                    cachedBlurFilter = BlurMaskFilter(requiredBlur, BlurMaskFilter.Blur.NORMAL)
+                    lastBlurRadius = requiredBlur
+                }
 
                 // 3. 实时轨迹的高斯边缘消除 (物理侵蚀感)
                 if (currentPathPoints.isNotEmpty()) {
+                    pathEraserPaint.maskFilter = cachedBlurFilter
                     pathEraserPaint.strokeWidth = baseRadius * 1.8f
                     val path = Path()
                     var first = true
                     currentPathPoints.forEach { latLng ->
-                        val screenPos = projection.toScreenLocation(latLng)
-                        if (first) {
-                            path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
-                            first = false
-                        } else {
-                            path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                        if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
+                            val screenPos = projection.toScreenLocation(latLng)
+                            if (first) {
+                                path.moveTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                                first = false
+                            } else {
+                                path.lineTo(screenPos.x.toFloat(), screenPos.y.toFloat())
+                            }
                         }
                     }
                     canvas.drawPath(path, pathEraserPaint)
@@ -686,35 +735,35 @@ class FlutterMapView(
 
                 // 4. 计算探索掩码的动态驱散 (Dynamic Erosion)
                 historyPoints.forEach { latLng ->
-                    val screenPos = projection.toScreenLocation(latLng)
-                    // 只渲染视野内部的点
-                    if (screenPos.x >= -baseRadius * 4 &&
-                                    screenPos.x <= width + baseRadius * 4 &&
-                                    screenPos.y >= -baseRadius * 4 &&
-                                    screenPos.y <= height + baseRadius * 4
-                    ) {
+                    if (latLng.latitude in minLat..maxLat && latLng.longitude in minLng..maxLng) {
+                        val screenPos = projection.toScreenLocation(latLng)
+                        val baseCheckR = baseRadius * 4.5f
+                        // 只渲染视野内部的点
+                        if (screenPos.x >= -baseCheckR &&
+                                        screenPos.x <= width + baseCheckR &&
+                                        screenPos.y >= -baseCheckR &&
+                                        screenPos.y <= height + baseCheckR
+                        ) {
 
-                        // 利用坐标Hash和时间计算独立呼吸波长，让边缘呈现动态侵蚀涌动效果
-                        val phase = latLng.latitude * 1000.0 + latLng.longitude * 1000.0
-                        val breatheErosion = Math.sin(time / 1500.0 + phase).toFloat() * 0.15f
-                        val dynamicRadius = baseRadius * 4.0f * (1.0f + breatheErosion)
+                            // 利用坐标Hash和时间计算独立呼吸波长，让边缘呈现动态侵蚀涌动效果
+                            val phase = latLng.latitude * 1000.0 + latLng.longitude * 1000.0
+                            val breatheErosion = Math.sin(time / 1500.0 + phase).toFloat() * 0.15f
+                            val dynamicRadius = baseRadius * 4.0f * (1.0f + breatheErosion)
 
-                        spotEraserPaint.shader =
-                                RadialGradient(
+                            fallbackGradient?.let { grad ->
+                                fallbackGradientMatrix.setScale(dynamicRadius, dynamicRadius)
+                                fallbackGradientMatrix.postTranslate(screenPos.x.toFloat(), screenPos.y.toFloat())
+                                grad.setLocalMatrix(fallbackGradientMatrix)
+                                spotEraserPaint.shader = grad
+
+                                canvas.drawCircle(
                                         screenPos.x.toFloat(),
                                         screenPos.y.toFloat(),
                                         dynamicRadius,
-                                        intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT),
-                                        floatArrayOf(0f, 0.35f, 1f), // Alpha decay
-                                        Shader.TileMode.CLAMP
+                                        spotEraserPaint
                                 )
-
-                        canvas.drawCircle(
-                                screenPos.x.toFloat(),
-                                screenPos.y.toFloat(),
-                                dynamicRadius,
-                                spotEraserPaint
-                        )
+                            }
+                        }
                     }
                 }
 
