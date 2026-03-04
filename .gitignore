@@ -56,3 +56,6 @@ app/src/main/rust/target/
 
 # Backups
 footprint_backup_*.json
+
+# Documentation generated
+PROJECT_SUMMARY.md
