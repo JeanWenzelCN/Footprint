@@ -587,6 +587,45 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                 )
+
+        // ── Badge Poster Compositing Channel ──
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.footprint/badge_poster")
+                .setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "composePoster" -> {
+                            val args = call.arguments as Map<String, Any>
+                            val pngBytes = args["badge_png_bytes"] as ByteArray
+                            val title = args["badge_title"] as? String ?: ""
+                            val colorHex = args["badge_color"] as? String ?: "#FFFFFF"
+                            val material = args["material_type"] as? String ?: "Base"
+
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                val path = com.footprint.badge.BadgePosterCompositor.compose(
+                                    context = this@MainActivity,
+                                    badgePngBytes = pngBytes,
+                                    badgeTitle = title,
+                                    badgeColorHex = colorHex,
+                                    materialType = material,
+                                )
+                                withContext(Dispatchers.Main) {
+                                    if (path != null) result.success(path)
+                                    else result.error("COMPOSE_FAILED", "海报合成失败", null)
+                                }
+                            }
+                        }
+                        "sharePoster" -> {
+                            val args = call.arguments as Map<String, Any>
+                            val path = args["path"] as? String
+                            if (path != null) {
+                                com.footprint.badge.BadgePosterCompositor.share(this@MainActivity, path)
+                                result.success(true)
+                            } else {
+                                result.error("NO_PATH", "海报路径为空", null)
+                            }
+                        }
+                        else -> result.notImplemented()
+                    }
+                }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

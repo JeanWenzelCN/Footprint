@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/physics.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'badge_share_poster.dart' as poster;
 
 class BadgeHallScreen extends StatefulWidget {
   final Map<String, dynamic> badgeDictionary;
@@ -420,6 +421,33 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                         child: Text(
                           "解锁条件: ${badge['condition_key']} >= ${badge['target_value']}",
                           style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // ── 分享海报按钮 ──
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            if (_program != null) {
+                              poster.shareBadgePoster(
+                                context: this.context,
+                                program: _program!,
+                                badge: badge as Map<String, dynamic>,
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.share_rounded, size: 18),
+                          label: const Text('分享纪念封'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            side: const BorderSide(color: Colors.white24),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
                         ),
                       ),
                     ],
