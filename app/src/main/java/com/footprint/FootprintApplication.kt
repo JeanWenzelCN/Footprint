@@ -8,6 +8,9 @@ import com.footprint.data.repository.FootprintRepository
 import com.footprint.utils.ApiKeyManager
 
 class FootprintApplication : Application() {
+    lateinit var badgeEngine: com.footprint.badge.BadgeEngine
+        private set
+
     lateinit var repository: FootprintRepository
         private set
 
@@ -30,6 +33,13 @@ class FootprintApplication : Application() {
 
         val database = FootprintDatabase.getInstance(this)
         val preferenceManager = com.footprint.utils.PreferenceManager(this)
+        
+        badgeEngine = com.footprint.badge.BadgeEngine(
+            this,
+            database.userBadgesDao(),
+            database.userStatsDao()
+        )
+        
         repository =
                 FootprintRepository(
                         database.footprintDao(),
@@ -38,7 +48,26 @@ class FootprintApplication : Application() {
                         database.timeCapsuleDao(),
                         database.userStatsDao(),
                         database.userBadgesDao(),
+                        badgeEngine,
                         preferenceManager
                 )
+                
+        // Schedule deep mining cold path
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiresCharging(true)
+            .setRequiresDeviceIdle(true)
+            .build()
+            
+        val badgeWorkRequest = androidx.work.PeriodicWorkRequestBuilder<com.footprint.badge.BadgeWorker>(
+            1, java.util.concurrent.TimeUnit.DAYS
+        )
+        .setConstraints(constraints)
+        .build()
+        
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "ColdPathBadgeWorker",
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            badgeWorkRequest
+        )
     }
 }

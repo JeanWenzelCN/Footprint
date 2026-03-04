@@ -22,6 +22,7 @@ class FootprintRepository(
         private val timeCapsuleDao: com.footprint.data.local.TimeCapsuleDao,
         private val userStatsDao: com.footprint.data.local.UserStatsDao,
         private val userBadgesDao: com.footprint.data.local.UserBadgesDao,
+        private val badgeEngine: com.footprint.badge.BadgeEngine,
         private val preferenceManager: com.footprint.utils.PreferenceManager
 ) {
 
@@ -173,6 +174,7 @@ class FootprintRepository(
         suspend fun saveEntry(entry: FootprintEntry) {
                 footprintDao.upsert(entry.toEntity())
                 userStatsDao.incrementStats(entry.distanceKm)
+                badgeEngine.evaluateHotPath(entry)
         }
 
         suspend fun deleteEntry(id: Long) = footprintDao.deleteById(id)

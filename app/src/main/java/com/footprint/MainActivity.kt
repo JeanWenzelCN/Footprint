@@ -538,6 +538,33 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                 )
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.footprint/badge_events")
+                .setStreamHandler(
+                        object : EventChannel.StreamHandler {
+                            private var badgeJob: Job? = null
+                            override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                                badgeJob = lifecycleScope.launch {
+                                    val app = application as FootprintApplication
+                                    app.badgeEngine.badgeEvents.collect { event ->
+                                        events.success(
+                                            gson.toJson(
+                                                mapOf(
+                                                    "badgeId" to event.badgeId,
+                                                    "title" to event.title,
+                                                    "description" to event.description,
+                                                    "icon" to event.icon
+                                                )
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            override fun onCancel(arguments: Any?) {
+                                badgeJob?.cancel()
+                            }
+                        }
+                )
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

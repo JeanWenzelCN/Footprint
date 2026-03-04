@@ -689,6 +689,11 @@ class _MainContainerState extends State<MainContainer>
   late Animation<double> _elasticAnimation;
   bool _isHiding = false;
 
+  final EventChannel _badgeChannel = const EventChannel('com.footprint/badge_events');
+  StreamSubscription? _badgeSub;
+  final List<dynamic> _badgeQueue = [];
+  bool _isShowingBadge = false;
+
   // GlobalKey 用于通知地图页面 tab 切换事件
   final GlobalKey<_ExploreMapScreenState> _mapKey = GlobalKey<_ExploreMapScreenState>();
 
@@ -720,6 +725,110 @@ class _MainContainerState extends State<MainContainer>
       TweenSequenceItem(tween: Tween(begin: 1.12, end: 0.95).chain(CurveTween(curve: Curves.easeInOut)), weight: 25),
       TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)), weight: 25),
     ]).animate(_tabBounceController);
+
+    _badgeSub = _badgeChannel.receiveBroadcastStream().listen((event) {
+      if (event != null) {
+        try {
+          final badgeData = jsonDecode(event.toString());
+          setState(() {
+            _badgeQueue.add(badgeData);
+          });
+          _processBadgeQueue();
+        } catch (e) {
+          debugPrint("Failed to parse badge: $e");
+        }
+      }
+    });
+  }
+
+  void _processBadgeQueue() async {
+    if (_isShowingBadge || _badgeQueue.isEmpty) return;
+    _isShowingBadge = true;
+    final badge = _badgeQueue.removeAt(0);
+
+    // Show capsule using Overlay
+    if (mounted) {
+      _showBadgeCapsule(badge);
+    }
+
+    await Future.delayed(const Duration(seconds: 4));
+    _isShowingBadge = false;
+    _processBadgeQueue();
+  }
+
+  void _showBadgeCapsule(dynamic badge) {
+    if (!mounted) return;
+    OverlayState? overlayState = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 16,
+          left: 16,
+          right: 16,
+          child: TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 600),
+            tween: Tween(begin: -100.0, end: 0.0),
+            curve: Curves.elasticOut,
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset(0, value),
+                child: child,
+              );
+            },
+            child: Material(
+              color: Colors.transparent,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Row(
+                      children: [
+                        const Text("🏆", style: TextStyle(fontSize: 28)),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text("边界突破！解锁 [${badge['title']}]", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(badge['description'] ?? '', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    overlayState.insert(overlayEntry);
+
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
+      }
+    });
   }
 
   void _handleScroll(ScrollNotification notification) {
@@ -755,6 +864,7 @@ class _MainContainerState extends State<MainContainer>
 
   @override
   void dispose() {
+    _badgeSub?.cancel();
     _navController.dispose();
     _tabBounceController.dispose();
     super.dispose();
