@@ -204,8 +204,15 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
         ),
       );
       
-      slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 20)));
+      slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 10)));
     });
+
+    // Handle Safe Area for the bottom
+    slivers.add(
+      SliverPadding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 40),
+      )
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFF1E140A),
@@ -268,57 +275,24 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
   }
 
   Widget _buildBadgeItem(dynamic badge, bool isUnlocked, int index) {
-    // 根据材质解析质量
+    // 根据材质解析振动和动画质感
     final String materialType = badge['visual_meta']?['material'] ?? 'Base';
-    double mass = 1.0;
-    double stiffness = 150.0;
-    double damping = 15.0;
-
-    if (materialType == 'Cyber') {
-      mass = 0.5;
-      stiffness = 200.0;
-      damping = 10.0;
-    } else if (materialType == 'Liquid') {
-      mass = 0.8;
-      stiffness = 100.0;
-      damping = 8.0;
-    } else if (materialType == 'Heavy') {
-      mass = 2.0;
-      stiffness = 300.0;
-      damping = 20.0;
-    }
-
-    final springSimulation = SpringSimulation(
-      SpringDescription(mass: mass, stiffness: stiffness, damping: damping),
-      0.0, // Initial position (starts off-screen top)
-      1.0,  // Target position (lands at 1.0)
-      0.0,   // Initial velocity
-    );
-
-    return AnimatedBuilder(
-      animation: _revealController,
-      builder: (context, child) {
-        // 使用弹簧模拟器和交错时间，计算每个勋章当前的Y轴进度
-        double t = _revealController.value;
-        double delay = index * 0.05;
-        double progress = 0.0;
+    
+    // Calculate a staggered delay so they drop nicely for the initial visible items.
+    // For items far down the list, TweenAnimationBuilder handles lazy-load insertion beautifully.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600 + (index % 6) * 100),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        // 下落感的位移和透明度
+        double yOffset = (1.0 - value) * -40.0;
+        double opacity = (value * 2).clamp(0.0, 1.0); // 快速淡入
         
-        if (t > delay) {
-             // 缩放时间到弹簧模拟所需的时间范围，比如整个动画 1.5 秒
-             double simTime = (t - delay) * 1.5; 
-             progress = springSimulation.x(simTime);
-        }
-
-        double scale = Curves.easeOutBack.transform((t * 2 - delay).clamp(0.0, 1.0));
-        double opacity = t > delay ? Curves.easeIn.transform(((t - delay) * 5).clamp(0.0, 1.0)) : 0.0;
-        
-        // 我们利用进度差值制造下落感 (-50 代表距离终点上方 50 像素)
-        double yOffset = (1.0 - progress) * -80.0;
-
         return Transform.translate(
           offset: Offset(0, yOffset),
           child: Transform.scale(
-            scale: scale,
+            scale: value.clamp(0.0, 1.2), // 防止过度反弹放大
             child: Opacity(opacity: opacity, child: child),
           ),
         );
@@ -415,16 +389,19 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                       alignment: Alignment.topCenter,
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 15.0),
-                        child: BadgeShaderWidget(
-                          program: _program!,
-                          isUnlocked: isUnlocked,
-                          materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
-                                        (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
-                                        (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
-                          baseColor: _parseColor(badge['visual_meta']?['color']),
-                          lightOffset: _gyroOffset + _pointerOffset,
-                          iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
-                          category: badge['category'] ?? 'General',
+                        child: AspectRatio(
+                          aspectRatio: 1.0,  // 强制正方形，避免拉伸成椭圆
+                          child: BadgeShaderWidget(
+                            program: _program!,
+                            isUnlocked: isUnlocked,
+                            materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
+                                          (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
+                                          (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
+                            baseColor: _parseColor(badge['visual_meta']?['color']),
+                            lightOffset: _gyroOffset + _pointerOffset,
+                            iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
+                            category: badge['category'] ?? 'General',
+                          ),
                         ),
                       ),
                     ),
@@ -434,8 +411,10 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
               const SizedBox(height: 8),
               // Name Plaque
               Container(
+                height: 32, // 固定高度以保证上面 Expanded 计算对齐
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: const Color(0xFF2A1C14), // Dark wood plaque
                   border: Border.all(color: const Color(0xFF5D4037), width: 1),
@@ -444,19 +423,17 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                     BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2, offset: const Offset(0, 1))
                   ]
                 ),
-                child: Center(
-                  child: Text(
-                    badge['title'],
-                    style: TextStyle(
-                      color: isUnlocked ? const Color(0xFFE8D3A2) : const Color(0xFF8B6539), // Gold text
-                      fontSize: 10,
-                      height: 1.1,
-                      fontWeight: isUnlocked ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                child: Text(
+                  badge['title'],
+                  style: TextStyle(
+                    color: isUnlocked ? const Color(0xFFE8D3A2) : const Color(0xFF8B6539), // Gold text
+                    fontSize: 10,
+                    height: 1.1,
+                    fontWeight: isUnlocked ? FontWeight.bold : FontWeight.normal,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
