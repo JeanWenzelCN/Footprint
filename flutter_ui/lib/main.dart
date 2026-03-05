@@ -1091,6 +1091,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int currentYear = DateTime.now().year;
   List<dynamic> allEntries = [];
+  List<dynamic> allTimeEntries = [];
   List<dynamic> onThisDayEntries = [];
   List<dynamic> yearlyGoals = [];
   double totalDistance = 0.0;
@@ -1098,6 +1099,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double avgEnergy = 0.0;
   Set<int> _expandedMonths = {};
   String _searchQuery = "";
+  final TextEditingController _searchController = TextEditingController();
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -1124,6 +1126,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadEntries();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1212,6 +1220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
 
         setState(() {
+          allTimeEntries = entries;
           allEntries = yearEntries;
           onThisDayEntries = onThisDay;
           yearlyGoals = yGoals;
@@ -1732,7 +1741,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Text("搜索结果", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 12),
-                    ...allEntries.where((e) {
+                    ...allTimeEntries.where((e) {
                       final loc = (e['location'] as String? ?? '').toLowerCase();
                       final title = (e['title'] as String? ?? '').toLowerCase();
                       final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
@@ -1756,7 +1765,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                       ),
                     )),
-                    if (allEntries.where((e) {
+                    if (allTimeEntries.where((e) {
                       final loc = (e['location'] as String? ?? '').toLowerCase();
                       final title = (e['title'] as String? ?? '').toLowerCase();
                       final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
@@ -2261,6 +2270,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 12),
           TextField(
+            controller: _searchController,
             onChanged: (val) {
               setState(() {
                 _searchQuery = val.trim().toLowerCase();
@@ -2269,6 +2279,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             decoration: InputDecoration(
               hintText: '搜索地点、标签...',
               prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty 
+                  ? IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = "";
+                          _searchController.clear();
+                        });
+                        FocusScope.of(context).unfocus();
+                      },
+                    ) 
+                  : null,
               filled: true,
               fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
               border: OutlineInputBorder(
