@@ -151,7 +151,7 @@
         "target_value": "220000",
         "visual_meta": {
             "material": "glass",
-            "color": "#E3F2FD",
+            "color": "#1565C0",
             "icon": "jilin_icon"
         }
     },
@@ -164,7 +164,7 @@
         "target_value": "230000",
         "visual_meta": {
             "material": "glass",
-            "color": "#B0BEC5",
+            "color": "#546E7A",
             "icon": "heilongjiang_icon"
         }
     },
@@ -372,7 +372,7 @@
         "target_value": "620000",
         "visual_meta": {
             "material": "glass",
-            "color": "#D4E157",
+            "color": "#9E9D24",
             "icon": "gansu_icon"
         }
     },
@@ -436,8 +436,8 @@
         "condition_key": "adcode",
         "target_value": "540000",
         "visual_meta": {
-            "material": "glass",
-            "color": "#FFFFFF",
+            "material": "liquid_glass",
+            "color": "#7E57C2",
             "icon": "xizang_icon"
         }
     },
@@ -450,7 +450,7 @@
         "target_value": "640000",
         "visual_meta": {
             "material": "glass",
-            "color": "#FFCC80",
+            "color": "#E65100",
             "icon": "ningxia_icon"
         }
     },
@@ -463,7 +463,7 @@
         "target_value": "650000",
         "visual_meta": {
             "material": "glass",
-            "color": "#FFF176",
+            "color": "#F9A825",
             "icon": "xinjiang_icon"
         }
     },
@@ -517,6 +517,266 @@
             "material": "gold",
             "color": "#FFA000",
             "icon": "baseline_wb_sunny_24"
+        }
+    },
+    {
+        "badge_id": "badge_emotion_snow_5",
+        "title": "踏雪寻踪",
+        "description": "在雪天记录5次足迹",
+        "category": "Emotion",
+        "condition_key": "weather_snow_count",
+        "target_value": "5",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#4FC3F7",
+            "icon": "baseline_snowshoeing_24"
+        }
+    },
+    {
+        "badge_id": "badge_emotion_storm_3",
+        "title": "风暴行者",
+        "description": "在暴风雨中记录3次足迹",
+        "category": "Emotion",
+        "condition_key": "weather_storm_count",
+        "target_value": "3",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#37474F",
+            "icon": "baseline_thunderstorm_24"
+        }
+    },
+    {
+        "badge_id": "badge_time_night_10",
+        "title": "夜行者",
+        "description": "在夜间(22:00-6:00)记录10次足迹",
+        "category": "Time",
+        "condition_key": "night_footprint_count",
+        "target_value": "10",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#1A237E",
+            "icon": "baseline_nightlight_24"
+        }
+    },
+    {
+        "badge_id": "badge_time_morning_10",
+        "title": "晨光先锋",
+        "description": "在清晨(5:00-7:00)记录10次足迹",
+        "category": "Time",
+        "condition_key": "early_morning_count",
+        "target_value": "10",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#FF8F00",
+            "icon": "baseline_alarm_on_24"
+        }
+    },
+    {
+        "badge_id": "badge_time_duration_100",
+        "title": "时光旅人",
+        "description": "累计记录足迹时长达到100小时",
+        "category": "Time",
+        "condition_key": "total_duration_hours",
+        "target_value": "100",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#7B1FA2",
+            "icon": "baseline_timer_24"
+        }
+    },
+    {
+        "badge_id": "badge_streak_7",
+        "title": "七日之约",
+        "description": "连续7天记录足迹",
+        "category": "Streak",
+        "condition_key": "consecutive_days",
+        "target_value": "7",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#E64A19",
+            "icon": "baseline_local_fire_department_24"
+        }
+    },
+    {
+        "badge_id": "badge_streak_30",
+        "title": "月度坚持",
+        "description": "连续30天记录足迹",
+        "category": "Streak",
+        "condition_key": "consecutive_days",
+        "target_value": "30",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#D84315",
+            "icon": "baseline_whatshot_24"
+        }
+    },
+    {
+        "badge_id": "badge_streak_100",
+        "title": "百日征程",
+        "description": "连续100天记录足迹",
+        "category": "Streak",
+        "condition_key": "consecutive_days",
+        "target_value": "100",
+        "visual_meta": {
+            "material": "gold",
+            "color": "#BF360C",
+            "icon": "baseline_emoji_events_24"
+        }
+    },
+    {
+        "badge_id": "badge_explorer_cities_10",
+        "title": "十城记",
+        "description": "探索了10个不同的城市",
+        "category": "Explorer",
+        "condition_key": "unique_cities",
+        "target_value": "10",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#00838F",
+            "icon": "baseline_auto_awesome_24"
+        }
+    },
+    {
+        "badge_id": "badge_explorer_cities_50",
+        "title": "五十城纵横",
+        "description": "探索了50个不同的城市",
+        "category": "Explorer",
+        "condition_key": "unique_cities",
+        "target_value": "50",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#006064",
+            "icon": "baseline_rocket_launch_24"
+        }
+    },
+    {
+        "badge_id": "badge_explorer_provinces_10",
+        "title": "半壁江山",
+        "description": "足迹覆盖10个省级行政区",
+        "category": "Explorer",
+        "condition_key": "provinces_visited",
+        "target_value": "10",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#C62828",
+            "icon": "baseline_explore_24"
+        }
+    },
+    {
+        "badge_id": "badge_explorer_altitude_3000",
+        "title": "高原勇士",
+        "description": "到达过海拔3000米以上",
+        "category": "Explorer",
+        "condition_key": "max_altitude",
+        "target_value": "3000",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#4527A0",
+            "icon": "baseline_elevation_24"
+        }
+    },
+    {
+        "badge_id": "badge_explorer_altitude_5000",
+        "title": "云端漫步",
+        "description": "到达过海拔5000米以上",
+        "category": "Explorer",
+        "condition_key": "max_altitude",
+        "target_value": "5000",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#311B92",
+            "icon": "baseline_elevation_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_footprints_100",
+        "title": "百足墨客",
+        "description": "累计记录了100条足迹",
+        "category": "Special",
+        "condition_key": "total_footprints",
+        "target_value": "100",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#1B5E20",
+            "icon": "baseline_edit_note_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_footprints_500",
+        "title": "铁杵成针",
+        "description": "累计记录了500条足迹",
+        "category": "Special",
+        "condition_key": "total_footprints",
+        "target_value": "500",
+        "visual_meta": {
+            "material": "gold",
+            "color": "#33691E",
+            "icon": "baseline_emoji_events_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_photos_50",
+        "title": "光影猎人",
+        "description": "累计拍摄了50张照片",
+        "category": "Special",
+        "condition_key": "photo_count",
+        "target_value": "50",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#AD1457",
+            "icon": "baseline_photo_camera_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_words_10000",
+        "title": "千字匠心",
+        "description": "累计撰写了10000字的足迹记录",
+        "category": "Special",
+        "condition_key": "detail_char_count",
+        "target_value": "10000",
+        "visual_meta": {
+            "material": "liquid_glass",
+            "color": "#4E342E",
+            "icon": "baseline_edit_note_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_marathon",
+        "title": "马拉松精神",
+        "description": "单次足迹距离超过42公里",
+        "category": "Special",
+        "condition_key": "max_single_distance",
+        "target_value": "42",
+        "visual_meta": {
+            "material": "cyber_neon",
+            "color": "#FF6D00",
+            "icon": "baseline_speed_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_first",
+        "title": "首次出发",
+        "description": "记录你的第一条足迹",
+        "category": "Special",
+        "condition_key": "total_footprints",
+        "target_value": "1",
+        "visual_meta": {
+            "material": "glass",
+            "color": "#0097A7",
+            "icon": "baseline_celebration_24"
+        }
+    },
+    {
+        "badge_id": "badge_special_century",
+        "title": "百日纪念",
+        "description": "使用足迹 App 满100天",
+        "category": "Special",
+        "condition_key": "consecutive_days",
+        "target_value": "100",
+        "visual_meta": {
+            "material": "gold",
+            "color": "#FF6F00",
+            "icon": "baseline_cake_24"
         }
     }
 ]

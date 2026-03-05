@@ -37,7 +37,7 @@ Future<void> shareBadgePoster({
     final Map<String, dynamic> args = {
       'badge_png_bytes': badgeBytes,
       'badge_title': badge['title'] ?? '',
-      'badge_color': badge['visual_meta']?['base_color'] ?? '#FFFFFF',
+      'badge_color': badge['visual_meta']?['color'] ?? '#FFFFFF',
       'material_type': badge['visual_meta']?['material'] ?? 'Base',
     };
 
@@ -79,7 +79,7 @@ Future<Uint8List?> _captureBadgeAt({
     ..rotateY(yawRad);
 
   final Color baseColor = _hexToColor(
-      badge['visual_meta']?['base_color'], true);
+      badge['visual_meta']?['color'], true);
   final double matType =
       badge['visual_meta']?['material'] == 'Cyber' ? 1.0 :
       badge['visual_meta']?['material'] == 'Liquid' ? 2.0 : 0.0;

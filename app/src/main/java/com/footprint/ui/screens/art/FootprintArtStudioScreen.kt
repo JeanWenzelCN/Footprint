@@ -178,6 +178,10 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
         var selectedLayout by remember { mutableStateOf(ArtLayout.FULLCREEN_A24) }
         var showControls by remember { mutableStateOf(true) }
 
+        // Material 3 DatePicker dialog state
+        var showStartDatePicker by remember { mutableStateOf(false) }
+        var showEndDatePicker by remember { mutableStateOf(false) }
+
         // Time Scope (Default to this year)
         var startDate by remember { mutableStateOf(LocalDate.now().withDayOfYear(1)) }
         var endDate by remember { mutableStateOf(LocalDate.now()) }
@@ -363,40 +367,8 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                         onMapStyleChange = { mapStyle = it },
                                         startDate = startDate,
                                         endDate = endDate,
-                                        onStartDateClick = {
-                                                android.app.DatePickerDialog(
-                                                                context,
-                                                                { _, y, m, d ->
-                                                                        startDate =
-                                                                                LocalDate.of(
-                                                                                        y,
-                                                                                        m + 1,
-                                                                                        d
-                                                                                )
-                                                                },
-                                                                startDate.year,
-                                                                startDate.monthValue - 1,
-                                                                startDate.dayOfMonth
-                                                        )
-                                                        .show()
-                                        },
-                                        onEndDateClick = {
-                                                android.app.DatePickerDialog(
-                                                                context,
-                                                                { _, y, m, d ->
-                                                                        endDate =
-                                                                                LocalDate.of(
-                                                                                        y,
-                                                                                        m + 1,
-                                                                                        d
-                                                                                )
-                                                                },
-                                                                endDate.year,
-                                                                endDate.monthValue - 1,
-                                                                endDate.dayOfMonth
-                                                        )
-                                                        .show()
-                                        },
+                                        onStartDateClick = { showStartDatePicker = true },
+                                        onEndDateClick = { showEndDatePicker = true },
                                         layout = selectedLayout,
                                         onLayoutChange = { selectedLayout = it },
                                         textColor = uiState.artTextColor,
@@ -1130,6 +1102,81 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 }
                         }
                 }
+        }
+
+        // ── Material 3 Start Date Picker Dialog ──
+        if (showStartDatePicker) {
+                val startDatePickerState =
+                        rememberDatePickerState(
+                                initialSelectedDateMillis =
+                                        startDate
+                                                .atStartOfDay(java.time.ZoneId.of("UTC"))
+                                                .toInstant()
+                                                .toEpochMilli()
+                        )
+                DatePickerDialog(
+                        onDismissRequest = { showStartDatePicker = false },
+                        confirmButton = {
+                                TextButton(
+                                        onClick = {
+                                                startDatePickerState.selectedDateMillis?.let {
+                                                        millis ->
+                                                        startDate =
+                                                                java.time.Instant.ofEpochMilli(
+                                                                                millis
+                                                                        )
+                                                                        .atZone(
+                                                                                java.time.ZoneId.of(
+                                                                                        "UTC"
+                                                                                )
+                                                                        )
+                                                                        .toLocalDate()
+                                                }
+                                                showStartDatePicker = false
+                                        }
+                                ) { Text("确定") }
+                        },
+                        dismissButton = {
+                                TextButton(onClick = { showStartDatePicker = false }) { Text("取消") }
+                        }
+                ) { DatePicker(state = startDatePickerState) }
+        }
+
+        // ── Material 3 End Date Picker Dialog ──
+        if (showEndDatePicker) {
+                val endDatePickerState =
+                        rememberDatePickerState(
+                                initialSelectedDateMillis =
+                                        endDate.atStartOfDay(java.time.ZoneId.of("UTC"))
+                                                .toInstant()
+                                                .toEpochMilli()
+                        )
+                DatePickerDialog(
+                        onDismissRequest = { showEndDatePicker = false },
+                        confirmButton = {
+                                TextButton(
+                                        onClick = {
+                                                endDatePickerState.selectedDateMillis?.let { millis
+                                                        ->
+                                                        endDate =
+                                                                java.time.Instant.ofEpochMilli(
+                                                                                millis
+                                                                        )
+                                                                        .atZone(
+                                                                                java.time.ZoneId.of(
+                                                                                        "UTC"
+                                                                                )
+                                                                        )
+                                                                        .toLocalDate()
+                                                }
+                                                showEndDatePicker = false
+                                        }
+                                ) { Text("确定") }
+                        },
+                        dismissButton = {
+                                TextButton(onClick = { showEndDatePicker = false }) { Text("取消") }
+                        }
+                ) { DatePicker(state = endDatePickerState) }
         }
 }
 

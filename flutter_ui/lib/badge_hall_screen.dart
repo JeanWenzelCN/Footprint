@@ -153,15 +153,19 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                 (context, index) {
                 final badge = items[index];
                 final isUnlocked = widget.unlockedIds.contains(badge['badge_id']);
-                return Padding(
-                  padding: EdgeInsets.only(bottom: index == items.length - 1 ? 40 : 0),
-                  child: _buildBadgeItem(badge, isUnlocked, index),
-                );
+                return _buildBadgeItem(badge, isUnlocked, index);
               },
               childCount: items.length,
             ),
           ),
         )
+      );
+
+      // Add spacing after each category section
+      slivers.add(
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 16),
+        ),
       );
     });
 
@@ -305,7 +309,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                           boxShadow: [
                             BoxShadow(
                               color: isUnlocked 
-                                  ? _parseColor(badge['visual_meta']?['base_color']).withAlpha(40)
+                                  ? _parseColor(badge['visual_meta']?['color']).withAlpha(40)
                                   : Colors.black.withAlpha(100),
                               blurRadius: 20,
                               spreadRadius: 8,
@@ -320,7 +324,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                       materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
                                     (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
                                     (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
-                      baseColor: _parseColor(badge['visual_meta']?['base_color']),
+                      baseColor: _parseColor(badge['visual_meta']?['color']),
                       lightOffset: _gyroOffset + _pointerOffset,
                       iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
                       category: badge['category'] ?? 'General',
@@ -369,13 +373,17 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     try {
       if (hex == null || hex.isEmpty) return Colors.grey;
       
-      // Specially boost target colors for Hunan (Red) and Guangdong (Teal)
-      // Using deeper, richer colors to avoid the "shallow" or "washed out" appearance
-      if (hex.toUpperCase() == "#E53935") return const Color(0xFFC62828); // Deep Crimson
-      if (hex.toUpperCase() == "#009688") return const Color(0xFF00695C); // Deep Jade Teal
-      
       final String buffer = hex.replaceFirst('#', '');
-      return Color(int.parse("FF$buffer", radix: 16));
+      final color = Color(int.parse("FF$buffer", radix: 16));
+      
+      // Ensure color has adequate saturation and brightness for visibility
+      // Boost very light/pastel colors by darkening them
+      final HSLColor hsl = HSLColor.fromColor(color);
+      if (hsl.lightness > 0.75) {
+        // Too light — darken to ensure visibility on dark background
+        return hsl.withLightness(0.55).toColor();
+      }
+      return color;
     } catch (_) {
       return Colors.blueAccent;
     }
@@ -433,6 +441,27 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
       case 'hongkong_icon': return Icons.nightlife; // 香港：维港/霓虹
       case 'macau_icon': return Icons.casino; // 澳门：博彩/大三巴
       
+      // 新增勋章图标映射
+      case 'baseline_nightlight_24': return Icons.nightlight_round; // 夜行者
+      case 'baseline_schedule_24': return Icons.schedule; // 时间相关
+      case 'baseline_alarm_on_24': return Icons.alarm_on; // 早起
+      case 'baseline_local_fire_department_24': return Icons.local_fire_department; // 连续打卡
+      case 'baseline_whatshot_24': return Icons.whatshot; // 连续记录
+      case 'baseline_auto_awesome_24': return Icons.auto_awesome; // 多样探索
+      case 'baseline_photo_camera_24': return Icons.photo_camera; // 摄影
+      case 'baseline_edit_note_24': return Icons.edit_note; // 写作
+      case 'baseline_emoji_events_24': return Icons.emoji_events; // 奖杯
+      case 'baseline_rocket_launch_24': return Icons.rocket_launch; // 传奇
+      case 'baseline_cake_24': return Icons.cake; // 周年纪念
+      case 'baseline_celebration_24': return Icons.celebration; // 里程碑
+      case 'baseline_speed_24': return Icons.speed; // 速度
+      case 'baseline_timer_24': return Icons.timer; // 时长
+      case 'baseline_calendar_month_24': return Icons.calendar_month; // 日历
+      case 'baseline_favorite_24': return Icons.favorite; // 最爱
+      case 'baseline_elevation_24': return Icons.terrain; // 海拔
+      case 'baseline_snowshoeing_24': return Icons.snowshoeing; // 极寒
+      case 'baseline_thunderstorm_24': return Icons.thunderstorm; // 风暴
+      
       default: return Icons.stars;
     }
   }
@@ -440,13 +469,21 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
   String _translateCategory(String category) {
     switch (category) {
       case 'Milestone':
-        return '里程碑成就';
+        return '里 程 碑 成 就';
       case 'Geographic':
-        return '地域足迹';
+        return '地 域 足 迹';
       case 'Emotion':
-        return '情感共鸣';
+        return '情 感 共 鸣';
+      case 'Time':
+        return '时 光 印 记';
+      case 'Streak':
+        return '毅 力 之 证';
+      case 'Explorer':
+        return '探 索 精 神';
+      case 'Special':
+        return '隐 藏 成 就';
       default:
-        return '探索奖章';
+        return '探 索 奖 章';
     }
   }
 
@@ -475,6 +512,32 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
         return "在雨天记录了 $target 次足迹";
       case 'weather_sunny_count':
         return "在晴天记录了 $target 次足迹";
+      case 'night_footprint_count':
+        return "在夜间（22:00-6:00）记录了 $target 次足迹";
+      case 'early_morning_count':
+        return "在清晨（5:00-7:00）记录了 $target 次足迹";
+      case 'consecutive_days':
+        return "连续 $target 天记录足迹";
+      case 'total_footprints':
+        return "累计记录了 $target 条足迹";
+      case 'photo_count':
+        return "累计拍摄了 $target 张照片";
+      case 'detail_char_count':
+        return "累计撰写了 $target 字的足迹记录";
+      case 'unique_cities':
+        return "探索了 $target 个不同的城市";
+      case 'provinces_visited':
+        return "足迹覆盖 $target 个省级行政区";
+      case 'max_altitude':
+        return "到达过海拔 $target 米以上";
+      case 'weather_snow_count':
+        return "在雪天记录了 $target 次足迹";
+      case 'weather_storm_count':
+        return "在暴风雨中记录了 $target 次足迹";
+      case 'total_duration_hours':
+        return "累计记录足迹时长达到 $target 小时";
+      case 'max_single_distance':
+        return "单次足迹距离超过 $target 公里";
       default:
         return "勋章解锁进度：$key 到达 $target";
     }
@@ -492,7 +555,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (context, animation, secondaryAnimation) {
         final catCN = _translateCategory((badge['category'] ?? 'Other').toString());
-        final baseColor = _parseColor(badge['visual_meta']?['base_color']);
+        final baseColor = _parseColor(badge['visual_meta']?['color']);
 
         return Center(
           child: Container(
