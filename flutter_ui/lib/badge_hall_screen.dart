@@ -93,8 +93,8 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
   Widget build(BuildContext context) {
     if (_program == null) {
       return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: Color(0xFF1A110C),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))),
       );
     }
     
@@ -103,8 +103,8 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     slivers.add(
       SliverAppBar(
         backgroundColor: Colors.transparent,
-        title: const Text("荣誉勋章", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("荣誉勋章", style: TextStyle(color: Color(0xFFE8D3A2), fontWeight: FontWeight.bold, letterSpacing: 4, fontFamily: 'serif')),
+        iconTheme: const IconThemeData(color: Color(0xFFE8D3A2)),
         pinned: true,
         expandedHeight: 120,
         flexibleSpace: FlexibleSpaceBar(
@@ -113,7 +113,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
+                colors: [const Color(0xFF150A05).withValues(alpha: 0.9), Colors.transparent],
               ),
             ),
           ),
@@ -124,30 +124,46 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     widget.badgeDictionary.forEach((category, items) {
       slivers.add(
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-            child: Text(
-              _translateCategory(category),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 14,
-                letterSpacing: 4,
-                fontWeight: FontWeight.bold,
+          child: Column(
+            children: [
+              const SizedBox(height: 32),
+              // Name Plate for the shelf
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A1C14),
+                  border: Border.all(color: const Color(0xFF8B6539), width: 1.5),
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4, offset: const Offset(0, 2))
+                  ]
+                ),
+                child: Text(
+                  _translateCategory(category),
+                  style: const TextStyle(
+                    color: Color(0xFFE8D3A2),
+                    fontSize: 16,
+                    letterSpacing: 4,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
-          ),
+              const SizedBox(height: 24),
+            ],
+          )
         )
       );
 
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 20,
-              childAspectRatio: 0.68,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 32,
+              childAspectRatio: 0.65,
             ),
             delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -161,33 +177,53 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
         )
       );
 
-      // Add spacing after each category section
+      // Shelf bottom edge
       slivers.add(
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 16),
+        SliverToBoxAdapter(
+          child: Container(
+            height: 20,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF3E2723), // Wood top highlight
+                  Color(0xFF1F1209), // Wood shadow
+                ],
+              ),
+              border: const Border(
+                top: BorderSide(color: Color(0xFF5D4037), width: 1),
+                bottom: BorderSide(color: Colors.black, width: 2),
+              ),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 10, offset: const Offset(0, 5))
+              ]
+            ),
+          ),
         ),
       );
+      
+      slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 20)));
     });
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF1E140A),
       body: Stack(
         children: [
-          // The Void Backdrop Spotlight
-          Positioned(
-            top: -200,
-            left: MediaQuery.of(context).size.width / 2 - 300,
+          // Background wood texture/gradient for the cabinet
+          Positioned.fill(
             child: Container(
-              width: 600,
-              height: 600,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                   colors: [
-                    Colors.white.withValues(alpha: 0.1),
-                    Colors.transparent
+                    Color(0xFF150A05),
+                    Color(0xFF2C1E16),
+                    Color(0xFF150A05),
                   ],
-                  stops: const [0.0, 1.0],
+                  stops: [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -205,6 +241,25 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: slivers,
+            ),
+          ),
+          
+          // Cabinet glass reflection overlay
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.05),
+                    Colors.transparent,
+                    Colors.white.withValues(alpha: 0.02),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.2, 0.8, 1.0],
+                ),
+              ),
             ),
           ),
         ],
@@ -294,59 +349,113 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
              return Transform.scale(scale: focusScale, child: child);
           },
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Expanded(
                 child: Stack(
-                  alignment: Alignment.center,
+                  alignment: Alignment.bottomCenter,
                   children: [
-                    // 底部的环境阴影，增加悬浮感
+                    // Pedestal back support
                     Positioned(
-                      bottom: 10,
+                      bottom: 5,
                       child: Container(
-                        width: 40,
-                        height: 10,
+                        width: 6,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [Colors.black, Color(0xFF4A4A4A), Colors.black],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Drop shadow on the pedestal base
+                    Positioned(
+                      bottom: 0,
+                      child: Container(
+                        width: 60,
+                        height: 15,
                         decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
                               color: isUnlocked 
-                                  ? _parseColor(badge['visual_meta']?['color']).withAlpha(40)
-                                  : Colors.black.withAlpha(100),
-                              blurRadius: 20,
-                              spreadRadius: 8,
+                                  ? _parseColor(badge['visual_meta']?['color']).withAlpha(60)
+                                  : Colors.black.withAlpha(80),
+                              blurRadius: 15,
+                              spreadRadius: 2,
                             ),
                           ],
                         ),
                       ),
                     ),
-                    BadgeShaderWidget(
-                      program: _program!,
-                      isUnlocked: isUnlocked,
-                      materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
-                                    (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
-                                    (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
-                      baseColor: _parseColor(badge['visual_meta']?['color']),
-                      lightOffset: _gyroOffset + _pointerOffset,
-                      iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
-                      category: badge['category'] ?? 'General',
+                    // Pedestal Base
+                    Positioned(
+                      bottom: 0,
+                      child: Container(
+                        width: 70,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFFD4AF37), Color(0xFF8B6508)], // Gold
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.8), offset: const Offset(0, 4), blurRadius: 4)
+                          ]
+                        ),
+                      ),
+                    ),
+                    // The Badge itself
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 15.0),
+                        child: BadgeShaderWidget(
+                          program: _program!,
+                          isUnlocked: isUnlocked,
+                          materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
+                                        (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
+                                        (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
+                          baseColor: _parseColor(badge['visual_meta']?['color']),
+                          lightOffset: _gyroOffset + _pointerOffset,
+                          iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
+                          category: badge['category'] ?? 'General',
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 36,
+              const SizedBox(height: 8),
+              // Name Plaque
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A1C14), // Dark wood plaque
+                  border: Border.all(color: const Color(0xFF5D4037), width: 1),
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2, offset: const Offset(0, 1))
+                  ]
+                ),
                 child: Center(
                   child: Text(
                     badge['title'],
                     style: TextStyle(
-                      color: isUnlocked ? Colors.white : Colors.white.withAlpha(120),
-                      fontSize: 11,
+                      color: isUnlocked ? const Color(0xFFE8D3A2) : const Color(0xFF8B6539), // Gold text
+                      fontSize: 10,
                       height: 1.1,
                       fontWeight: isUnlocked ? FontWeight.bold : FontWeight.normal,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                    overflow: TextOverflow.visible,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
