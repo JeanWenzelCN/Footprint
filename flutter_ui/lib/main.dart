@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:amap_flutter_location/amap_flutter_location.dart';
 import 'package:amap_flutter_location/amap_location_option.dart';
+import 'package:city_pickers/city_pickers.dart';
 import 'footprint_detail_page.dart';
 import 'goal_planner_page.dart';
 import 'badge_hall_screen.dart';
@@ -55,7 +56,8 @@ class AddFootprintPage extends StatefulWidget {
 
 class _AddFootprintPageState extends State<AddFootprintPage> {
   late TextEditingController _titleController;
-  late TextEditingController _locationController;
+  late TextEditingController _detailedLocationController;
+  String _selectedRegion = "";
   late TextEditingController _detailController;
   late TextEditingController _distanceController;
   late TextEditingController _tagsController;
@@ -84,7 +86,15 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
     super.initState();
     final e = widget.initialEntry;
     _titleController = TextEditingController(text: e?['title'] ?? '');
-    _locationController = TextEditingController(text: e?['location'] ?? '');
+    final locStr = e?['location'] as String? ?? '';
+    final locParts = locStr.split(' ');
+    if (locParts.length > 1) {
+      _selectedRegion = locParts[0];
+      _detailedLocationController = TextEditingController(text: locParts.sublist(1).join(' '));
+    } else {
+      _selectedRegion = "";
+      _detailedLocationController = TextEditingController(text: locStr);
+    }
     _detailController = TextEditingController(text: e?['detail'] ?? '');
     _distanceController = TextEditingController(text: e != null ? (e['distanceKm']?.toString() ?? '5.0') : "5.0");
     _tagsController = TextEditingController(text: (e?['tags'] as List<dynamic>?)?.join(', ') ?? '');
@@ -113,7 +123,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   @override
   void dispose() {
     _titleController.dispose();
-    _locationController.dispose();
+    _detailedLocationController.dispose();
     _distanceController.dispose();
     _tagsController.dispose();
     _tempController.dispose();
@@ -186,9 +196,50 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             ),
           ),
           const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    FocusScope.of(context).unfocus();
+                    Result? result = await CityPickers.showCityPicker(
+                       context: context,
+                       theme: Theme.of(context).brightness == Brightness.dark ? ThemeData.dark() : ThemeData.light(),
+                    );
+                    if (result != null) {
+                      setState(() {
+                         _selectedRegion = "${result.provinceName ?? ''} ${result.cityName ?? ''} ${result.areaName ?? ''}".trim();
+                      });
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: '省/市/区',
+                      prefixIcon: const Icon(Icons.map_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(
+                      _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           TextField(
-            controller: _locationController,
-            decoration: InputDecoration(labelText: '地点', prefixIcon: const Icon(Icons.place_outlined), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+             controller: _detailedLocationController,
+             decoration: InputDecoration(
+               labelText: '详细地址 (如景点、餐馆、小区)',
+               prefixIcon: const Icon(Icons.place_outlined),
+               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))
+             ),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -284,11 +335,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
               )),
             ],
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _locationController,
-            decoration: InputDecoration(labelText: '地点', prefixIcon: const Icon(Icons.place_outlined), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-          ),
+
           const SizedBox(height: 16),
           TextField(
             controller: _detailController,
@@ -365,7 +412,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
               final entryData = {
                 "id": widget.initialEntry?['id'] ?? 0,
                 "title": _titleController.text,
-                "location": _locationController.text,
+                "location": "${_selectedRegion} ${_detailedLocationController.text}".trim(),
                 "detail": _detailController.text,
                 "mood": mappedMood,
                 "tags": _tagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
@@ -432,7 +479,8 @@ class AddGoalPage extends StatefulWidget {
 
 class _AddGoalPageState extends State<AddGoalPage> {
   late TextEditingController _titleController;
-  late TextEditingController _locationController;
+  late TextEditingController _detailedLocationController;
+  String _selectedRegion = "";
   late TextEditingController _notesController;
   DateTime _selectedDate = DateTime.now();
 
@@ -441,7 +489,15 @@ class _AddGoalPageState extends State<AddGoalPage> {
     super.initState();
     final g = widget.initialGoal;
     _titleController = TextEditingController(text: g?['title'] ?? '');
-    _locationController = TextEditingController(text: g?['targetLocation'] ?? '');
+    final locStr = g?['targetLocation'] as String? ?? '';
+    final locParts = locStr.split(' ');
+    if (locParts.length > 1) {
+      _selectedRegion = locParts[0];
+      _detailedLocationController = TextEditingController(text: locParts.sublist(1).join(' '));
+    } else {
+      _selectedRegion = "";
+      _detailedLocationController = TextEditingController(text: locStr);
+    }
     _notesController = TextEditingController(text: g?['notes'] ?? '');
     if (g?['targetDate'] != null) {
       try { _selectedDate = DateTime.parse(g['targetDate']); } catch(_) {}
@@ -451,7 +507,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
   @override
   void dispose() {
     _titleController.dispose();
-    _locationController.dispose();
+    _detailedLocationController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -479,13 +535,50 @@ class _AddGoalPageState extends State<AddGoalPage> {
             ),
           ),
           const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    FocusScope.of(context).unfocus();
+                    Result? result = await CityPickers.showCityPicker(
+                       context: context,
+                       theme: Theme.of(context).brightness == Brightness.dark ? ThemeData.dark() : ThemeData.light(),
+                    );
+                    if (result != null) {
+                      setState(() {
+                         _selectedRegion = "${result.provinceName ?? ''} ${result.cityName ?? ''} ${result.areaName ?? ''}".trim();
+                      });
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: '省/市/区',
+                      prefixIcon: const Icon(Icons.map_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(
+                      _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           TextField(
-            controller: _locationController,
-            decoration: InputDecoration(
-              labelText: '目的地',
-              prefixIcon: const Icon(Icons.place_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+             controller: _detailedLocationController,
+             decoration: InputDecoration(
+               labelText: '详细目的地 (如景区或具体位置)',
+               prefixIcon: const Icon(Icons.place_outlined),
+               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))
+             ),
           ),
           const SizedBox(height: 16),
           InkWell(
@@ -527,7 +620,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
               final goalData = {
                 "id": widget.initialGoal?['id'] ?? 0,
                 "title": _titleController.text,
-                "targetLocation": _locationController.text,
+                "targetLocation": "${_selectedRegion} ${_detailedLocationController.text}".trim(),
                 "targetDate": "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
                 "notes": _notesController.text,
                 "isCompleted": widget.initialGoal?['isCompleted'] ?? false,
@@ -1004,6 +1097,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int uniquePlacesLength = 0;
   double avgEnergy = 0.0;
   Set<int> _expandedMonths = {};
+  String _searchQuery = "";
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -1628,6 +1722,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ..._buildTimeline(cs),
             ],
           ),
+          if (_searchQuery.isNotEmpty)
+            Positioned.fill(
+              top: 180,
+              child: Container(
+                color: cs.surface,
+                child: ListView(
+                  padding: const EdgeInsets.all(16).copyWith(bottom: 120),
+                  children: [
+                    Text("搜索结果", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    ...allEntries.where((e) {
+                      final loc = (e['location'] as String? ?? '').toLowerCase();
+                      final title = (e['title'] as String? ?? '').toLowerCase();
+                      final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
+                      return loc.contains(_searchQuery) || title.contains(_searchQuery) || tags.contains(_searchQuery);
+                    }).map((e) => Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: cs.outlineVariant)),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: cs.primaryContainer, shape: BoxShape.circle),
+                          child: Icon(Icons.place, color: cs.primary, size: 20),
+                        ),
+                        title: Text(e['title'] ?? '未知记录', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(e['location'] ?? ''),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                        onTap: () {
+                           FocusScope.of(context).unfocus();
+                           _showDetail(e);
+                        },
+                      ),
+                    )),
+                    if (allEntries.where((e) {
+                      final loc = (e['location'] as String? ?? '').toLowerCase();
+                      final title = (e['title'] as String? ?? '').toLowerCase();
+                      final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
+                      return loc.contains(_searchQuery) || title.contains(_searchQuery) || tags.contains(_searchQuery);
+                    }).isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 32),
+                        child: Center(child: Text("没有找到匹配的足迹", style: TextStyle(color: Colors.grey))),
+                      )
+                  ],
+                ),
+              ),
+            ),
           _fixedTop(cs, tt),
         ],
       ),
@@ -2119,6 +2261,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 12),
           TextField(
+            onChanged: (val) {
+              setState(() {
+                _searchQuery = val.trim().toLowerCase();
+              });
+            },
             decoration: InputDecoration(
               hintText: '搜索地点、标签...',
               prefixIcon: const Icon(Icons.search),

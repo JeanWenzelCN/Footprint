@@ -1,16 +1,26 @@
+import com.android.build.gradle.BaseExtension
+
 plugins {
     id("com.android.application") version "8.13.2" apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
     id("org.jetbrains.kotlin.kapt") version "1.9.22" apply false
 }
 
-import com.android.build.gradle.BaseExtension
-
 tasks.register("clean", Delete::class) {
     delete(rootProject.layout.buildDirectory)
 }
 
 subprojects {
+    // Inject fake flutter config if not exists to fix AGP 8.x+ error with some plugins
+    // We use a Map so Groovy can access it via property syntax (flutter.compileSdkVersion)
+    if (project.name == "flutter_plugin_android_lifecycle" || project.name.contains("city_picker")) {
+        project.extensions.extraProperties.set("flutter", mapOf(
+            "compileSdkVersion" to 36,
+            "minSdkVersion" to 21,
+            "targetSdkVersion" to 36
+        ))
+    }
+
     // Aggressive fix for "Namespace not specified" and low compileSdk in AGP 8.x+ for Flutter plugins
     project.afterEvaluate {
         if (project.hasProperty("android")) {

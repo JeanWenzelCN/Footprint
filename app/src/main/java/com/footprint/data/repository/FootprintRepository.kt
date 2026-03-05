@@ -213,15 +213,24 @@ class FootprintRepository(
 
         fun ensureSeedData() {
                 ioScope.launch {
-                        if (!preferenceManager.hasSeededV5) {
-                                if (footprintDao.count() == 0) {
-                                        SeedData.entries.forEach { footprintDao.upsert(it) }
-                                }
-                                if (travelGoalDao.count() == 0) {
-                                        SeedData.goals.forEach { travelGoalDao.upsert(it) }
-                                }
-                                preferenceManager.hasSeededV5 = true
+                        // Clear existing seed data if any
+                        val seedTitles = listOf("川西彩林穿越", "魔都城市夜跑", "厦门海岸线骑行")
+                        val seedGoalTitles = listOf("川藏线摩旅", "极地观星计划")
+                        
+                        try {
+                            footprintDao.getAll().filter { it.title in seedTitles }.forEach { 
+                                footprintDao.deleteById(it.id)
+                                userStatsDao.incrementStats(-it.distanceKm, -1)
+                            }
+                            travelGoalDao.getAll().filter { it.title in seedGoalTitles }.forEach {
+                                travelGoalDao.deleteById(it.id)
+                            }
+                        } catch (e: Exception) {
+                            // Silent fail for cleanup
                         }
+                        
+                        // Mark as seeded (even if we just cleared them) to prevent future seeding
+                        preferenceManager.hasSeededV5 = true
                 }
         }
 
