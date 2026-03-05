@@ -42,9 +42,12 @@ build/
 /app/app_new_build/
 
 # Rust
-app/src/main/rust/target/
+app/rust/target/
 **/*.pdb
 **/*.exe
+
+# Gradle Distributions
+gradle/gradle-8.6-bin/
 
 # Kotlin
 /bin/

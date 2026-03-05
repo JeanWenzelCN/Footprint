@@ -132,10 +132,6 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-
-    // Google Play Services - Location
-    implementation("com.google.android.gms:play-services-location:21.1.0")
 
     // AMap (高德地图) SDK
     implementation("com.amap.api:3dmap:latest.integration")

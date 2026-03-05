@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,33 +59,32 @@ const val CYBER_GLITCH_SHADER =
     uniform vec2 uResolution;
     uniform float uTime;
 
-    float hash(vec2 p) {
-        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    float random(vec2 st) {
+        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
     }
 
     vec4 main(vec2 fragCoord) {
-        vec2 uv = fragCoord / uResolution;
+        vec2 uv = fragCoord / uResolution.xy;
+        float time = uTime * 2.0;
         
-        // Horizontal Glitch Blocks
-        float glitch = step(0.98, hash(vec2(floor(uv.y * 50.0), floor(uTime * 10.0))));
-        float offset = glitch * 0.02 * sin(uTime * 20.0);
+        // RGB Split
+        float amount = 0.005 * sin(time);
+        vec4 col;
+        col.r = composable.eval(fragCoord + vec2(amount, 0.0)).r;
+        col.g = composable.eval(fragCoord).g;
+        col.b = composable.eval(fragCoord - vec2(amount, 0.0)).b;
+        col.a = composable.eval(fragCoord).a;
         
         // Scanlines
-        float scanline = sin(uv.y * 800.0) * 0.04;
+        float scanline = sin(fragCoord.y * 1.5 + time * 10.0) * 0.04;
+        col.rgb -= scanline;
         
-        // Sampling with offset
-        vec4 color = composable.eval(fragCoord + vec2(offset * uResolution.x, 0.0));
-        
-        // Neon tint
-        color.rgb += vec3(0.0, 0.1, 0.2); // Base cyberpunk blue
-        
-        // Random color bursts
-        if (glitch > 0.0) {
-            color.r += 0.2;
-            color.b += 0.3;
+        // Random horizontal shift
+        if (random(vec2(time)) > 0.98) {
+            col.rgb += random(uv + time) * 0.1;
         }
         
-        return vec4(color.rgb - scanline, color.a);
+        return col;
     }
 """
 
@@ -92,6 +93,7 @@ const val CYBER_GLITCH_SHADER =
 fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
         val context = LocalContext.current
+        val resolver = androidx.compose.ui.platform.LocalFontFamilyResolver.current
         val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
         val mapView = remember { TextureMapView(context).apply { onCreate(null) } }
         val hazeState = remember { HazeState() }
@@ -719,52 +721,27 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                                                                                 traceColorInt
                                                                                                 )
 
-                                                                                        val typefaceId =
-                                                                                                when (uiState.artFontName
-                                                                                                ) {
-                                                                                                        "MaShanZheng" ->
-                                                                                                                com.footprint
-                                                                                                                        .R
-                                                                                                                        .font
-                                                                                                                        .ma_shan_zheng
-                                                                                                        "ZhiMangXing" ->
-                                                                                                                com.footprint
-                                                                                                                        .R
-                                                                                                                        .font
-                                                                                                                        .zhi_mang_xing
-                                                                                                        "LongCang" ->
-                                                                                                                com.footprint
-                                                                                                                        .R
-                                                                                                                        .font
-                                                                                                                        .long_cang
-                                                                                                        "LiuJianMaoCao" ->
-                                                                                                                com.footprint
-                                                                                                                        .R
-                                                                                                                        .font
-                                                                                                                        .liu_jian_mao_cao
-                                                                                                        "ZCOOLXiaoWei" ->
-                                                                                                                com.footprint
-                                                                                                                        .R
-                                                                                                                        .font
-                                                                                                                        .zcool_xiao_wei
-                                                                                                        else ->
-                                                                                                                null
-                                                                                                }
-                                                                                        val customTypeface =
-                                                                                                typefaceId
-                                                                                                        ?.let {
-                                                                                                                androidx.core
-                                                                                                                        .content
-                                                                                                                        .res
-                                                                                                                        .ResourcesCompat
-                                                                                                                        .getFont(
-                                                                                                                                context,
-                                                                                                                                it
-                                                                                                                        )
-                                                                                                        }
-                                                                                                        ?: android.graphics
-                                                                                                                .Typeface
-                                                                                                                .DEFAULT
+                                                                                         val fontFamily =
+                                                                                                 if (uiState.artFontName == "Default") FontFamily.Default
+                                                                                                 else if (uiState.artFontName == "Serif") FontFamily.Serif
+                                                                                                 else if (uiState.artFontName == "Monospace") FontFamily.Monospace
+                                                                                                 else if (uiState.artFontName == "Cursive") FontFamily.Cursive
+                                                                                                 else {
+                                                                                                     val resId = when (uiState.artFontName) {
+                                                                                                         "MaShanZheng" -> com.footprint.R.font.ma_shan_zheng
+                                                                                                         "ZhiMangXing" -> com.footprint.R.font.zhi_mang_xing
+                                                                                                         "LongCang" -> com.footprint.R.font.long_cang
+                                                                                                         "LiuJianMaoCao" -> com.footprint.R.font.liu_jian_mao_cao
+                                                                                                         "ZCOOLXiaoWei" -> com.footprint.R.font.zcool_xiao_wei
+                                                                                                         else -> null
+                                                                                                     }
+                                                                                                     if (resId != null) FontFamily(Font(resId)) else FontFamily.Default                                                                                                 }
+
+                                                                                         val customTypeface = try {
+                                                                                             resolver.resolve(fontFamily).value as android.graphics.Typeface
+                                                                                         } catch (e: Exception) {
+                                                                                             android.graphics.Typeface.DEFAULT
+                                                                                         }
 
                                                                                         val finalTypeface =
                                                                                                 if (uiState.artTextItalic
@@ -1206,48 +1183,25 @@ fun ArtLayoutOverlay(
 ) {
         val fontFamily =
                 remember(artFont) {
-                        when (artFont) {
-                                "Serif" -> androidx.compose.ui.text.font.FontFamily.Serif
-                                "Monospace" -> androidx.compose.ui.text.font.FontFamily.Monospace
-                                "Cursive" -> androidx.compose.ui.text.font.FontFamily.Cursive
-                                "MaShanZheng" ->
-                                        androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.font.Font(
-                                                        com.footprint.R.font.ma_shan_zheng,
-                                                        FontWeight.Normal
-                                                )
-                                        )
-                                "ZhiMangXing" ->
-                                        androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.font.Font(
-                                                        com.footprint.R.font.zhi_mang_xing,
-                                                        FontWeight.Normal
-                                                )
-                                        )
-                                "LongCang" ->
-                                        androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.font.Font(
-                                                        com.footprint.R.font.long_cang,
-                                                        FontWeight.Normal
-                                                )
-                                        )
-                                "LiuJianMaoCao" ->
-                                        androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.font.Font(
-                                                        com.footprint.R.font.liu_jian_mao_cao,
-                                                        FontWeight.Normal
-                                                )
-                                        )
-                                "ZCOOLXiaoWei" ->
-                                        androidx.compose.ui.text.font.FontFamily(
-                                                androidx.compose.ui.text.font.Font(
-                                                        com.footprint.R.font.zcool_xiao_wei,
-                                                        FontWeight.Normal
-                                                )
-                                        )
-                                else -> androidx.compose.ui.text.font.FontFamily.Default
-                        }
-                }
+                        if (artFont == "Default") androidx.compose.ui.text.font.FontFamily.Default
+                        else if (artFont == "Serif") androidx.compose.ui.text.font.FontFamily.Serif
+                        else if (artFont == "Monospace") androidx.compose.ui.text.font.FontFamily.Monospace
+                        else if (artFont == "Cursive") androidx.compose.ui.text.font.FontFamily.Cursive
+                        else {
+                            val resId = when (artFont) {
+                                "MaShanZheng" -> com.footprint.R.font.ma_shan_zheng
+                                "ZhiMangXing" -> com.footprint.R.font.zhi_mang_xing
+                                "LongCang" -> com.footprint.R.font.long_cang
+                                "LiuJianMaoCao" -> com.footprint.R.font.liu_jian_mao_cao
+                                "ZCOOLXiaoWei" -> com.footprint.R.font.zcool_xiao_wei
+                                else -> null
+                            }
+                            if (resId != null) {
+                                androidx.compose.ui.text.font.FontFamily(Font(resId))
+                            } else {
+                                androidx.compose.ui.text.font.FontFamily.Default
+                            }
+                        }                }
 
         val themeContentColor =
                 when (polaroidFrameStyle) {
