@@ -16,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -675,35 +673,13 @@ fun ArtStyleControls(
                                                         "ZCOOLXiaoWei"
                                                 )
                                         val f = fonts[index]
+                                        val context =
+                                                androidx.compose.ui.platform.LocalContext.current
                                         val fontFamily =
-                                                androidx.compose.runtime.remember(f) {
-                                                        when (f) {
-                                                                "Serif" ->
-                                                                        androidx.compose.ui.text
-                                                                                .font.FontFamily
-                                                                                .Serif
-                                                                "Monospace" ->
-                                                                        androidx.compose.ui.text
-                                                                                .font.FontFamily
-                                                                                .Monospace
-                                                                "Cursive" ->
-                                                                        androidx.compose.ui.text
-                                                                                .font.FontFamily
-                                                                                .Cursive
-                                                                "MaShanZheng" ->
-                                                                        FontFamily(Font(com.footprint.R.font.ma_shan_zheng))
-                                                                "ZhiMangXing" ->
-                                                                        FontFamily(Font(com.footprint.R.font.zhi_mang_xing))
-                                                                "LongCang" ->
-                                                                        FontFamily(Font(com.footprint.R.font.long_cang))
-                                                                "LiuJianMaoCao" ->
-                                                                        FontFamily(Font(com.footprint.R.font.liu_jian_mao_cao))
-                                                                "ZCOOLXiaoWei" ->
-                                                                        FontFamily(Font(com.footprint.R.font.zcool_xiao_wei))
-                                                                else ->
-                                                                        FontFamily.Default
-                                                        }
-                                                }
+                                                com.footprint.utils.FontManager.getFontFamily(
+                                                        context,
+                                                        f
+                                                )
                                         FilterChip(
                                                 selected = fontName == f,
                                                 onClick = { onFontNameChange(f) },

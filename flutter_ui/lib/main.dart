@@ -135,15 +135,50 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   Future<void> _pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final List<XFile> images = await picker.pickMultiImage();
+      // 使用 try-catch 捕获可能的平台异常
+      final List<XFile> images = await picker.pickMultiImage(
+        imageQuality: 85, // 稍微压缩以提高兼容性和性能
+      );
       debugPrint("Picked ${images.length} images");
       if (images.isNotEmpty) {
-        setState(() => photos.addAll(images.map((img) => File(img.path))));
+        // 过滤掉无效路径
+        final List<File> validFiles = [];
+        for (var img in images) {
+          final file = File(img.path);
+          if (await file.exists()) {
+            validFiles.add(file);
+          }
+        }
+        setState(() => photos.addAll(validFiles));
       } else {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("未选择照片")));
       }
+    } on PlatformException catch (e) {
+      debugPrint("Platform Error picking image: ${e.code}, ${e.message}");
+      String errorMsg = "选取照片出错: ${e.message ?? e.code}";
+      if (e.code == "missing_valid_image_uri") {
+        errorMsg = "无法读取部分照片（可能是由于未下载的云端照片），请尝试先在相册中打开该照片或逐张选取。";
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg), 
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: "重试(单张)",
+              onPressed: () async {
+                final picker = ImagePicker();
+                final image = await picker.pickImage(source: ImageSource.gallery);
+                if (image != null) {
+                  setState(() => photos.add(File(image.path)));
+                }
+              },
+            ),
+          )
+        );
+      }
     } catch (e) {
-      debugPrint("Error picking image: $e");
+      debugPrint("General Error picking image: $e");
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("选取照片出错: $e")));
     }
   }
@@ -205,7 +240,20 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
                     FocusScope.of(context).unfocus();
                     Result? result = await CityPickers.showCityPicker(
                        context: context,
-                       theme: Theme.of(context).brightness == Brightness.dark ? ThemeData.dark() : ThemeData.light(),
+                       itemExtent: 45, // 增大滑动列表的行高，让文字清晰
+                           theme: ThemeData(
+                               brightness: Theme.of(context).brightness,
+                               primaryColor: cs.primary,
+                               colorScheme: Theme.of(context).brightness == Brightness.dark 
+                                  ? ColorScheme.dark(primary: cs.primary, onPrimary: Colors.white, surface: const Color(0xFF121212))
+                                  : ColorScheme.light(primary: cs.primary, onPrimary: Colors.white),
+                               textButtonTheme: TextButtonThemeData(
+                                 style: TextButton.styleFrom(
+                                   foregroundColor: cs.primary, 
+                                   textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                                 )
+                               ),
+                            ),
                     );
                     if (result != null) {
                       setState(() {
@@ -220,11 +268,19 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
                       prefixIcon: const Icon(Icons.map_outlined),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(
-                      _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 24),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                            overflow: TextOverflow.visible,
+                          ),
+                          maxLines: 2, // 允许换行，避免字体过小
+                        ),
                       ),
                     ),
                   ),
@@ -544,7 +600,20 @@ class _AddGoalPageState extends State<AddGoalPage> {
                     FocusScope.of(context).unfocus();
                     Result? result = await CityPickers.showCityPicker(
                        context: context,
-                       theme: Theme.of(context).brightness == Brightness.dark ? ThemeData.dark() : ThemeData.light(),
+                       itemExtent: 45, // 增大滑动列表的行高，让文字清晰
+                           theme: ThemeData(
+                               brightness: Theme.of(context).brightness,
+                               primaryColor: cs.primary,
+                               colorScheme: Theme.of(context).brightness == Brightness.dark 
+                                  ? ColorScheme.dark(primary: cs.primary, onPrimary: Colors.white, surface: const Color(0xFF121212))
+                                  : ColorScheme.light(primary: cs.primary, onPrimary: Colors.white),
+                               textButtonTheme: TextButtonThemeData(
+                                 style: TextButton.styleFrom(
+                                   foregroundColor: cs.primary, 
+                                   textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                                 )
+                               ),
+                            ),
                     );
                     if (result != null) {
                       setState(() {
@@ -559,11 +628,19 @@ class _AddGoalPageState extends State<AddGoalPage> {
                       prefixIcon: const Icon(Icons.map_outlined),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(
-                      _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 24),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                            overflow: TextOverflow.visible,
+                          ),
+                          maxLines: 2, // 允许换行，避免字体过小且不一致
+                        ),
                       ),
                     ),
                   ),

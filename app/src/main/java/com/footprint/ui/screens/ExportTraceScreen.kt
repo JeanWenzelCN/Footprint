@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.compose.ui.res.painterResource
+import com.footprint.R
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -211,7 +211,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
             ) {
                 Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
+                        painterResource(R.drawable.ic_arrow_back),
                         contentDescription = "Back",
                         tint = MaterialTheme.colorScheme.onSurface
                 )

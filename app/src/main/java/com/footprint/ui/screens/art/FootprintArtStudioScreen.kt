@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +26,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +42,7 @@ import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
 import com.footprint.FootprintViewModel
+import com.footprint.R
 import com.footprint.utils.HolographicExportUtils
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
@@ -721,27 +722,26 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                                                                                 traceColorInt
                                                                                                 )
 
-                                                                                         val fontFamily =
-                                                                                                 if (uiState.artFontName == "Default") FontFamily.Default
-                                                                                                 else if (uiState.artFontName == "Serif") FontFamily.Serif
-                                                                                                 else if (uiState.artFontName == "Monospace") FontFamily.Monospace
-                                                                                                 else if (uiState.artFontName == "Cursive") FontFamily.Cursive
-                                                                                                 else {
-                                                                                                     val resId = when (uiState.artFontName) {
-                                                                                                         "MaShanZheng" -> com.footprint.R.font.ma_shan_zheng
-                                                                                                         "ZhiMangXing" -> com.footprint.R.font.zhi_mang_xing
-                                                                                                         "LongCang" -> com.footprint.R.font.long_cang
-                                                                                                         "LiuJianMaoCao" -> com.footprint.R.font.liu_jian_mao_cao
-                                                                                                         "ZCOOLXiaoWei" -> com.footprint.R.font.zcool_xiao_wei
-                                                                                                         else -> null
-                                                                                                     }
-                                                                                                     if (resId != null) FontFamily(Font(resId)) else FontFamily.Default                                                                                                 }
+                                                                                        val fontFamily =
+                                                                                                com.footprint.utils.FontManager.getFontFamily(
+                                                                                                        context,
+                                                                                                        uiState.artFontName
+                                                                                                )
 
-                                                                                         val customTypeface = try {
-                                                                                             resolver.resolve(fontFamily).value as android.graphics.Typeface
-                                                                                         } catch (e: Exception) {
-                                                                                             android.graphics.Typeface.DEFAULT
-                                                                                         }
+                                                                                        val customTypeface =
+                                                                                                try {
+                                                                                                        resolver.resolve(
+                                                                                                                        fontFamily
+                                                                                                                )
+                                                                                                                .value as
+                                                                                                                android.graphics.Typeface
+                                                                                                } catch (
+                                                                                                        e:
+                                                                                                                Exception) {
+                                                                                                        android.graphics
+                                                                                                                .Typeface
+                                                                                                                .DEFAULT
+                                                                                                }
 
                                                                                         val finalTypeface =
                                                                                                 if (uiState.artTextItalic
@@ -905,7 +905,11 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         contentColor = Color.Black
                                                 ) {
                                                         Icon(
-                                                                Icons.Default.Download,
+                                                                painter =
+                                                                        painterResource(
+                                                                                R.drawable
+                                                                                        .ic_download
+                                                                        ),
                                                                 contentDescription = null
                                                         )
                                                         Spacer(Modifier.width(8.dp))
@@ -1068,8 +1072,7 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                         contentColor = selectedColor
                                                 ) {
                                                         Icon(
-                                                                com.footprint.ui.screens.art
-                                                                        .ArtIcons.Holographic,
+                                                                painter = painterResource(R.drawable.ic_auto_awesome),
                                                                 contentDescription = null
                                                         )
                                                         Spacer(Modifier.width(8.dp))
@@ -1181,27 +1184,8 @@ fun ArtLayoutOverlay(
         userNickname: String = "旅行者",
         hazeState: HazeState? = null
 ) {
-        val fontFamily =
-                remember(artFont) {
-                        if (artFont == "Default") androidx.compose.ui.text.font.FontFamily.Default
-                        else if (artFont == "Serif") androidx.compose.ui.text.font.FontFamily.Serif
-                        else if (artFont == "Monospace") androidx.compose.ui.text.font.FontFamily.Monospace
-                        else if (artFont == "Cursive") androidx.compose.ui.text.font.FontFamily.Cursive
-                        else {
-                            val resId = when (artFont) {
-                                "MaShanZheng" -> com.footprint.R.font.ma_shan_zheng
-                                "ZhiMangXing" -> com.footprint.R.font.zhi_mang_xing
-                                "LongCang" -> com.footprint.R.font.long_cang
-                                "LiuJianMaoCao" -> com.footprint.R.font.liu_jian_mao_cao
-                                "ZCOOLXiaoWei" -> com.footprint.R.font.zcool_xiao_wei
-                                else -> null
-                            }
-                            if (resId != null) {
-                                androidx.compose.ui.text.font.FontFamily(Font(resId))
-                            } else {
-                                androidx.compose.ui.text.font.FontFamily.Default
-                            }
-                        }                }
+        val context = LocalContext.current
+        val fontFamily = com.footprint.utils.FontManager.getFontFamily(context, artFont)
 
         val themeContentColor =
                 when (polaroidFrameStyle) {

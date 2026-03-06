@@ -57,9 +57,10 @@ android {
             }
         }
         debug {
-            // 移除后缀，确保包名与高德后台配置 ("com.footprint") 一致
-            // applicationIdSuffix = ".debug"
-            // versionNameSuffix = "-debug"
+            ndk {
+                abiFilters.clear()
+                abiFilters.add("arm64-v8a")
+            }
         }
     }
 
@@ -88,6 +89,7 @@ android {
             excludes += "**/target/**"
         }
         jniLibs {
+            useLegacyPackaging = true
             excludes += "**/libVkLayer_khronos_validation.so"
             excludes += "**/libflutter.so.debug"
         }
@@ -117,7 +119,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.foundation:foundation-layout")
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.ui:ui-tooling-preview")

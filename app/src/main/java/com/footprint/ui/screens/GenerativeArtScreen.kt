@@ -7,10 +7,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
+import androidx.compose.ui.res.painterResource
+import com.footprint.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +46,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                                 title = { Text("足迹生成艺术", fontWeight = FontWeight.Bold) },
                                 navigationIcon = {
                                         IconButton(onClick = onBack) {
-                                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                                                Icon(painterResource(R.drawable.ic_arrow_back), "Back")
                                         }
                                 },
                                 colors =
@@ -149,7 +148,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                                                                                 .primary
                                                         )
                                         ) {
-                                                Icon(Icons.Default.Share, null)
+                                                Icon(painterResource(R.drawable.ic_share), null)
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text("导出并分享")
                                         }
