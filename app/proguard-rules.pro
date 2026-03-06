@@ -69,6 +69,10 @@
 # --- 12. image_picker Flutter plugin ---
 -keep class io.flutter.plugins.imagepicker.** { *; }
 -dontwarn io.flutter.plugins.imagepicker.**
+# Additionally keep AndroidX FileProvider and related classes for URI handling
+-keep class androidx.core.content.FileProvider { *; }
+-keep class androidx.core.content.ContextCompat { *; }
+-keep class android.support.v4.content.FileProvider { *; }
 
 # --- 13. Prevent stripping of native methods ---
 -keepclasseswithmembernames class * {
