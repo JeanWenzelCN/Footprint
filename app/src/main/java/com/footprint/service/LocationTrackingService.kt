@@ -59,7 +59,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
         val totalDistance: StateFlow<Float> = _totalDistanceTraveled.asStateFlow()
 
         private var _sessionStartTime: Long = 0
-        val sessionStartTime: Long get() = _sessionStartTime
+        val sessionStartTime: Long
+            get() = _sessionStartTime
 
         private var _lastLocation: AMapLocation? = null
 
@@ -98,7 +99,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         repository = (application as com.footprint.FootprintApplication).repository
         notificationManager = getSystemService(NotificationManager::class.java)
         createNotificationChannel()
-        
+
         // Recover persistent state if needed
         val prefs = getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
         if (prefs.getBoolean("is_tracking", false)) {
@@ -163,13 +164,14 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 _lastLocation = null
                 _sessionStartTime = System.currentTimeMillis()
                 _sharedTrackingPath.value = emptyList() // Reset path for new session
-                
+
                 // Persist start state
-                getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE).edit()
-                    .putBoolean("is_tracking", true)
-                    .putFloat("total_distance", 0.0f)
-                    .putLong("session_start", _sessionStartTime)
-                    .apply()
+                getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("is_tracking", true)
+                        .putFloat("total_distance", 0.0f)
+                        .putLong("session_start", _sessionStartTime)
+                        .apply()
 
                 resumeTrackingFlow()
                 Log.d("FootprintLoc", "定位服务已启动, Session start: $_sessionStartTime")
@@ -179,11 +181,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 locationClient?.stopLocation()
                 _sharedIsTracking.value = false
                 _notificationUpdateJob?.cancel()
-                
+
                 // Clear persistence
-                getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE).edit()
-                    .putBoolean("is_tracking", false)
-                    .apply()
+                getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("is_tracking", false)
+                        .apply()
 
                 // Release WakeLock
                 if (wakeLock?.isHeld == true) {
@@ -237,12 +240,17 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 } else {
                                     isValidPoint = true
                                     _totalDistanceTraveled.value += distance.toFloat()
-                                    
-                                    // Update persistence every 10 meters to avoid overkill but keep current
+
+                                    // Update persistence every 10 meters to avoid overkill but keep
+                                    // current
                                     if (_totalDistanceTraveled.value % 10 < 1.0) {
-                                        getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE).edit()
-                                            .putFloat("total_distance", _totalDistanceTraveled.value)
-                                            .apply()
+                                        getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                                                .edit()
+                                                .putFloat(
+                                                        "total_distance",
+                                                        _totalDistanceTraveled.value
+                                                )
+                                                .apply()
                                     }
                                 }
                             }
@@ -394,8 +402,10 @@ class LocationTrackingService : Service(), AMapLocationListener {
         }
 
         // Start Foreground
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) ==
-                        PackageManager.PERMISSION_GRANTED
+        if (ActivityCompat.checkSelfPermission(
+                        this,
+                        android.Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
         ) {
             val notification = buildNotification(_totalDistanceTraveled.value.toInt(), 0f, "")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -571,6 +581,6 @@ fun AMapLocation.toAddressString(): String {
     } else if (!this.poiName.isNullOrEmpty()) {
         this.poiName
     } else {
-        "(${this.latitude}, ${this.longitude})"
+        String.format("%.3f, %.3f", this.latitude, this.longitude)
     }
 }

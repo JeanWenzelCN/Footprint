@@ -1382,7 +1382,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                              return ListTile(
                                leading: Icon(Icons.location_on, color: cs.primary),
                                title: Text(eDate),
-                               subtitle: Text(entry['location'] ?? '未知地点', maxLines: 2, overflow: TextOverflow.ellipsis),
+                               subtitle: Builder(builder: (context) {
+                                 String loc = entry['location'] ?? '未知地点';
+                                 final coordRegex = RegExp(r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
+                                 final match = coordRegex.firstMatch(loc);
+                                 if (match != null) {
+                                   try {
+                                     double lat = double.parse(match.group(1)!);
+                                     double lng = double.parse(match.group(2)!);
+                                     loc = "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
+                                   } catch (_) {}
+                                 }
+                                 return Text(loc, maxLines: 2, overflow: TextOverflow.ellipsis);
+                               }),
                                onTap: () { Navigator.pop(context); _showDetail(entry); },
                              );
                            case 'energy':
@@ -1834,7 +1846,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Icon(Icons.place, color: cs.primary, size: 20),
                         ),
                         title: Text(e['title'] ?? '未知记录', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(e['location'] ?? ''),
+                        subtitle: Builder(builder: (context) {
+                          String loc = e['location'] ?? '';
+                          final coordRegex = RegExp(r'(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)');
+                          final match = coordRegex.firstMatch(loc);
+                          if (match != null) {
+                            try {
+                              double lat = double.parse(match.group(1)!);
+                              double lng = double.parse(match.group(2)!);
+                              loc = "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
+                            } catch (_) {}
+                          }
+                          return Text(loc);
+                        }),
                         trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                         onTap: () {
                            FocusScope.of(context).unfocus();

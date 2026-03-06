@@ -263,7 +263,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                         _statDrop("里程", "${distance.toStringAsFixed(1)} KM", Icons.directions_walk, cs, tt),
                         _statDrop("能量", "$energy", Icons.bolt, cs, tt),
                         if (entry['latitude'] != null && entry['longitude'] != null)
-                          _statDrop("坐标", "${(entry['latitude'] as num).toDouble().toStringAsFixed(2)}, ${(entry['longitude'] as num).toDouble().toStringAsFixed(2)}", Icons.location_on, cs, tt)
+                          _statDrop("坐标", "${(entry['latitude'] as num).toDouble().toStringAsFixed(3)}, ${(entry['longitude'] as num).toDouble().toStringAsFixed(3)}", Icons.location_on, cs, tt)
                         else
                           _statDrop("天气", _mapWeatherToChinese(weather), Icons.wb_sunny, cs, tt),
                         _statDrop("心情", mood, Icons.mood, cs, tt),
