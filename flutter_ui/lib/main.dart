@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:amap_flutter_location/amap_flutter_location.dart';
@@ -15,6 +16,7 @@ import 'package:city_pickers/city_pickers.dart';
 import 'footprint_detail_page.dart';
 import 'goal_planner_page.dart';
 import 'badge_hall_screen.dart';
+import 'package:flutter/foundation.dart';
 
 Widget buildAvatar(String avatarId, {double radius = 24, Color? bgColor, Color? fgColor}) {
   if (avatarId.contains('/') || avatarId.contains('\\')) {
@@ -57,6 +59,7 @@ class AddFootprintPage extends StatefulWidget {
 class _AddFootprintPageState extends State<AddFootprintPage> {
   late TextEditingController _titleController;
   late TextEditingController _detailedLocationController;
+
   String _selectedRegion = "";
   late TextEditingController _detailController;
   late TextEditingController _distanceController;
@@ -133,70 +136,56 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    
-    Future<void> handleImageResult(List<XFile> images) async {
-      if (images.isNotEmpty) {
-        final List<File> validFiles = [];
-        for (var img in images) {
-          final file = File(img.path);
-          if (await file.exists()) {
-            validFiles.add(file);
-          }
-        }
-        if (mounted) setState(() => photos.addAll(validFiles));
-      } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("未选择照片")));
-      }
-    }
-
     try {
-      // 尝试使用多选模式，移除所有质量压缩，直接获取系统原始文件路径
-      final List<XFile> images = await picker.pickMultiImage();
-      debugPrint("Picked ${images.length} images from multi-picker");
-      await handleImageResult(images);
-    } on PlatformException catch (e) {
-      debugPrint("Platform Error in multi-pick: ${e.code}, ${e.message}");
-      String errorMsg = "系统无法直接读取所选照片。";
+      // 对于现代 Android (API 33+)，file_picker 使用系统选择器 (SAF/Photo Picker)
+      // 这些选择器由系统权限托管，应用不需要申请 READ_EXTERNAL_STORAGE 或 READ_MEDIA_IMAGES
+      // 只有在极少数需要直接访问非缓存文件的场景下才需要权限
       
-      // 如果报错是关于 URI 或权限的，提供重试机会
-      if (e.code == "missing_valid_image_uri" || e.code == "no_valid_image_uri") {
-        errorMsg = "系统无法读取照片（可能是云专区照片尚未同步），请尝试单张选取或稍后再试。";
-      }
-
+      // 给用户一个已经开始的操作反馈
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg), 
-            duration: const Duration(seconds: 4),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            action: SnackBarAction(
-              label: "重试(单张)",
-              textColor: Colors.white,
-              onPressed: () async {
-                try {
-                  // 强制指定来源为 Gallery
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.gallery,
-                  );
-                  if (image != null) {
-                    await handleImageResult([image]);
-                  }
-                } catch (pe) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("单张重试失败，请确保照片已下载至本地。"))
-                    );
-                  }
-                }
-              },
-            ),
-          )
+          const SnackBar(content: Text("正在打开系统相册..."), duration: Duration(milliseconds: 500))
         );
       }
+
+      // 使用 file_picker 替代 image_picker 以获得更好的稳定性
+      // file_picker 10.x+ 在 Android 上默认使用系统原生选择器
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: true,
+      );
+      
+      if (result != null && result.paths.isNotEmpty) {
+        final List<File> validFiles = [];
+        for (String? path in result.paths) {
+          if (path != null) {
+            final file = File(path);
+            if (await file.exists()) {
+              validFiles.add(file);
+            } else {
+               debugPrint("Picked file no longer exists or inaccessible: $path");
+            }
+          }
+        }
+        if (mounted) {
+          if (validFiles.isNotEmpty) {
+            setState(() => photos.addAll(validFiles));
+          } else {
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("无法读取选中的照片文件")));
+          }
+        }
+      }
     } catch (e) {
-      debugPrint("General Error picking image: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作异常: $e")));
+      debugPrint("Photo Picker Error: $e");
+      String errorMsg = e.toString();
+      if (errorMsg.contains("missing_valid_image_uri")) {
+        errorMsg = "系统无法找到选定的图片，请尝试从本地相册选取而非云端同步图片。";
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("读取照片失败: $errorMsg"))
+        );
+      }
     }
   }
 
@@ -248,64 +237,62 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    FocusScope.of(context).unfocus();
-                    Result? result = await CityPickers.showCityPicker(
-                       context: context,
-                       itemExtent: 45, // 增大滑动列表的行高，让文字清晰
-                           theme: ThemeData(
-                               brightness: Theme.of(context).brightness,
-                               primaryColor: cs.primary,
-                               colorScheme: Theme.of(context).brightness == Brightness.dark 
-                                  ? ColorScheme.dark(primary: cs.primary, onPrimary: Colors.white, surface: const Color(0xFF121212))
-                                  : ColorScheme.light(primary: cs.primary, onPrimary: Colors.white),
-                               textButtonTheme: TextButtonThemeData(
-                                 style: TextButton.styleFrom(
-                                   foregroundColor: cs.primary, 
-                                   textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                                 )
-                               ),
-                            ),
-                    );
-                    if (result != null) {
-                      setState(() {
-                         _selectedRegion = "${result.provinceName ?? ''} ${result.cityName ?? ''} ${result.areaName ?? ''}".trim();
-                      });
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: '省/市/区',
-                      prefixIcon: const Icon(Icons.map_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 24),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
-                            overflow: TextOverflow.visible,
-                          ),
-                          maxLines: 2, // 允许换行，避免字体过小
-                        ),
+          // --- 省市区选择框 ---
+          InkWell(
+            onTap: () async {
+              FocusScope.of(context).unfocus();
+              Result? result = await CityPickers.showCityPicker(
+                 context: context,
+                 itemExtent: 45,
+                     theme: ThemeData(
+                         brightness: Theme.of(context).brightness,
+                         primaryColor: cs.primary,
+                         colorScheme: Theme.of(context).brightness == Brightness.dark 
+                            ? ColorScheme.dark(primary: cs.primary, onPrimary: Colors.white, surface: const Color(0xFF121212))
+                            : ColorScheme.light(primary: cs.primary, onPrimary: Colors.white),
+                         textButtonTheme: TextButtonThemeData(
+                           style: TextButton.styleFrom(
+                             foregroundColor: cs.primary, 
+                             textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                           )
+                         ),
                       ),
-                    ),
-                  ),
-                ),
+              );
+              if (result != null) {
+                final region = "${result.provinceName ?? ''} ${result.cityName ?? ''} ${result.areaName ?? ''}".trim();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("已确认地点: $region"),
+                      duration: const Duration(seconds: 2),
+                    )
+                  );
+                }
+                setState(() {
+                   _selectedRegion = region;
+                });
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: '地点/行政区划',
+                prefixIcon: const Icon(Icons.map_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-            ],
+              child: Text(
+                _selectedRegion.isEmpty ? "点击选择省/市/区" : _selectedRegion,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                maxLines: 2,
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          // --- 详细目的地输入框 ---
           TextField(
              controller: _detailedLocationController,
              decoration: InputDecoration(
@@ -609,63 +596,63 @@ class _AddGoalPageState extends State<AddGoalPage> {
           ),
           const SizedBox(height: 16),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    FocusScope.of(context).unfocus();
-                    Result? result = await CityPickers.showCityPicker(
-                       context: context,
-                       itemExtent: 45, // 增大滑动列表的行高，让文字清晰
-                           theme: ThemeData(
-                               brightness: Theme.of(context).brightness,
-                               primaryColor: cs.primary,
-                               colorScheme: Theme.of(context).brightness == Brightness.dark 
-                                  ? ColorScheme.dark(primary: cs.primary, onPrimary: Colors.white, surface: const Color(0xFF121212))
-                                  : ColorScheme.light(primary: cs.primary, onPrimary: Colors.white),
-                               textButtonTheme: TextButtonThemeData(
-                                 style: TextButton.styleFrom(
-                                   foregroundColor: cs.primary, 
-                                   textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                                 )
-                               ),
-                            ),
-                    );
-                    if (result != null) {
-                      setState(() {
-                         _selectedRegion = "${result.provinceName ?? ''} ${result.cityName ?? ''} ${result.areaName ?? ''}".trim();
-                      });
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: '省/市/区',
-                      prefixIcon: const Icon(Icons.map_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 24),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          _selectedRegion.isEmpty ? "点击选择" : _selectedRegion,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
-                            overflow: TextOverflow.visible,
-                          ),
-                          maxLines: 2, // 允许换行，避免字体过小且不一致
-                        ),
+          const SizedBox(height: 16),
+          // --- 省市区选择框 ---
+          InkWell(
+            onTap: () async {
+              FocusScope.of(context).unfocus();
+              Result? result = await CityPickers.showCityPicker(
+                 context: context,
+                 itemExtent: 45,
+                     theme: ThemeData(
+                         brightness: Theme.of(context).brightness,
+                         primaryColor: cs.primary,
+                         colorScheme: Theme.of(context).brightness == Brightness.dark 
+                            ? ColorScheme.dark(primary: cs.primary, onPrimary: Colors.white, surface: const Color(0xFF121212))
+                            : ColorScheme.light(primary: cs.primary, onPrimary: Colors.white),
+                         textButtonTheme: TextButtonThemeData(
+                           style: TextButton.styleFrom(
+                             foregroundColor: cs.primary, 
+                             textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                           )
+                         ),
                       ),
-                    ),
-                  ),
-                ),
+              );
+              if (result != null) {
+                final region = "${result.provinceName ?? ''} ${result.cityName ?? ''} ${result.areaName ?? ''}".trim();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("已确认地点: $region"),
+                      duration: const Duration(seconds: 2),
+                    )
+                  );
+                }
+                setState(() {
+                   _selectedRegion = region;
+                });
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: '地点/行政区划',
+                prefixIcon: const Icon(Icons.map_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-            ],
+              child: Text(
+                _selectedRegion.isEmpty ? "点击选择省/市/区" : _selectedRegion,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _selectedRegion.isEmpty ? cs.outline : cs.onSurface,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                maxLines: 2,
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          // --- 详细目的地输入框 ---
           TextField(
              controller: _detailedLocationController,
              decoration: InputDecoration(
@@ -2439,7 +2426,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
               const Center(
                 child: Text(
-                  "Footprint v3.5.3",
+                  "Footprint v3.5.7\n记录足迹，遇见更好的自己。",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ),
@@ -3324,10 +3311,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 OutlinedButton.icon(
                   onPressed: () async {
-                    final picker = ImagePicker();
-                    final file = await picker.pickImage(source: ImageSource.gallery);
-                    if (file != null) {
-                      _up('updateAvatar', file.path);
+                    try {
+                      final picker = ImagePicker();
+                      final file = await picker.pickImage(source: ImageSource.gallery);
+                      if (file != null) {
+                        _up('updateAvatar', file.path);
+                      }
+                    } catch (e) {
+                      debugPrint("Avatar Picker Error: $e");
+                      String errorMsg = e.toString();
+                      if (errorMsg.contains("missing_valid_image_uri")) {
+                        errorMsg = "系统无法找到选定的图片，请尝试从本地相册选取而非云端同步图片。";
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("上传头像失败: $errorMsg"))
+                        );
+                      }
                     }
                   },
                   icon: const Icon(Icons.upload),
