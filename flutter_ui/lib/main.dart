@@ -151,17 +151,17 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
     }
 
     try {
-      // 尝试使用多选模式，移除 imageQuality 以减少由于云端照片未下载导致的读取/压缩失败
+      // 尝试使用多选模式，移除所有质量压缩，直接获取系统原始文件路径
       final List<XFile> images = await picker.pickMultiImage();
-      debugPrint("Picked ${images.length} images");
+      debugPrint("Picked ${images.length} images from multi-picker");
       await handleImageResult(images);
     } on PlatformException catch (e) {
-      debugPrint("Platform Error picking image: ${e.code}, ${e.message}");
-      String errorMsg = "选取照片出错: ${e.message ?? e.code}";
+      debugPrint("Platform Error in multi-pick: ${e.code}, ${e.message}");
+      String errorMsg = "系统无法直接读取所选照片。";
       
-      // 如果报错是关于 URI 的，尝试回退到单选模式或提示
-      if (e.code == "missing_valid_image_uri") {
-        errorMsg = "系统无法读取该照片（可能是云端照片且未下载），请尝试逐张选取。";
+      // 如果报错是关于 URI 或权限的，提供重试机会
+      if (e.code == "missing_valid_image_uri" || e.code == "no_valid_image_uri") {
+        errorMsg = "系统无法读取照片（可能是云专区照片尚未同步），请尝试单张选取或稍后再试。";
       }
 
       if (mounted) {
@@ -169,14 +169,25 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
           SnackBar(
             content: Text(errorMsg), 
             duration: const Duration(seconds: 4),
+            backgroundColor: Theme.of(context).colorScheme.error,
             action: SnackBarAction(
-              label: "单张尝试",
+              label: "重试(单张)",
+              textColor: Colors.white,
               onPressed: () async {
                 try {
-                  final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-                  if (image != null) await handleImageResult([image]);
+                  // 强制指定来源为 Gallery
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.gallery,
+                  );
+                  if (image != null) {
+                    await handleImageResult([image]);
+                  }
                 } catch (pe) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("重试也失败了: $pe")));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("单张重试失败，请确保照片已下载至本地。"))
+                    );
+                  }
                 }
               },
             ),
