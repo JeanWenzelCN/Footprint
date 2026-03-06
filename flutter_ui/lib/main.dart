@@ -151,11 +151,8 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
     }
 
     try {
-      // 尝试使用多选模式，移除 imageQuality 以减少压缩导致的 URI 读取失败
-      // 启用 usePhotoPicker 使用系统原生的照片选择器，通常更稳定
-      final List<XFile> images = await picker.pickMultiImage(
-        usePhotoPicker: true,
-      );
+      // 尝试使用多选模式，移除 imageQuality 以减少由于云端照片未下载导致的读取/压缩失败
+      final List<XFile> images = await picker.pickMultiImage();
       debugPrint("Picked ${images.length} images");
       await handleImageResult(images);
     } on PlatformException catch (e) {
@@ -176,10 +173,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
               label: "单张尝试",
               onPressed: () async {
                 try {
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.gallery,
-                    usePhotoPicker: true,
-                  );
+                  final XFile? image = await picker.pickImage(source: ImageSource.gallery);
                   if (image != null) await handleImageResult([image]);
                 } catch (pe) {
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("重试也失败了: $pe")));
