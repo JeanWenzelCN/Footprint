@@ -133,15 +133,10 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   }
 
   Future<void> _pickImage() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      // 使用 try-catch 捕获可能的平台异常
-      final List<XFile> images = await picker.pickMultiImage(
-        imageQuality: 85, // 稍微压缩以提高兼容性和性能
-      );
-      debugPrint("Picked ${images.length} images");
+    final ImagePicker picker = ImagePicker();
+    
+    Future<void> handleImageResult(List<XFile> images) async {
       if (images.isNotEmpty) {
-        // 过滤掉无效路径
         final List<File> validFiles = [];
         for (var img in images) {
           final file = File(img.path);
@@ -149,28 +144,45 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             validFiles.add(file);
           }
         }
-        setState(() => photos.addAll(validFiles));
+        if (mounted) setState(() => photos.addAll(validFiles));
       } else {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("未选择照片")));
       }
+    }
+
+    try {
+      // 尝试使用多选模式，移除 imageQuality 以减少压缩导致的 URI 读取失败
+      // 启用 usePhotoPicker 使用系统原生的照片选择器，通常更稳定
+      final List<XFile> images = await picker.pickMultiImage(
+        usePhotoPicker: true,
+      );
+      debugPrint("Picked ${images.length} images");
+      await handleImageResult(images);
     } on PlatformException catch (e) {
       debugPrint("Platform Error picking image: ${e.code}, ${e.message}");
       String errorMsg = "选取照片出错: ${e.message ?? e.code}";
+      
+      // 如果报错是关于 URI 的，尝试回退到单选模式或提示
       if (e.code == "missing_valid_image_uri") {
-        errorMsg = "无法读取部分照片（可能是由于未下载的云端照片），请尝试先在相册中打开该照片或逐张选取。";
+        errorMsg = "系统无法读取该照片（可能是云端照片且未下载），请尝试逐张选取。";
       }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMsg), 
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
             action: SnackBarAction(
-              label: "重试(单张)",
+              label: "单张尝试",
               onPressed: () async {
-                final picker = ImagePicker();
-                final image = await picker.pickImage(source: ImageSource.gallery);
-                if (image != null) {
-                  setState(() => photos.add(File(image.path)));
+                try {
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    usePhotoPicker: true,
+                  );
+                  if (image != null) await handleImageResult([image]);
+                } catch (pe) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("重试也失败了: $pe")));
                 }
               },
             ),
@@ -179,7 +191,7 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
       }
     } catch (e) {
       debugPrint("General Error picking image: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("选取照片出错: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作异常: $e")));
     }
   }
 
