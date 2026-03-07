@@ -141,7 +141,9 @@ class MainActivity : FlutterActivity() {
                             val state =
                                     mapOf(
                                             "isTracking" to service.isTracking.value,
+                                            "isPaused" to service.isPaused.value,
                                             "totalDistance" to service.totalDistance.value,
+                                            "totalDurationMs" to service.totalDurationMs,
                                             "sessionStartTime" to service.sessionStartTime,
                                             "path" to
                                                     service.trackingPath.value.map {
@@ -161,6 +163,18 @@ class MainActivity : FlutterActivity() {
                         }
                         "stopTracking" -> {
                             com.footprint.service.LocationTrackingService.stopTracking(
+                                    this@MainActivity
+                            )
+                            result.success(true)
+                        }
+                        "pauseTracking" -> {
+                            com.footprint.service.LocationTrackingService.pauseTracking(
+                                    this@MainActivity
+                            )
+                            result.success(true)
+                        }
+                        "resumeTracking" -> {
+                            com.footprint.service.LocationTrackingService.resumeTracking(
                                     this@MainActivity
                             )
                             result.success(true)

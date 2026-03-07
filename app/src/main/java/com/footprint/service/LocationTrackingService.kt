@@ -42,6 +42,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
         const val CHANNEL_ID = "location_tracking_channel"
         const val ACTION_START_TRACKING = "com.footprint.START_TRACKING"
         const val ACTION_STOP_TRACKING = "com.footprint.STOP_TRACKING"
+        const val ACTION_PAUSE_TRACKING = "com.footprint.PAUSE_TRACKING"
+        const val ACTION_RESUME_TRACKING = "com.footprint.RESUME_TRACKING"
 
         // Thresholds
         private const val MAX_SPEED_THRESHOLD_MS =
@@ -52,13 +54,22 @@ class LocationTrackingService : Service(), AMapLocationListener {
         private val _sharedIsTracking = MutableStateFlow(false)
         val isTracking: StateFlow<Boolean> = _sharedIsTracking.asStateFlow()
 
+        private val _sharedIsPaused = MutableStateFlow(false)
+        val isPaused: StateFlow<Boolean> = _sharedIsPaused.asStateFlow()
+
         private val _sharedCurrentLocation = MutableStateFlow<AMapLocation?>(null)
         val currentLocation: StateFlow<AMapLocation?> = _sharedCurrentLocation.asStateFlow()
 
         private val _totalDistanceTraveled = MutableStateFlow(0.0f)
         val totalDistance: StateFlow<Float> = _totalDistanceTraveled.asStateFlow()
 
-        private var _sessionStartTime: Long = 0
+        private var _accumulatedDurationMs: Long = 0
+        private var _lastResumeTime: Long = 0
+
+        val totalDurationMs: Long
+            get() = _accumulatedDurationMs + if (_sharedIsPaused.value || !_sharedIsTracking.value) 0L else (System.currentTimeMillis() - _lastResumeTime)
+
+        private var _sessionStartTime: Long = 0 // Keep for legacy if needed, but we use resume logic now
         val sessionStartTime: Long
             get() = _sessionStartTime
 
@@ -79,8 +90,6 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     Intent(context, LocationTrackingService::class.java).apply {
                         action = ACTION_START_TRACKING
                     }
-            // Always start as a regular service first. The service will promote itself to
-            // foreground.
             context.startService(intent)
         }
 
@@ -88,6 +97,22 @@ class LocationTrackingService : Service(), AMapLocationListener {
             val intent =
                     Intent(context, LocationTrackingService::class.java).apply {
                         action = ACTION_STOP_TRACKING
+                    }
+            context.startService(intent)
+        }
+
+        fun pauseTracking(context: Context) {
+            val intent =
+                    Intent(context, LocationTrackingService::class.java).apply {
+                        action = ACTION_PAUSE_TRACKING
+                    }
+            context.startService(intent)
+        }
+
+        fun resumeTracking(context: Context) {
+            val intent =
+                    Intent(context, LocationTrackingService::class.java).apply {
+                        action = ACTION_RESUME_TRACKING
                     }
             context.startService(intent)
         }
@@ -160,21 +185,55 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
         when (intent.action) {
             ACTION_START_TRACKING -> {
+                _sharedIsPaused.value = false
                 _totalDistanceTraveled.value = 0.0f
                 _lastLocation = null
                 _sessionStartTime = System.currentTimeMillis()
-                _sharedTrackingPath.value = emptyList() // Reset path for new session
+                _lastResumeTime = _sessionStartTime
+                _accumulatedDurationMs = 0
+                _sharedTrackingPath.value = emptyList()
 
-                // Persist start state
                 getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
                         .edit()
                         .putBoolean("is_tracking", true)
+                        .putBoolean("is_paused", false)
                         .putFloat("total_distance", 0.0f)
                         .putLong("session_start", _sessionStartTime)
                         .apply()
 
                 resumeTrackingFlow()
                 Log.d("FootprintLoc", "定位服务已启动, Session start: $_sessionStartTime")
+            }
+            ACTION_PAUSE_TRACKING -> {
+                if (_sharedIsTracking.value && !_sharedIsPaused.value) {
+                    _sharedIsPaused.value = true
+                    _accumulatedDurationMs += (System.currentTimeMillis() - _lastResumeTime)
+                    
+                    getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("is_paused", true)
+                        .apply()
+                        
+                    updateNotificationImmediately(
+                        _totalDistanceTraveled.value.toInt(),
+                        0f,
+                        _sharedCurrentLocation.value?.address ?: "已暂停记录"
+                    )
+                    Log.d("FootprintLoc", "定位服务已暂停")
+                }
+            }
+            ACTION_RESUME_TRACKING -> {
+                if (_sharedIsTracking.value && _sharedIsPaused.value) {
+                    _sharedIsPaused.value = false
+                    _lastResumeTime = System.currentTimeMillis()
+                    
+                    getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("is_paused", false)
+                        .apply()
+                        
+                    Log.d("FootprintLoc", "定位服务已恢复")
+                }
             }
             // ...
             ACTION_STOP_TRACKING -> {
@@ -219,7 +278,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     _sharedCurrentLocation.value = clonedLocation
                     _locationError.value = null
 
-                    if (_sharedIsTracking.value) {
+                    if (_sharedIsTracking.value && !_sharedIsPaused.value) {
                         var isValidPoint = false
                         val now = System.currentTimeMillis()
 
@@ -333,8 +392,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         // Update stats
         val distanceKm = distanceMeters / 1000.0
         val speedKmh = speedMs * 3.6f
-        val elapsedMs = System.currentTimeMillis() - _sessionStartTime
-        val duration = formatDuration(elapsedMs)
+        val duration = formatDuration(totalDurationMs)
 
         remoteViews.setTextViewText(
                 com.footprint.R.id.notification_distance,
@@ -347,7 +405,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         remoteViews.setTextViewText(com.footprint.R.id.notification_time, duration)
         remoteViews.setTextViewText(
                 com.footprint.R.id.notification_address,
-                address.ifEmpty { "正在记录轨迹..." }
+                if (_sharedIsPaused.value) "记录已暂停: $address" else address.ifEmpty { "正在记录轨迹..." }
         )
 
         val stopIntent =
@@ -371,7 +429,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .setCustomContentView(remoteViews)
                 .setStyle(NotificationCompat.DecoratedCustomViewStyle())
@@ -379,7 +437,18 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止记录", stopPendingIntent)
-                .build()
+
+        if (_sharedIsPaused.value) {
+            val resumeIntent = Intent(this, LocationTrackingService::class.java).apply { action = ACTION_RESUME_TRACKING }
+            val resumePI = PendingIntent.getService(this, 2, resumeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(android.R.drawable.ic_media_play, "继续", resumePI)
+        } else {
+            val pauseIntent = Intent(this, LocationTrackingService::class.java).apply { action = ACTION_PAUSE_TRACKING }
+            val pausePI = PendingIntent.getService(this, 3, pauseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(android.R.drawable.ic_media_pause, "暂停", pausePI)
+        }
+
+        return builder.build()
     }
 
     private fun formatDuration(ms: Long): String {
@@ -515,7 +584,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             title = "自动追踪",
                             location = lastLocation?.toAddressString() ?: "未知地点",
                             detail =
-                                    "通过自动追踪记录：共 ${points.size} 个点，耗时 ${ (endTime - _sessionStartTime) / 60000 } 分钟",
+                                    "通过自动追踪记录：共 ${points.size} 个点，耗时 ${ totalDurationMs / 60000 } 分钟",
                             mood = Mood.RELAXED,
                             tags = listOf("自动追踪"),
                             distanceKm = totalDistance / 1000.0,

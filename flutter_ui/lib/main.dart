@@ -2506,9 +2506,11 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
 
   // === 追踪状态 (Flutter 实现，匹配原 Kotlin LocationTrackingService) ===
   bool _isTracking = false;
+  bool _isPaused = false;
   final List<Map<String, double>> _trackingPath = [];
   double _totalDistance = 0.0;
   int _sessionStartTime = 0;
+  int _lastKnownDurationMs = 0;
   double? _lastLat;
   double? _lastLng;
   int? _lastPointTime;
@@ -2580,8 +2582,10 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       if (state['isTracking'] == true) {
         setState(() {
           _isTracking = true;
+          _isPaused = state['isPaused'] == true;
           _totalDistance = (state['totalDistance'] as num).toDouble();
-          _sessionStartTime = state['sessionStartTime'];
+          _lastKnownDurationMs = (state['totalDurationMs'] as num).toInt();
+          _sessionStartTime = DateTime.now().millisecondsSinceEpoch - _lastKnownDurationMs;
           _trackingPath.clear();
           for (var p in state['path']) {
             _trackingPath.add({'latitude': p['latitude'], 'longitude': p['longitude']});
@@ -2598,7 +2602,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   void _startDurationTimer() {
     _durationTimer?.cancel();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_isTracking) return;
+      if (!mounted || !_isTracking || _isPaused) return;
       setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
     });
   }
@@ -2827,13 +2831,45 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     } catch (_) {}
 
     try {
-      // 通过通道启动后台定位服务，产生系统通知栏并持久化
       await dataChannel.invokeMethod('startTracking');
-      setState(() => _isTracking = true);
+      setState(() {
+        _isTracking = true;
+        _isPaused = false;
+        _lastKnownDurationMs = 0;
+        _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
+      });
 
       _startDurationTimer();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("启动追踪失败: $e"), backgroundColor: Colors.orange));
+    }
+  }
+
+  // === 暂停追踪 ===
+  Future<void> _pauseTracking() async {
+    try {
+      await dataChannel.invokeMethod('pauseTracking');
+      final json = await dataChannel.invokeMethod('getTrackingState');
+      final state = jsonDecode(json);
+      setState(() {
+         _isPaused = true;
+         _lastKnownDurationMs = (state['totalDurationMs'] as num).toInt();
+      });
+    } catch (e) {
+      debugPrint('Error pausing tracking: $e');
+    }
+  }
+
+  // === 恢复追踪 ===
+  Future<void> _resumeTracking() async {
+    try {
+      await dataChannel.invokeMethod('resumeTracking');
+      setState(() {
+        _isPaused = false;
+        _sessionStartTime = DateTime.now().millisecondsSinceEpoch - _lastKnownDurationMs;
+      });
+    } catch (e) {
+      debugPrint('Error resuming tracking: $e');
     }
   }
 
@@ -2849,6 +2885,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
 
     setState(() {
       _isTracking = false;
+      _isPaused = false;
       _trackingPath.clear();
       _totalDistance = 0.0;
       _lastLat = null;
@@ -2983,17 +3020,35 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
                 child: Icon(Icons.my_location, color: cs.primary),
               ),
               const SizedBox(height: 16),
-              // 开始/停止足迹记录按钮
-              FloatingActionButton(
-                heroTag: "track_btn",
-                onPressed: () => _isTracking ? _stopTracking() : _startTracking(),
-                backgroundColor: _isTracking ? Colors.red : cs.primary,
-                child: Icon(
-                  _isTracking ? Icons.stop : Icons.play_arrow,
-                  color: Colors.white,
-                  size: 32,
+              // 开始/停止/暂停足迹记录按钮组
+              if (!_isTracking)
+                FloatingActionButton(
+                  heroTag: "track_start_btn",
+                  onPressed: _startTracking,
+                  backgroundColor: cs.primary,
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
+                )
+              else
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 暂停/继续按钮
+                    FloatingActionButton(
+                      heroTag: "track_pause_btn",
+                      onPressed: () => _isPaused ? _resumeTracking() : _pauseTracking(),
+                      backgroundColor: Colors.orangeAccent,
+                      child: Icon(_isPaused ? Icons.play_arrow : Icons.pause, color: Colors.white, size: 32),
+                    ),
+                    const SizedBox(height: 12),
+                    // 停止按钮
+                    FloatingActionButton(
+                      heroTag: "track_stop_btn",
+                      onPressed: _stopTracking,
+                      backgroundColor: Colors.red,
+                      child: const Icon(Icons.stop, color: Colors.white, size: 32),
+                    ),
+                  ],
                 ),
-              ),
             ],
           ),
         ),
