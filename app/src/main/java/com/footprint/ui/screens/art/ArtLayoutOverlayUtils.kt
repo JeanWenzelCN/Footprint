@@ -317,15 +317,6 @@ object ArtLayoutOverlayUtils {
                                                 )
                                         }
                                         "HEAVY_MECHANICAL" -> {
-                                                val armorColor =
-                                                        when (uiState.armorType) {
-                                                                ArmorType.GUNMETAL ->
-                                                                        Color.parseColor("#2C2C2E")
-                                                                ArmorType.CARBON_FIBER ->
-                                                                        Color.parseColor("#1C1C1E")
-                                                                ArmorType.WORN_OLIVE ->
-                                                                        Color.parseColor("#4B5320")
-                                                        }
                                                 val heavyFramePaint =
                                                         Paint().apply {
                                                                 color = armorColor

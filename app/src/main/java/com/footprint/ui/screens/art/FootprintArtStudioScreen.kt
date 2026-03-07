@@ -508,13 +508,11 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                 polaroidFramePadding = uiState.polaroidFramePadding,
                                 polaroidInnerBorder = uiState.polaroidInnerBorder,
                                 woodType = uiState.woodType,
-                                engravingDepth = uiState.engravingDepth,
                                 canvasGrain = uiState.canvasGrain,
                                 armorType = uiState.armorType,
                                 mechanicalSeams = uiState.mechanicalSeams,
                                 hasHazardStriping = uiState.hasHazardStriping,
-                                userNickname = uiState.userNickname,
-                                hazeState = hazeState
+                                userNickname = uiState.userNickname
                         )
 
                         // Top Bar & Export Button
@@ -827,12 +825,8 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                                                                                                                 .utils
                                                                                                                                                 .ArtLayoutOverlayUtils
                                                                                                                                                 .drawOverlay(
-                                                                                                                                                        context =
-                                                                                                                                                                context,
                                                                                                                                                         canvas =
                                                                                                                                                                 canvas,
-                                                                                                                                                        bitmap =
-                                                                                                                                                                bitmap,
                                                                                                                                                         layout =
                                                                                                                                                                 selectedLayout,
                                                                                                                                                         uiState =
@@ -1008,8 +1002,6 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
                                                                         com.footprint.utils
                                                                                 .HolographicExportUtils
                                                                                 .generateHolographicScrollContent(
-                                                                                        context =
-                                                                                                context,
                                                                                         title =
                                                                                                 uiState.artAuthorName
                                                                                                         .ifBlank {
@@ -1176,13 +1168,11 @@ fun ArtLayoutOverlay(
         polaroidFramePadding: Float = 0.5f,
         polaroidInnerBorder: Float = 1f,
         woodType: WoodType = WoodType.ASH,
-        engravingDepth: Float = 0.5f,
         canvasGrain: Float = 0.3f,
         armorType: ArmorType = ArmorType.GUNMETAL,
         mechanicalSeams: Float = 0.5f,
         hasHazardStriping: Boolean = false,
-        userNickname: String = "旅行者",
-        hazeState: HazeState? = null
+        userNickname: String = "旅行者"
 ) {
         val context = LocalContext.current
         val fontFamily = com.footprint.utils.FontManager.getFontFamily(context, artFont)

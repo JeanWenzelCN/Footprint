@@ -54,7 +54,6 @@ fun FootprintTheme(
         style: AppThemeStyle = AppThemeStyle.CLASSIC,
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         dominantMood: com.footprint.data.model.Mood? = null,
-        dynamicColor: Boolean = true,
         content: @Composable () -> Unit
 ) {
     val darkTheme =

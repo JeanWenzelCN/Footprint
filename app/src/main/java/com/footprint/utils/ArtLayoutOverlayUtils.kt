@@ -10,9 +10,7 @@ import java.time.LocalDate
 object ArtLayoutOverlayUtils {
 
     fun drawOverlay(
-            context: Context,
             canvas: Canvas,
-            bitmap: Bitmap,
             layout: ArtLayout,
             uiState: com.footprint.ui.state.FootprintUiState,
             totalDistanceKm: Double,
@@ -154,7 +152,6 @@ object ArtLayoutOverlayUtils {
                         alpha = 100
                     }
                     val rivetRadius = (3f * scale).toFloat() + (uiState.mechanicalSeams * 2f * scale).toFloat()
-                    val spacing = (60f * scale).toFloat()
                     
                     fun drawRivet(x: Float, y: Float) {
                         canvas.drawCircle(x, y, rivetRadius, rivetPaint)

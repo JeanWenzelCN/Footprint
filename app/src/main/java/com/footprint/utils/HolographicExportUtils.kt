@@ -56,7 +56,6 @@ object HolographicExportUtils {
          * auto-formatting corruption of placeholders.
          */
         fun generateHolographicScrollContent(
-                context: android.content.Context,
                 title: String,
                 metadata: String,
                 tracePoints: List<LatLng>,

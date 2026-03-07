@@ -26,7 +26,6 @@ fun LiquidGlassCard(
     borderWidth: Dp = 1.dp,
     borderColor: Color = Color.White.copy(alpha = 0.5f),
     noiseOpacity: Float = 0.05f,
-    blurRadius: Dp = 20.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
     // LocalHazeState is guaranteed to be present (has default value)
