@@ -36,10 +36,10 @@ abstract class FootprintDatabase : RoomDatabase() {
                 val MIGRATION_5_6 =
                         object : androidx.room.migration.Migration(5, 6) {
                                 override fun migrate(
-                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
                                 ) {
                                         // Create Badges table
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     CREATE TABLE IF NOT EXISTS `badges` (
                         `id` TEXT NOT NULL,
@@ -57,7 +57,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         )
 
                                         // Create Privacy Fences table
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     CREATE TABLE IF NOT EXISTS `privacy_fences` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -71,7 +71,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         )
 
                                         // Create Track Points table (if not exists)
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     CREATE TABLE IF NOT EXISTS `track_points` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -90,25 +90,25 @@ abstract class FootprintDatabase : RoomDatabase() {
                 val MIGRATION_6_7 =
                         object : androidx.room.migration.Migration(6, 7) {
                                 override fun migrate(
-                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
                                 ) {
                                         // Safely add columns to footprints table
                                         try {
-                                                database.execSQL(
+                                                db.execSQL(
                                                         "ALTER TABLE footprints ADD COLUMN transport_type TEXT NOT NULL DEFAULT 'UNKNOWN'"
                                                 )
                                         } catch (e: Exception) {
                                                 // Column might already exist
                                         }
                                         try {
-                                                database.execSQL(
+                                                db.execSQL(
                                                         "ALTER TABLE footprints ADD COLUMN carbon_saved REAL NOT NULL DEFAULT 0.0"
                                                 )
                                         } catch (e: Exception) {
                                                 // Column might already exist
                                         }
                                         try {
-                                                database.execSQL(
+                                                db.execSQL(
                                                         "ALTER TABLE footprints ADD COLUMN icon TEXT NOT NULL DEFAULT 'LocationOn'"
                                                 )
                                         } catch (e: Exception) {
@@ -117,7 +117,7 @@ abstract class FootprintDatabase : RoomDatabase() {
 
                                         // Safely add columns to travel_goals table
                                         try {
-                                                database.execSQL(
+                                                db.execSQL(
                                                         "ALTER TABLE travel_goals ADD COLUMN icon TEXT NOT NULL DEFAULT 'Flag'"
                                                 )
                                         } catch (e: Exception) {
@@ -129,10 +129,10 @@ abstract class FootprintDatabase : RoomDatabase() {
                 val MIGRATION_7_8 =
                         object : androidx.room.migration.Migration(7, 8) {
                                 override fun migrate(
-                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
                                 ) {
                                         // Create Time Capsules table
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     CREATE TABLE IF NOT EXISTS `time_capsules` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -153,11 +153,11 @@ abstract class FootprintDatabase : RoomDatabase() {
                 val MIGRATION_9_10 =
                         object : androidx.room.migration.Migration(9, 10) {
                                 override fun migrate(
-                                        database: androidx.sqlite.db.SupportSQLiteDatabase
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
                                 ) {
                                         // Add adcode to track_points
                                         try {
-                                                database.execSQL(
+                                                db.execSQL(
                                                         "ALTER TABLE track_points ADD COLUMN adcode TEXT"
                                                 )
                                         } catch (e: Exception) {
@@ -165,7 +165,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         }
 
                                         // Create User Badges table
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     CREATE TABLE IF NOT EXISTS `user_badges` (
                         `badgeId` TEXT NOT NULL,
@@ -180,7 +180,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         )
 
                                         // Create User Stats table
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     CREATE TABLE IF NOT EXISTS `user_stats` (
                         `id` INTEGER NOT NULL,
@@ -194,7 +194,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         )
 
                                         // Ensure a single row exists
-                                        database.execSQL(
+                                        db.execSQL(
                                                 """
                     INSERT OR IGNORE INTO user_stats (id, totalMileage, totalDays, citiesVisitedCount, totalFootprints)
                     VALUES (1, 0.0, 0, 0, 0)

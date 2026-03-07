@@ -95,7 +95,7 @@ fun FootprintArtStudioScreen(viewModel: FootprintViewModel, onBack: () -> Unit) 
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
         val context = LocalContext.current
         val resolver = androidx.compose.ui.platform.LocalFontFamilyResolver.current
-        val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
         val mapView = remember { TextureMapView(context).apply { onCreate(null) } }
         val hazeState = remember { HazeState() }
         val haptic = LocalHapticFeedback.current
@@ -1468,6 +1468,7 @@ fun ArtLayoutOverlay(
                                                                                 )
                                                                                         60
                                                                                 else 35
+                                                                        val grainColor = Color.Black.copy(alpha = 0.05f)
                                                                         for (i in 0 until density) {
                                                                                 val offset =
                                                                                         (i.toFloat() /
@@ -1479,12 +1480,7 @@ fun ArtLayoutOverlay(
                                                                                                         size.height)
                                                                                 if (isVertical) {
                                                                                         drawLine(
-                                                                                                color =
-                                                                                                        Color.Black
-                                                                                                                .copy(
-                                                                                                                        alpha =
-                                                                                                                                0.05f
-                                                                                                                ),
+                                                                                                color = grainColor,
                                                                                                 start =
                                                                                                         Offset(
                                                                                                                 offset,
@@ -1502,12 +1498,7 @@ fun ArtLayoutOverlay(
                                                                                         )
                                                                                 } else {
                                                                                         drawLine(
-                                                                                                color =
-                                                                                                        Color.Black
-                                                                                                                .copy(
-                                                                                                                        alpha =
-                                                                                                                                0.05f
-                                                                                                                ),
+                                                                                                color = grainColor,
                                                                                                 start =
                                                                                                         Offset(
                                                                                                                 0f,

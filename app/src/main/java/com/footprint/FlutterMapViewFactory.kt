@@ -8,7 +8,6 @@ import io.flutter.plugin.platform.PlatformViewFactory
 
 class FlutterMapViewFactory(private val messenger: BinaryMessenger) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
-        val creationParams = args as? Map<String?, Any?>?
-        return FlutterMapView(context, viewId, messenger, creationParams)
+        return FlutterMapView(context, viewId, messenger)
     }
 }

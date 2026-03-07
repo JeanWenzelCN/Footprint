@@ -123,10 +123,6 @@ fun ArtStyleControls(
                                 }
                                 Text("-", color = Color.Gray)
                                 TextButton(onClick = onEndDateClick) {
-                                        val dateFormatter =
-                                                java.time.format.DateTimeFormatter.ofPattern(
-                                                        "yyyy.MM.dd"
-                                                )
                                         Text(endDate.format(dateFormatter), color = accentColor)
                                 }
                         }

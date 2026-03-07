@@ -20,8 +20,7 @@ import kotlinx.coroutines.flow.collectLatest
 class FlutterMapView(
         private val context: Context,
         id: Int,
-        messenger: BinaryMessenger,
-        creationParams: Map<String?, Any?>?
+        messenger: BinaryMessenger
 ) : PlatformView, MethodChannel.MethodCallHandler {
 
     private val container = FrameLayout(context)
@@ -185,13 +184,14 @@ class FlutterMapView(
                 result.success(true)
             }
             "setEntries" -> {
-                val entries = call.arguments as? List<Map<String, Any>>
+                val entries = call.arguments as? List<*>
                 for (marker in markerList) {
                     marker.remove()
                 }
                 markerList.clear()
 
-                entries?.forEach { entry ->
+                entries?.forEach { it ->
+                    val entry = it as? Map<*, *> ?: return@forEach
                     val lat = (entry["latitude"] as? Number)?.toDouble()
                     val lng = (entry["longitude"] as? Number)?.toDouble()
                     val id = (entry["id"] as? Number)?.toLong()
@@ -221,15 +221,16 @@ class FlutterMapView(
             }
             "setHistoryPoints" -> {
                 // 用于加载历史数据的接口 (迷雾挖洞)
-                val points = call.arguments as? List<Map<String, Any>>
+                val points = call.arguments as? List<*>
                 historyPoints =
                         points?.mapNotNull {
+                            val itMap = it as? Map<*, *> ?: return@mapNotNull null
                             val lat =
-                                    (it["lat"] as? Number)?.toDouble()
-                                            ?: (it["latitude"] as? Number)?.toDouble()
+                                    (itMap["lat"] as? Number)?.toDouble()
+                                            ?: (itMap["latitude"] as? Number)?.toDouble()
                             val lng =
-                                    (it["lng"] as? Number)?.toDouble()
-                                            ?: (it["longitude"] as? Number)?.toDouble()
+                                    (itMap["lng"] as? Number)?.toDouble()
+                                            ?: (itMap["longitude"] as? Number)?.toDouble()
                             if (lat != null && lng != null) LatLng(lat, lng) else null
                         }
                                 ?: emptyList()
@@ -238,15 +239,16 @@ class FlutterMapView(
                 result.success(true)
             }
             "setTrackingPath" -> {
-                val points = call.arguments as? List<Map<String, Any>>
+                val points = call.arguments as? List<*>
                 val latLngPoints =
                         points?.mapNotNull {
+                            val itMap = it as? Map<*, *> ?: return@mapNotNull null
                             val lat =
-                                    (it["lat"] as? Number)?.toDouble()
-                                            ?: (it["latitude"] as? Number)?.toDouble()
+                                    (itMap["lat"] as? Number)?.toDouble()
+                                            ?: (itMap["latitude"] as? Number)?.toDouble()
                             val lng =
-                                    (it["lng"] as? Number)?.toDouble()
-                                            ?: (it["longitude"] as? Number)?.toDouble()
+                                    (itMap["lng"] as? Number)?.toDouble()
+                                            ?: (itMap["longitude"] as? Number)?.toDouble()
                             if (lat != null && lng != null) LatLng(lat, lng) else null
                         }
                                 ?: emptyList()

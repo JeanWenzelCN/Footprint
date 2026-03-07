@@ -21,15 +21,6 @@ object ArtLayoutOverlayUtils {
                 customTypeface: Typeface,
                 scale: Double
         ) {
-                val coreColorInt =
-                        when (uiState.artColorStyle) {
-                                "Deep Blue" -> Color.parseColor("#007AFF")
-                                "Cyber Pink" -> Color.parseColor("#FF2D55")
-                                "Neon Green" -> Color.parseColor("#00FF9F")
-                                "Gold" -> Color.parseColor("#FFCC00")
-                                else -> Color.parseColor("#00FF9F")
-                        }
-
                 val themeContentColor =
                         when (uiState.polaroidFrameStyle) {
                                 "ACOUSTIC_WOOD" -> Color.parseColor("#3E2723")

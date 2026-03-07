@@ -86,9 +86,9 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                         "getTrackPoints" -> {
-                            val args = call.arguments as Map<String, Any>
-                            val startTime = (args["startTime"] as Number).toLong()
-                            val endTime = (args["endTime"] as Number).toLong()
+                            val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler
+                            val startTime = (args["startTime"] as? Number)?.toLong() ?: 0L
+                            val endTime = (args["endTime"] as? Number)?.toLong() ?: 0L
                             lifecycleScope.launch(Dispatchers.IO) {
                                 try {
                                     val points = repository.getTrackPointsOnce(startTime, endTime)
@@ -293,13 +293,13 @@ class MainActivity : FlutterActivity() {
 
                         // --- Flutter 追踪：保存单个轨迹点 ---
                         "saveTrackPoint" -> {
-                            val args = call.arguments as Map<String, Any>
-                            val lat = (args["latitude"] as Number).toDouble()
-                            val lng = (args["longitude"] as Number).toDouble()
-                            val alt = (args["altitude"] as Number).toDouble()
-                            val acc = (args["accuracy"] as Number).toFloat()
-                            val spd = (args["speed"] as Number).toFloat()
-                            val ts = (args["timestamp"] as Number).toLong()
+                            val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler
+                            val lat = (args["latitude"] as? Number)?.toDouble() ?: 0.0
+                            val lng = (args["longitude"] as? Number)?.toDouble() ?: 0.0
+                            val alt = (args["altitude"] as? Number)?.toDouble() ?: 0.0
+                            val acc = (args["accuracy"] as? Number)?.toFloat() ?: 0f
+                            val spd = (args["speed"] as? Number)?.toFloat() ?: 0f
+                            val ts = (args["timestamp"] as? Number)?.toLong() ?: 0L
                             lifecycleScope.launch(Dispatchers.IO) {
                                 try {
                                     repository.saveTrackPointRaw(lat, lng, alt, acc, spd, ts)
@@ -313,9 +313,9 @@ class MainActivity : FlutterActivity() {
                         }
                         // --- Flutter 追踪：保存完整追踪会话为足迹记录 ---
                         "saveTrackingSession" -> {
-                            val args = call.arguments as Map<String, Any>
-                            val totalDistanceM = (args["totalDistanceM"] as Number).toDouble()
-                            val pointCount = (args["pointCount"] as Number).toInt()
+                            val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler
+                            val totalDistanceM = (args["totalDistanceM"] as? Number)?.toDouble() ?: 0.0
+                            val pointCount = (args["pointCount"] as? Number)?.toInt() ?: 0
                             val address = args["address"] as? String ?: "未知地点"
                             val lat = (args["latitude"] as? Number)?.toDouble()
                             val lng = (args["longitude"] as? Number)?.toDouble()
@@ -354,8 +354,8 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                         "openNativeScreen" -> {
-                            val args = call.arguments as Map<String, Any>
-                            val screenType = args["screen_type"] as String
+                            val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler
+                            val screenType = args["screen_type"] as? String ?: return@setMethodCallHandler
                             val intent =
                                     Intent(
                                                     this@MainActivity,
@@ -383,7 +383,7 @@ class MainActivity : FlutterActivity() {
                                             )
 
                                     val processedPhotos =
-                                            entry.photos?.mapNotNull { path ->
+                                            entry.photos.mapNotNull { path ->
                                                 try {
                                                     val originalFile = java.io.File(path)
                                                     if (!originalFile.exists())
@@ -417,7 +417,6 @@ class MainActivity : FlutterActivity() {
                                                     path
                                                 }
                                             }
-                                                    ?: emptyList()
                                     val finalEntry = entry.copy(photos = processedPhotos)
 
                                     repository.saveEntry(finalEntry)
@@ -611,8 +610,8 @@ class MainActivity : FlutterActivity() {
                 .setMethodCallHandler { call, result ->
                     when (call.method) {
                         "composePoster" -> {
-                            val args = call.arguments as Map<String, Any>
-                            val pngBytes = args["badge_png_bytes"] as ByteArray
+                            val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler
+                            val pngBytes = args["badge_png_bytes"] as? ByteArray ?: return@setMethodCallHandler
                             val title = args["badge_title"] as? String ?: ""
                             val colorHex = args["badge_color"] as? String ?: "#FFFFFF"
                             val material = args["material_type"] as? String ?: "Base"
@@ -632,7 +631,7 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                         "sharePoster" -> {
-                            val args = call.arguments as Map<String, Any>
+                            val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler
                             val path = args["path"] as? String
                             if (path != null) {
                                 com.footprint.badge.BadgePosterCompositor.share(this@MainActivity, path)

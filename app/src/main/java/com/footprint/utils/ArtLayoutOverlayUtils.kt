@@ -98,20 +98,93 @@ object ArtLayoutOverlayUtils {
                 val mapRight = mapLeft + mapWidth
                 val mapBottom = mapTop + mapHeight
 
+                val frameStyle = uiState.polaroidFrameStyle
+
                 val frameColor =
-                        when (uiState.polaroidFrameStyle) {
+                        when (frameStyle) {
                             "CLASSIC_BLACK" -> android.graphics.Color.parseColor("#1A1A1A")
+                            "ACOUSTIC_WOOD" -> {
+                                when (uiState.woodType) {
+                                    com.footprint.ui.screens.art.WoodType.WALNUT -> android.graphics.Color.parseColor("#5D4037")
+                                    com.footprint.ui.screens.art.WoodType.VINTAGE_OAK -> android.graphics.Color.parseColor("#8B4513")
+                                    else -> android.graphics.Color.parseColor("#D2B48C")
+                                }
+                            }
+                            "HEAVY_MECHANICAL" -> {
+                                when (uiState.armorType) {
+                                    com.footprint.ui.screens.art.ArmorType.GUNMETAL -> android.graphics.Color.parseColor("#2C2C2C")
+                                    com.footprint.ui.screens.art.ArmorType.CARBON_FIBER -> android.graphics.Color.parseColor("#121212")
+                                    else -> android.graphics.Color.parseColor("#455A64")
+                                }
+                            }
+                            "CYBER_GLITCH" -> android.graphics.Color.parseColor("#0F0F0F")
                             else -> android.graphics.Color.parseColor("#FAFAFA")
                         }
 
                 val paperPaint = Paint().apply { color = frameColor }
 
-                // 2. Draw Frame
+                // 2. Draw Frame with Material Effects
+                if (frameStyle == "HEAVY_MECHANICAL") {
+                    val chamfer = (24f * scale).toFloat()
+                    val path = Path().apply {
+                        moveTo(chamfer, 0f)
+                        lineTo(width - chamfer, 0f)
+                        lineTo(width, chamfer)
+                        lineTo(width, height - chamfer)
+                        lineTo(width - chamfer, height)
+                        lineTo(chamfer, height)
+                        lineTo(0f, height - chamfer)
+                        lineTo(0f, chamfer)
+                        close()
+                        addRect(mapLeft, mapTop, mapRight, mapBottom, Path.Direction.CW)
+                        fillType = Path.FillType.EVEN_ODD
+                    }
+                    canvas.drawPath(path, paperPaint)
+                    
+                    // Armor Texture
+                    val noisePaint = Paint().apply {
+                        color = android.graphics.Color.BLACK
+                        alpha = (25 * uiState.canvasGrain).toInt()
+                    }
+                    canvas.drawRect(0f, 0f, width, height, noisePaint)
 
-                canvas.drawRect(0f, 0f, width, mapTop, paperPaint) // Top Tint
-                canvas.drawRect(0f, mapBottom, width, height, paperPaint) // Bottom Tint
-                canvas.drawRect(0f, mapTop, mapLeft, mapBottom, paperPaint) // Left Tint
-                canvas.drawRect(mapRight, mapTop, width, mapBottom, paperPaint) // Right Tint
+                    // Rivets
+                    val rivetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.BLACK
+                        alpha = 100
+                    }
+                    val rivetRadius = (3f * scale).toFloat() + (uiState.mechanicalSeams * 2f * scale).toFloat()
+                    val spacing = (60f * scale).toFloat()
+                    
+                    fun drawRivet(x: Float, y: Float) {
+                        canvas.drawCircle(x, y, rivetRadius, rivetPaint)
+                    }
+                    
+                    drawRivet(mapLeft / 2, mapTop / 2)
+                    drawRivet(width - mapLeft / 2, mapTop / 2)
+                    drawRivet(mapLeft / 2, height - (30f * scale).toFloat())
+                    drawRivet(width - mapLeft / 2, height - (30f * scale).toFloat())
+                } else if (frameStyle == "ACOUSTIC_WOOD") {
+                    // Mitered Wood Joints
+                    canvas.drawRect(0f, 0f, width, height, paperPaint)
+                    
+                    // Grain Effect
+                    val grainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.BLACK
+                        alpha = (12 * uiState.canvasGrain).toInt()
+                        strokeWidth = (1.5f * scale).toFloat()
+                    }
+                    val density = if (uiState.woodType == com.footprint.ui.screens.art.WoodType.VINTAGE_OAK) 60 else 35
+                    for (i in 0 until density) {
+                        val offset = (i.toFloat() / density) * width
+                        canvas.drawLine(offset, 0f, offset + width * 0.02f, height, grainPaint)
+                    }
+                } else {
+                    canvas.drawRect(0f, 0f, width, mapTop, paperPaint)
+                    canvas.drawRect(0f, mapBottom, width, height, paperPaint)
+                    canvas.drawRect(0f, mapTop, mapLeft, mapBottom, paperPaint)
+                    canvas.drawRect(mapRight, mapTop, width, mapBottom, paperPaint)
+                }
 
                 // 3. Inner Border
                 if (uiState.polaroidInnerBorder > 0) {
@@ -120,7 +193,7 @@ object ArtLayoutOverlayUtils {
                                 style = Paint.Style.STROKE
                                 strokeWidth = (uiState.polaroidInnerBorder * scale).toFloat()
                                 color =
-                                        if (uiState.polaroidFrameStyle == "CLASSIC_BLACK") {
+                                        if (frameStyle == "CLASSIC_BLACK" || frameStyle == "HEAVY_MECHANICAL") {
                                             Color.White.copy(alpha = 0.2f).toArgb()
                                         } else {
                                             Color.Black.copy(alpha = 0.15f).toArgb()
@@ -130,16 +203,16 @@ object ArtLayoutOverlayUtils {
                 }
 
                 // 4. Typography & Watermark Area
-                val isBlack = uiState.polaroidFrameStyle == "CLASSIC_BLACK"
+                val isDarkFrame = frameStyle == "CLASSIC_BLACK" || frameStyle == "HEAVY_MECHANICAL" || frameStyle == "CYBER_GLITCH"
                 val primaryTextColor =
-                        if (isBlack) android.graphics.Color.WHITE else android.graphics.Color.BLACK
-                val secondaryTextColor = android.graphics.Color.GRAY
+                        if (isDarkFrame) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                val secondaryTextColor = if (isDarkFrame) android.graphics.Color.LTGRAY else android.graphics.Color.GRAY
 
                 // Main Title
                 textPaint.apply {
                     textSize = (28f * scale).toFloat()
                     color = primaryTextColor
-                    alpha = if (isBlack) 230 else 200
+                    alpha = if (isDarkFrame) 230 else 200
                 }
                 val centerX = width / 2
                 val titleY = mapBottom + (60f * scale).toFloat()
@@ -175,7 +248,6 @@ object ArtLayoutOverlayUtils {
                             typeface = customTypeface
                         }
                 canvas.drawText(dateRange, mapLeft, metaY, metaPaint)
-
 
                 canvas.drawText(
                         "TOTAL DISTANCE: %.2f KM".format(totalDistanceKm),
@@ -312,9 +384,6 @@ object ArtLayoutOverlayUtils {
         var rsum: Int
         var gsum: Int
         var bsum: Int
-        var x: Int
-        var y: Int
-        var i: Int
         var p: Int
         var yp: Int
         var yi: Int

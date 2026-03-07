@@ -49,8 +49,6 @@ fun GlassCard(
         borderWidth: Dp = 1.dp,
         borderColor: Color = Color.White.copy(alpha = 0.4f),
         noiseOpacity: Float = 0.03f, // Subtler noise
-        blurRadius: Dp =
-                20.dp, // Note: Haze blur radius is set on the hazeChild or global HazeState
         content: @Composable BoxScope.() -> Unit
 ) {
     Box(

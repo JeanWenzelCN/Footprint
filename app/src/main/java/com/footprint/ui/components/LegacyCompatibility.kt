@@ -48,7 +48,6 @@ fun LiquidGlassCard(
         borderWidth = borderWidth,
         borderColor = borderColor,
         noiseOpacity = noiseOpacity,
-        blurRadius = blurRadius,
         content = content
     )
 }

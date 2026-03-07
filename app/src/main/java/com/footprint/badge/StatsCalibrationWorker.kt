@@ -6,15 +6,13 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.footprint.data.local.FootprintDatabase
 import com.footprint.data.local.UserStatsEntity
-import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 class StatsCalibrationWorker(
-    appContext: Context,
+    context: Context,
     workerParams: WorkerParameters
-) : CoroutineWorker(appContext, workerParams) {
+) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
         Log.i("StatsCalibration", "Ghost calibration task started (Self-Healing)")
@@ -28,8 +26,6 @@ class StatsCalibrationWorker(
         val uniqueDays = mutableSetOf<String>()
         val uniqueCities = mutableSetOf<String>()
         
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
-
         val chunkSize = 10000
         var offset = 0
 

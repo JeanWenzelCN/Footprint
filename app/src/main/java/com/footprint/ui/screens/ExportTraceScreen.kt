@@ -78,21 +78,18 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             }
 
     // Map lifecycle
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
         val observer =
                 androidx.lifecycle.LifecycleEventObserver { _, event ->
                     when (event) {
-                        androidx.lifecycle.Lifecycle.Event.ON_CREATE -> mapView.onCreate(null)
                         androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapView.onResume()
                         androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                        androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
                         else -> {}
                     }
                 }
         lifecycle.addObserver(observer)
 
-        // Handle initial state if verified (e.g. if already RESUMED)
         if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
             mapView.onResume()
         }
@@ -128,11 +125,11 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             }
         }
 
-        val entriesInRange =
+        val filteredEntries =
                 uiState.entries.filter {
                     !it.happenedOn.isBefore(startDate) && !it.happenedOn.isAfter(endDate)
                 }
-        val validEntries = entriesInRange.filter { it.latitude != null && it.longitude != null }
+        val validEntries = filteredEntries.filter { it.latitude != null && it.longitude != null }
         validEntries.forEach { entry ->
             val position = LatLng(entry.latitude!!, entry.longitude!!)
             mapView.map.addMarker(

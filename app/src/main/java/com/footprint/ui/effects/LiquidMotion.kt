@@ -37,8 +37,6 @@ import androidx.compose.ui.unit.dp
 fun MetaballBox(
         modifier: Modifier = Modifier,
         blurRadius: Float = 40f,
-        alphaCutoff: Float =
-                0.5f, // Not strictly used in matrix calc directly here, hardcoded for now
         content: @Composable BoxScope.() -> Unit
 ) {
     // 1. Define the Blur Effect
@@ -62,44 +60,6 @@ fun MetaballBox(
                     // - Low alpha (edges of blur) becomes < 0 (transparent)
                     // - High alpha (center) stays > 1 (opaque)
                     // - Overlapping blurred regions sum up and cross the threshold together
-
-                    val matrix =
-                            ColorMatrix(
-                                    floatArrayOf(
-                                            1f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            1f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            1f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            0f,
-                                            60f,
-                                            -3000f / (255f) // Optimized experimental values.
-                                            // e.g. Alpha * 60 - 11.
-                                            // Careful calibration needed. If too aggressive, shapes
-                                            // disappear.
-                                            )
-                            )
-                    // Adjusting constants for smoother result:
-                    // Standard approach: Alpha * 18 - 7 (for approx 0-1 range if using floats
-                    // directly?
-                    // Android ColorMatrix operates on 0-255 usually but passed as floats acting on
-                    // unmultiplied?
-                    // Actually usually it operates on [0..255] range logic but inputs are
-                    // normalized [0..1]?
-                    // Documentation says: R' = a*R + b*G + c*B + d*A + e
-                    // If inputs are 0-255: matrix is applied directly.
 
                     // Let's use a standard "gooey" matrix constant.
                     // Alpha * 18 - 7 * 255 (if offset is 0-255 range)
