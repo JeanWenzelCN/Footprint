@@ -137,21 +137,37 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
 
   Future<void> _pickImage() async {
     try {
-      // 对于现代 Android (API 33+)，file_picker 使用系统选择器 (SAF/Photo Picker)
-      // 这些选择器由系统权限托管，应用不需要申请 READ_EXTERNAL_STORAGE 或 READ_MEDIA_IMAGES
-      // 只有在极少数需要直接访问非缓存文件的场景下才需要权限
-      
-      // 给用户一个已经开始的操作反馈
+      // 1. 权限检查与申请
+      if (Platform.isAndroid) {
+        // 根据 Android 版本申请不同权限
+        bool granted = false;
+        // 如果是 Android 13 (API 33) 及以上，申请媒体图片权限
+        if (await Permission.photos.isGranted || await Permission.photos.request().isGranted) {
+          granted = true;
+        } else if (await Permission.storage.isGranted || await Permission.storage.request().isGranted) {
+          // 对于旧版本 Android，尝试申请存储权限
+          granted = true;
+        }
+        
+        if (!granted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("需要存储权限才能读取照片")));
+          }
+          return;
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("正在打开系统相册..."), duration: Duration(milliseconds: 500))
+          const SnackBar(content: Text("正在打开系统选择器..."), duration: Duration(milliseconds: 500))
         );
       }
 
-      // 使用 file_picker 替代 image_picker 以获得更好的稳定性
-      // file_picker 10.x+ 在 Android 上默认使用系统原生选择器
+      // 2. 使用 FilePicker 的 Custom 模式，这比 FileType.image 在 Android 上更稳健
+      // 且能规避 ImagePicker 常见的 missing_valid_image_uri 平台错误
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
         allowMultiple: true,
       );
       
@@ -162,28 +178,24 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             final file = File(path);
             if (await file.exists()) {
               validFiles.add(file);
-            } else {
-               debugPrint("Picked file no longer exists or inaccessible: $path");
             }
           }
         }
-        if (mounted) {
-          if (validFiles.isNotEmpty) {
-            setState(() => photos.addAll(validFiles));
-          } else {
-             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("无法读取选中的照片文件")));
-          }
+        
+        if (mounted && validFiles.isNotEmpty) {
+          setState(() => photos.addAll(validFiles));
         }
       }
     } catch (e) {
       debugPrint("Photo Picker Error: $e");
       String errorMsg = e.toString();
-      if (errorMsg.contains("missing_valid_image_uri")) {
-        errorMsg = "系统无法找到选定的图片，请尝试从本地相册选取而非云端同步图片。";
-      }
+      // 如果依然报错，可能是环境极端问题，提供更详细的提示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("读取照片失败: $errorMsg"))
+          SnackBar(
+            content: Text("选择照片失败: $errorMsg"),
+            action: SnackBarAction(label: "重试", onPressed: _pickImage),
+          )
         );
       }
     }
@@ -3313,7 +3325,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: () async {
                     try {
                       final picker = ImagePicker();
-                      final file = await picker.pickImage(source: ImageSource.gallery);
+                      final file = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        requestFullMetadata: false,
+                      );
                       if (file != null) {
                         _up('updateAvatar', file.path);
                       }
