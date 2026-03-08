@@ -6,7 +6,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -42,6 +46,14 @@ import kotlin.math.cos
 import kotlin.math.PI
 import kotlin.random.Random
 
+enum class ArtPalette(val label: String, val colors: List<Color>) {
+    CYBERPUNK("赛博朋克", listOf(Color(0xFF00E5FF), Color(0xFF651FFF), Color(0xFFFF4081))),
+    AURORA("极光之境", listOf(Color(0xFF00FF9F), Color(0xFF00B8FF), Color(0xFF001AFF))),
+    VOLCANO("熔岩赤红", listOf(Color(0xFFFF5722), Color(0xFFFFC107), Color(0xFFD50000))),
+    FOREST("翡翠绿意", listOf(Color(0xFF00C853), Color(0xFFB2FF59), Color(0xFF1B5E20))),
+    MONO("水墨黑白", listOf(Color.White, Color.LightGray, Color.DarkGray))
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
@@ -49,6 +61,9 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var artStyle by remember { mutableStateOf(ArtStyle.LIQUID_NEON) }
     var timeFilter by remember { mutableFloatStateOf(1f) } // 0.0 to 1.0
+    var selectedPalette by remember { mutableStateOf(ArtPalette.CYBERPUNK) }
+    var visualDensity by remember { mutableFloatStateOf(0.5f) } // 0.1 to 1.0
+    var randomSeed by remember { mutableLongStateOf(42L) }
 
     // Get all track points (or a sample)
     val allTrackPoints by viewModel.getHeatmapPoints().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -75,23 +90,27 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
-                    Column {
-                        Text("足迹工坊 · 时空热力", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("足迹工坊 · 时空热力", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
                         Text(displayDateRange, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), "Back")
+                        Icon(painterResource(R.drawable.ic_arrow_back), "Back", tint = Color.White)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Refresh or randomize seed */ }) {
-                        Icon(Icons.Default.Refresh, "Randomize")
+                    IconButton(onClick = { randomSeed = System.currentTimeMillis() }) {
+                        Icon(Icons.Default.Refresh, "Randomize", tint = MaterialTheme.colorScheme.primary)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.Black.copy(alpha = 0.9f),
+                    titleContentColor = Color.White
+                )
             )
         },
         containerColor = Color(0xFF0A0A0A) // Darker background for art
@@ -121,19 +140,20 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
             ) {
                 if (filteredPoints.isNotEmpty()) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawArt(this, filteredPoints, artStyle, size)
+                        drawArt(this, filteredPoints, artStyle, selectedPalette, visualDensity, randomSeed, size)
                         
                         // Overlay decorative text
                         val paint = android.graphics.Paint().apply {
                             color = android.graphics.Color.WHITE
-                            textSize = 40f
-                            alpha = 100
+                            textSize = 36f
+                            alpha = 80
                             isFakeBoldText = true
+                            letterSpacing = 0.2f
                         }
                         
                         drawContext.canvas.nativeCanvas.drawText(
-                            "FOOTPRINT ART // ${artStyle.label}",
-                            40f, size.height - 60f, paint
+                            "FOOTPRINT ART // ${artStyle.label} // SEED:${randomSeed.toString().takeLast(4)}",
+                            60f, size.height - 80f, paint
                         )
                     }
                 } else {
@@ -176,7 +196,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                     Text("视觉风格", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         ArtStyle.entries.forEach { style ->
@@ -186,7 +206,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                                 onClick = { artStyle = style },
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.width(100.dp)
                             ) {
                                 Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
                                     Text(
@@ -199,6 +219,60 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    Text("艺术配色", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ArtPalette.entries.forEach { palette ->
+                            val isSelected = selectedPalette == palette
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.clickable { selectedPalette = palette }
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .background(
+                                            Brush.sweepGradient(palette.colors),
+                                            shape = androidx.compose.foundation.shape.CircleShape
+                                        )
+                                        .border(
+                                            if (isSelected) 2.dp else 0.dp,
+                                            Color.White,
+                                            androidx.compose.foundation.shape.CircleShape
+                                        )
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    palette.label, 
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) Color.White else Color.Gray
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("视觉浓度", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
+                        Spacer(Modifier.weight(1f))
+                        Text("${(visualDensity * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                    }
+                    Slider(
+                        value = visualDensity,
+                        onValueChange = { visualDensity = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.tertiary,
+                            activeTrackColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    )
                     
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -206,7 +280,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                         onClick = {
                             scope.launch {
                                 try {
-                                    val bitmap = captureArtToBitmap(context, filteredPoints, artStyle)
+                                    val bitmap = captureArtToBitmap(context, filteredPoints, artStyle, selectedPalette, visualDensity, randomSeed)
                                     saveAndShareArt(context, bitmap)
                                 } catch (e: Exception) {
                                     android.widget.Toast.makeText(context, "导出失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -239,6 +313,9 @@ private fun drawArt(
     drawScope: DrawScope,
     trackPoints: List<TrackPointEntity>,
     style: ArtStyle,
+    palette: ArtPalette,
+    density: Float,
+    seed: Long,
     size: Size
 ) {
     with(drawScope) {
@@ -281,18 +358,18 @@ private fun drawArt(
                 drawPath(
                     path = path,
                     brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFF00E5FF), Color(0xFF651FFF), Color(0xFFFF4081)),
+                        colors = palette.colors,
                         start = Offset(0f, 0f),
                         end = Offset(size.width, size.height)
                     ),
-                    style = Stroke(width = 24f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                    alpha = 0.5f
+                    style = Stroke(width = 12f + 40f * density, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    alpha = 0.4f + 0.3f * density
                 )
                 drawPath(
                     path = path,
                     color = Color.White,
-                    style = Stroke(width = 3f, cap = StrokeCap.Round),
-                    alpha = 0.8f
+                    style = Stroke(width = 2f + 4f * density, cap = StrokeCap.Round),
+                    alpha = 0.6f + 0.3f * density
                 )
             }
             ArtStyle.HEATMAP -> {
@@ -302,11 +379,11 @@ private fun drawArt(
                     val y = projectY(pt.latitude)
                     drawCircle(
                         brush = Brush.radialGradient(
-                            0.0f to Color(0xFFFF5722).copy(alpha = 0.2f),
-                            0.5f to Color(0xFFFFC107).copy(alpha = 0.05f),
+                            0.0f to palette.colors.first().copy(alpha = 0.1f + 0.2f * density),
+                            0.7f to palette.colors.getOrElse(1) { palette.colors.first() }.copy(alpha = 0.05f),
                             1.0f to Color.Transparent
                         ),
-                        radius = 60f,
+                        radius = 40f + 80f * density,
                         center = Offset(x, y),
                         blendMode = BlendMode.Screen
                     )
@@ -324,36 +401,36 @@ private fun drawArt(
                     if (index > 0) {
                         val prev = trackPoints[index - 1]
                         drawLine(
-                            color = color,
+                            brush = Brush.linearGradient(palette.colors),
                             start = Offset(projectX(prev.longitude), projectY(prev.latitude)),
                             end = Offset(x, y),
-                            strokeWidth = 2f + progress * 20f,
+                            strokeWidth = (2f + progress * 20f) * density * 2f,
                             cap = StrokeCap.Round,
-                            alpha = progress * 0.7f
+                            alpha = progress * (0.4f + 0.5f * density)
                         )
                     }
                 }
             }
             ArtStyle.GALAXY_DUST -> {
-                val rand = Random(42)
+                val rand = Random(seed)
                 trackPoints.forEach { pt ->
                     val x = projectX(pt.longitude)
                     val y = projectY(pt.latitude)
-                    val pSize = (2..12).random(rand).toFloat()
+                    val pSize = (2..12).random(rand).toFloat() * (0.5f + density)
                     
                     drawCircle(
-                        color = Color.White,
+                        color = palette.colors.random(rand),
                         radius = pSize / 2,
                         center = Offset(x, y),
-                        alpha = rand.nextFloat() * (0.9f - 0.3f) + 0.3f
+                        alpha = (rand.nextFloat() * 0.6f + 0.3f) * density
                     )
                     
-                    if (rand.nextFloat() > 0.95f) {
+                    if (rand.nextFloat() > (1.0f - 0.1f * density)) {
                         // Rare "star burst"
-                        val glowSize = pSize * 5f
+                        val glowSize = pSize * (4f + 8f * density)
                         drawCircle(
                             brush = Brush.radialGradient(
-                                0f to Color.White.copy(alpha = 0.4f),
+                                0f to palette.colors.random(rand).copy(alpha = 0.4f),
                                 1f to Color.Transparent
                             ),
                             radius = glowSize,
@@ -369,7 +446,10 @@ private fun drawArt(
 private fun captureArtToBitmap(
         context: android.content.Context,
         points: List<TrackPointEntity>,
-        style: ArtStyle
+        style: ArtStyle,
+        palette: ArtPalette,
+        density: Float,
+        seed: Long
 ): Bitmap {
         val width = 1080
         val height = 1920
@@ -383,7 +463,7 @@ private fun captureArtToBitmap(
                 layoutDirection = LayoutDirection.Ltr,
                 canvas = androidx.compose.ui.graphics.Canvas(canvas),
                 size = Size(width.toFloat(), height.toFloat())
-        ) { drawArt(this, points, style, size) }
+        ) { drawArt(this, points, style, palette, density, seed, size) }
         return bitmap
 }
 
