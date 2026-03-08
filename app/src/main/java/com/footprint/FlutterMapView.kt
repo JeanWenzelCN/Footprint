@@ -44,6 +44,7 @@ class FlutterMapView(
 
     private var livePolyline: Polyline? = null
     private var historyPolyline: Polyline? = null
+    private var heatmapOverlay: TileOverlay? = null
     private val markerList = mutableListOf<Marker>()
 
     init {
@@ -105,6 +106,7 @@ class FlutterMapView(
                 currentPathPoints = locations.map { LatLng(it.latitude, it.longitude) }
                 fogOverlay.updateLivePathMercatorCache()
                 updateLivePolyline()
+                if (heatmapOverlay != null) updateHeatmap()
                 fogOverlay.invalidate()
             }
         }
@@ -165,6 +167,42 @@ class FlutterMapView(
                 }
     }
 
+    private fun updateHeatmap() {
+        val map = aMap ?: return
+        heatmapOverlay?.remove()
+        heatmapOverlay = null
+
+        val allPoints = mutableListOf<LatLng>()
+        allPoints.addAll(historyPoints)
+        allPoints.addAll(currentPathPoints)
+
+        if (allPoints.isEmpty()) return
+
+        try {
+            val builder = HeatmapTileProvider.Builder()
+            builder.data(allPoints)
+            // 自定义渐变色，使其更具设计感（深蓝->青->绿->黄->橙红）
+            val gradient = Gradient(
+                intArrayOf(
+                    Color.argb(0, 0, 122, 255),    // 透明
+                    Color.rgb(102, 204, 255),      // 淡蓝
+                    Color.rgb(102, 255, 204),      // 青
+                    Color.rgb(255, 255, 102),      // 黄
+                    Color.rgb(255, 87, 34)         // 橙红
+                ),
+                floatArrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+            )
+            builder.gradient(gradient)
+            builder.radius(45) // 增加半径使热力效果更丝滑
+            builder.transparency(0.15) // 设置透明度（0为不透明，1为全透明）
+
+            val provider = builder.build()
+            heatmapOverlay = map.addTileOverlay(TileOverlayOptions().tileProvider(provider))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "setFogEnabled" -> {
@@ -181,6 +219,13 @@ class FlutterMapView(
                 val mode = call.arguments as? String ?: "STANDARD"
                 updateMapStyle(mode)
                 fogOverlay.visibility = if (mode == "FOG") View.VISIBLE else View.GONE
+                
+                if (mode == "HEATMAP") {
+                    updateHeatmap()
+                } else {
+                    heatmapOverlay?.remove()
+                    heatmapOverlay = null
+                }
                 result.success(true)
             }
             "setEntries" -> {
@@ -236,6 +281,7 @@ class FlutterMapView(
                                 ?: emptyList()
                 fogOverlay.updateHistoryMercatorCache()
                 fogOverlay.invalidate()
+                if (heatmapOverlay != null) updateHeatmap()
                 result.success(true)
             }
             "setTrackingPath" -> {

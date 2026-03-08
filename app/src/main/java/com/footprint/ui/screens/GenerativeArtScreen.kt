@@ -148,7 +148,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
                 shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    containerColor = Color(0xFF1E1E1E).copy(alpha = 0.98f) // Forced dark card for art controls
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
@@ -156,19 +156,24 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.DateRange, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("时空演进", style = MaterialTheme.typography.labelLarge)
+                        Text("时空演进", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
                         Spacer(Modifier.weight(1f))
-                        Text("${(timeFilter * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                        Text("${(timeFilter * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                     }
                     Slider(
                         value = timeFilter,
                         onValueChange = { timeFilter = it },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                        )
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    Text("视觉风格", style = MaterialTheme.typography.labelLarge)
+                    Text("视觉风格", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -180,14 +185,14 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                                 selected = isSelected,
                                 onClick = { artStyle = style },
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
                                     Text(
                                         style.label, 
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White.copy(alpha = 0.7f),
                                         maxLines = 1
                                     )
                                 }
