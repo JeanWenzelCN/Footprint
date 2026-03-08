@@ -43,7 +43,7 @@ class FootprintRepository(
         suspend fun getAllGoals(): List<TravelGoal> = travelGoalDao.getAll().map { it.toModel() }
 
         // --- Tracking ---
-        suspend fun saveTrackPoint(location: com.amap.api.location.AMapLocation) {
+        suspend fun saveTrackPoint(location: com.amap.api.location.AMapLocation, sessionId: Long = 0) {
                 val entity =
                         com.footprint.data.local.TrackPointEntity(
                                 latitude = location.latitude,
@@ -52,7 +52,8 @@ class FootprintRepository(
                                 speed = location.speed,
                                 accuracy = location.accuracy,
                                 altitude = location.altitude,
-                                adcode = location.adCode
+                                adcode = location.adCode,
+                                sessionId = sessionId
                         )
                 trackPointDao.insert(entity)
         }
@@ -64,7 +65,8 @@ class FootprintRepository(
                 accuracy: Float,
                 speed: Float,
                 timestamp: Long,
-                adcode: String? = null
+                adcode: String? = null,
+                sessionId: Long = 0
         ) {
                 val entity =
                         com.footprint.data.local.TrackPointEntity(
@@ -74,7 +76,8 @@ class FootprintRepository(
                                 speed = speed,
                                 accuracy = accuracy,
                                 altitude = altitude,
-                                adcode = adcode
+                                adcode = adcode,
+                                sessionId = sessionId
                         )
                 trackPointDao.insert(entity)
         }

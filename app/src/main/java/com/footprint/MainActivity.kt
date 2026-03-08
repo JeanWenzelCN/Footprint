@@ -128,7 +128,7 @@ class MainActivity : FlutterActivity() {
                                     // 合并两个数据源
                                     val allPoints = mutableListOf<Map<String, Double>>()
                                     trackLocations.forEach {
-                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude))
+                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude, "sessionId" to it.sessionId.toDouble()))
                                     }
                                     entries.filter { it.latitude != null && it.longitude != null }.forEach {
                                         allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!))
@@ -307,9 +307,10 @@ class MainActivity : FlutterActivity() {
                             val acc = (args["accuracy"] as? Number)?.toFloat() ?: 0f
                             val spd = (args["speed"] as? Number)?.toFloat() ?: 0f
                             val ts = (args["timestamp"] as? Number)?.toLong() ?: 0L
+                            val sid = (args["sessionId"] as? Number)?.toLong() ?: 0L
                             lifecycleScope.launch(Dispatchers.IO) {
                                 try {
-                                    repository.saveTrackPointRaw(lat, lng, alt, acc, spd, ts)
+                                    repository.saveTrackPointRaw(lat, lng, alt, acc, spd, ts, null, sid)
                                     withContext(Dispatchers.Main) { result.success(true) }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {

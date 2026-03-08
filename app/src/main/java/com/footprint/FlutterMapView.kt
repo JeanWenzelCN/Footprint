@@ -1,7 +1,8 @@
-package com.footprint
+package com.footprint 
 
 import android.content.Context
 import android.graphics.*
+import java.util.LinkedHashMap
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
@@ -43,7 +44,7 @@ class FlutterMapView(
     private var historyPoints: List<LatLng> = emptyList()
 
     private var livePolyline: Polyline? = null
-    private var historyPolyline: Polyline? = null
+    private val historyPolylines = mutableListOf<Polyline>()
     private var heatmapOverlay: TileOverlay? = null
     private val markerList = mutableListOf<Marker>()
     private val capsuleMarkers = mutableListOf<Marker>()
@@ -91,12 +92,12 @@ class FlutterMapView(
             }
 
             setOnMarkerClickListener { marker ->
-                val id = marker.snippet?.toLongOrNull()
-                if (id != null) {
+                val markerId = marker.snippet?.toLongOrNull()
+                if (markerId != null) {
                     if (marker.title == "CAPSULE") {
-                        channel.invokeMethod("onCapsuleClick", id)
+                        channel.invokeMethod("onCapsuleClick", markerId)
                     } else {
-                        channel.invokeMethod("onMarkerClick", id)
+                        channel.invokeMethod("onMarkerClick", markerId)
                     }
                 }
                 true
@@ -402,36 +403,52 @@ class FlutterMapView(
             }
             "setHistoryPoints" -> {
                 // 用于加载历史数据的接口 (同时用于迷雾挖洞和历史轨迹线绘制)
-                val points = call.arguments as? List<*>
-                val latLngPoints = points?.mapNotNull {
-                    val itMap = it as? Map<*, *> ?: return@mapNotNull null
+                val points: List<Any?> = (call.arguments as? List<*>) ?: emptyList()
+                
+                // 1. 解析带 SessionId 的点位
+                val sessionGroups = LinkedHashMap<Long, MutableList<LatLng>>()
+                val allPointsForFog = mutableListOf<LatLng>()
+
+                points.forEach {
+                    val itMap = it as? Map<*, *> ?: return@forEach
                     val lat = (itMap["lat"] as? Number)?.toDouble() ?: (itMap["latitude"] as? Number)?.toDouble()
                     val lng = (itMap["lng"] as? Number)?.toDouble() ?: (itMap["longitude"] as? Number)?.toDouble()
-                    if (lat != null && lng != null) LatLng(lat, lng) else null
-                } ?: emptyList()
+                    val sid = (itMap["sessionId"] as? Number)?.toLong() ?: 0L
+                    
+                    if (lat != null && lng != null) {
+                        val latLng = LatLng(lat, lng)
+                        allPointsForFog.add(latLng)
+                        // Group by sessionId to separate lines
+                        sessionGroups.getOrPut(sid) { mutableListOf() }.add(latLng)
+                    }
+                }
 
                 // 更新迷雾挖洞点位
-                historyPoints = latLngPoints
+                historyPoints = allPointsForFog
                 fogOverlay.updateHistoryMercatorCache()
                 fogOverlay.invalidate()
 
                 // 更新热力图（如果开启）
                 if (heatmapOverlay != null) updateHeatmap()
 
-                // 更新历史轨迹线
-                historyPolyline?.remove()
-                historyPolyline = null
-                if (latLngPoints.isNotEmpty()) {
-                    val pathColor = getPathColor(false)
-                    historyPolyline = aMap?.addPolyline(
-                        PolylineOptions()
-                            .addAll(latLngPoints)
-                            .width(if (currentMode == "CAPSULE") 15f else 18f)
-                            .color(pathColor)
-                            .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                            .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                            .zIndex(90f)
-                    )
+                // 更新历史轨迹线：清除旧线并为每个 session 绘制新线
+                historyPolylines.forEach { it.remove() }
+                historyPolylines.clear()
+                
+                val pathColor = getPathColor(false)
+                for ((_, segmentPoints) in sessionGroups) {
+                    if (segmentPoints.size >= 2) {
+                        val polyline = aMap?.addPolyline(
+                            PolylineOptions()
+                                .addAll(segmentPoints)
+                                .width(if (currentMode == "CAPSULE") 15f else 18f)
+                                .color(pathColor)
+                                .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                .zIndex(90f)
+                        )
+                        polyline?.let { historyPolylines.add(it) }
+                    }
                 }
                 result.success(true)
             }

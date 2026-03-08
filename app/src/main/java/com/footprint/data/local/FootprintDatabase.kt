@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
                         TimeCapsuleEntity::class,
                         UserBadgeEntity::class,
                         UserStatsEntity::class],
-        version = 10,
+        version = 11,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -203,6 +203,22 @@ abstract class FootprintDatabase : RoomDatabase() {
                                 }
                         }
 
+                val MIGRATION_10_11 =
+                        object : androidx.room.migration.Migration(10, 11) {
+                                override fun migrate(
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        // Add sessionId to track_points
+                                        try {
+                                                db.execSQL(
+                                                        "ALTER TABLE track_points ADD COLUMN sessionId INTEGER NOT NULL DEFAULT 0"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                }
+                        }
+
                 fun getInstance(context: Context): FootprintDatabase =
                         instance
                                 ?: synchronized(this) {
@@ -216,7 +232,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         "footprint-db"
                                 )
                                 .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-                                .addMigrations(MIGRATION_9_10)
+                                .addMigrations(MIGRATION_9_10, MIGRATION_10_11)
                                 .fallbackToDestructiveMigration()
                                 .build()
         }

@@ -11,5 +11,6 @@ data class TrackPointEntity(
         val speed: Float,
         val accuracy: Float,
         val altitude: Double,
-        val adcode: String? = null
+        val adcode: String? = null,
+        val sessionId: Long = 0
 )

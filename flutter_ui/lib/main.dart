@@ -2439,7 +2439,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  "Footprint v3.6.0",
+                  "Footprint v3.6.1",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.blueAccent),
                 ),
               ),
@@ -2562,6 +2562,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
           setState(() {
             _isTracking = data['isTracking'];
             _updateNativeLocationState();
+            _updateNativeMap();
             if (!_isTracking) {
               _durationStr = '00:00:00';
               _durationTimer?.cancel();
@@ -2610,6 +2611,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         });
         _startDurationTimer();
         _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
+        _updateNativeMap();
       }
     } catch (e) {
       debugPrint('Error recovering state: $e');
@@ -2794,10 +2796,16 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _mapChannel?.invokeMethod('setTheme', isDark);
     _mapChannel?.invokeMethod('setMapMode', mapMode);
     _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
-    _mapChannel?.invokeMethod('setEntries', _allEntries);
-    _mapChannel?.invokeMethod('setCapsules', _capsules);
-    if (_fogPoints.isNotEmpty) {
+    
+    // User request: Hide history in standard mode when not tracking
+    final bool showHistory = mapMode != 'STANDARD' || _isTracking;
+    _mapChannel?.invokeMethod('setEntries', showHistory ? _allEntries : []);
+    _mapChannel?.invokeMethod('setCapsules', showHistory ? _capsules : []);
+    
+    if (showHistory) {
       _mapChannel?.invokeMethod('setHistoryPoints', _fogPoints);
+    } else {
+      _mapChannel?.invokeMethod('setHistoryPoints', <Map<String, double>>[]);
     }
   }
 

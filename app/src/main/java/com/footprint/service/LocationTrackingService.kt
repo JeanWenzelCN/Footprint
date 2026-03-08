@@ -328,7 +328,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                         val app =
                                                 applicationContext as
                                                         com.footprint.FootprintApplication
-                                        app.repository.saveTrackPoint(clonedLocation)
+                                        app.repository.saveTrackPoint(clonedLocation, _sessionStartTime)
                                     } catch (e: Exception) {
                                         Log.e("FootprintLoc", "Failed to save point: ${e.message}")
                                     }
