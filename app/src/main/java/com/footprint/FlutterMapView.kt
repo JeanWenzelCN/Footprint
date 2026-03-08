@@ -145,7 +145,7 @@ class FlutterMapView(
                     map.addPolyline(
                             PolylineOptions()
                                     .addAll(currentPathPoints)
-                                    .width(if (currentMode == "CAPSULE") 15f else 18f)
+                                    .width(if (currentMode == "CAPSULE") 10f else 12f)
                                     .color(pathColor)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                     .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
@@ -435,20 +435,54 @@ class FlutterMapView(
                 historyPolylines.forEach { it.remove() }
                 historyPolylines.clear()
                 
-                val pathColor = getPathColor(false)
-                for ((_, segmentPoints) in sessionGroups) {
-                    if (segmentPoints.size >= 2) {
-                        val polyline = aMap?.addPolyline(
-                            PolylineOptions()
-                                .addAll(segmentPoints)
-                                .width(if (currentMode == "CAPSULE") 15f else 18f)
+                // 在热力图模式下，不显示轨迹折线，避免视觉冲突
+                if (currentMode != "HEATMAP") {
+                    val pathColor = getPathColor(false)
+                    for ((_, segmentPoints) in sessionGroups) {
+                        if (segmentPoints.size >= 2) {
+                            val polyline = aMap?.addPolyline(
+                                PolylineOptions()
+                                    .addAll(segmentPoints)
+                                    .width(if (currentMode == "CAPSULE") 10f else 12f)
+                                    .color(pathColor)
+                                    .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                    .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                    .zIndex(90f)
+                            )
+                            polyline?.let { historyPolylines.add(it) }
+                        }
+                    }
+                }
+                result.success(true)
+            }
+            "setTrackingPath" -> {
+                // 用于显示单个历史足迹轨迹 (Detail Page 使用)
+                val points: List<Any?> = (call.arguments as? List<*>) ?: emptyList()
+                val latLngs = mutableListOf<LatLng>()
+                points.forEach {
+                    val itMap = it as? Map<*, *> ?: return@forEach
+                    val lat = (itMap["lat"] as? Number)?.toDouble() ?: (itMap["latitude"] as? Number)?.toDouble()
+                    val lng = (itMap["lng"] as? Number)?.toDouble() ?: (itMap["longitude"] as? Number)?.toDouble()
+                    if (lat != null && lng != null) {
+                        latLngs.add(LatLng(lat, lng))
+                    }
+                }
+                
+                historyPolylines.forEach { it.remove() }
+                historyPolylines.clear()
+                
+                if (latLngs.size >= 2) {
+                    val pathColor = getPathColor(false)
+                    val polyline = aMap?.addPolyline(
+                        PolylineOptions()
+                                .addAll(latLngs)
+                                .width(if (currentMode == "CAPSULE") 10f else 12f)
                                 .color(pathColor)
                                 .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                 .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                .zIndex(90f)
-                        )
-                        polyline?.let { historyPolylines.add(it) }
-                    }
+                                .zIndex(95f)
+                    )
+                    polyline?.let { historyPolylines.add(it) }
                 }
                 result.success(true)
             }
