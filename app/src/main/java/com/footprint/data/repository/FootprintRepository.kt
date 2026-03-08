@@ -166,6 +166,9 @@ class FootprintRepository(
         fun observeAllCapsules(): Flow<List<com.footprint.data.local.TimeCapsuleEntity>> =
                 timeCapsuleDao.getAllCapsules()
 
+        suspend fun getAllTimeCapsules(): List<com.footprint.data.local.TimeCapsuleEntity> =
+                timeCapsuleDao.getAllCapsulesOnce()
+
         suspend fun unlockCapsule(id: Long) = timeCapsuleDao.unlockCapsule(id)
 
         suspend fun getReadyToUnlockCapsules(

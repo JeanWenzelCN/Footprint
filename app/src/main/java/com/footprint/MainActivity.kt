@@ -70,6 +70,13 @@ class MainActivity : FlutterActivity() {
                                 result.success(json)
                             }
                         }
+                        "getAllTimeCapsules" -> {
+                            lifecycleScope.launch {
+                                val capsules = withContext(Dispatchers.IO) { repository.getAllTimeCapsules() }
+                                val json = withContext(Dispatchers.Default) { gson.toJson(capsules) }
+                                result.success(json)
+                            }
+                        }
                         "getStats" -> {
                             lifecycleScope.launch {
                                 val entries =

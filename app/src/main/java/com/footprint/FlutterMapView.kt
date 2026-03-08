@@ -46,6 +46,10 @@ class FlutterMapView(
     private var historyPolyline: Polyline? = null
     private var heatmapOverlay: TileOverlay? = null
     private val markerList = mutableListOf<Marker>()
+    private val capsuleMarkers = mutableListOf<Marker>()
+    private var rawCapsules: List<Map<*, *>> = emptyList()
+    private var rawEntries: List<Map<*, *>> = emptyList()
+    private var currentMode: String = "STANDARD"
 
     init {
         channel.setMethodCallHandler(this)
@@ -87,9 +91,13 @@ class FlutterMapView(
             }
 
             setOnMarkerClickListener { marker ->
-                val entryId = marker.snippet?.toLongOrNull()
-                if (entryId != null) {
-                    channel.invokeMethod("onMarkerClick", entryId)
+                val id = marker.snippet?.toLongOrNull()
+                if (id != null) {
+                    if (marker.title == "CAPSULE") {
+                        channel.invokeMethod("onCapsuleClick", id)
+                    } else {
+                        channel.invokeMethod("onMarkerClick", id)
+                    }
                 }
                 true
             }
@@ -131,21 +139,13 @@ class FlutterMapView(
         livePolyline?.remove()
         livePolyline = null
         if (currentPathPoints.isNotEmpty()) {
-            val prefs = com.footprint.utils.PreferenceManager(context)
-            val liveColorHex =
-                    when (prefs.artColorStyle) {
-                        "Deep Blue" -> "#007AFF"
-                        "Cyber Pink" -> "#FF2D55"
-                        "Neon Green" -> "#00FF9F"
-                        "Gold" -> "#FFCC00"
-                        else -> "#00FF9F"
-                    }
+            val pathColor = getPathColor(true)
             livePolyline =
                     map.addPolyline(
                             PolylineOptions()
                                     .addAll(currentPathPoints)
-                                    .width(18f)
-                                    .color(Color.parseColor(liveColorHex))
+                                    .width(if (currentMode == "CAPSULE") 15f else 18f)
+                                    .color(pathColor)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                     .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
                                     .zIndex(100f)
@@ -153,18 +153,176 @@ class FlutterMapView(
         }
     }
 
+    private fun getPathColor(isLive: Boolean): Int {
+        if (currentMode == "CAPSULE") {
+            return Color.parseColor(if (isLive) "#00E5FF" else "#01579B")
+        }
+        val prefs = com.footprint.utils.PreferenceManager(context)
+        val hex = when (prefs.artColorStyle) {
+            "Deep Blue" -> "#007AFF"
+            "Cyber Pink" -> "#FF2D55"
+            "Neon Green" -> "#00FF9F"
+            "Gold" -> "#FFCC00"
+            else -> if (isLive) "#00FF9F" else "#42A5F5"
+        }
+        return Color.parseColor(hex)
+    }
+
     override fun getView(): View = container
 
     private fun updateMapStyle(mode: String? = null) {
-        val currentMode = mode ?: "STANDARD"
-        // 如果是迷雾或热力模式，强制使用夜间模式以配合视觉效果
-        // 否则根据应用主题设置地图样式
+        val modeToUse = mode ?: currentMode
+        // 如果是迷雾、热力或胶囊模式，强制使用夜间模式以配合视觉效果
         aMap?.mapType =
-                if (currentMode == "FOG" || currentMode == "HEATMAP" || isDark) {
+                if (modeToUse == "FOG" || modeToUse == "HEATMAP" || modeToUse == "CAPSULE" || isDark) {
                     AMap.MAP_TYPE_NIGHT
                 } else {
                     AMap.MAP_TYPE_NORMAL
                 }
+        
+        // 胶囊模式下可以显示路况图层来增加现代感
+        aMap?.isTrafficEnabled = (modeToUse == "CAPSULE")
+    }
+
+    private fun updateMarkers() {
+        updateEntryMarkers()
+        updateCapsuleMarkers()
+    }
+
+    private fun updateEntryMarkers() {
+        markerList.forEach { it.remove() }
+        markerList.clear()
+
+        // 热力图模式下不显示点位标记，让视觉焦点在于密集度
+        if (currentMode == "HEATMAP") return
+
+        rawEntries.forEach { it ->
+            val entry = it as? Map<*, *> ?: return@forEach
+            val lat = (entry["latitude"] as? Number)?.toDouble()
+            val lng = (entry["longitude"] as? Number)?.toDouble()
+            val id = (entry["id"] as? Number)?.toLong()
+            val title = entry["title"] as? String ?: "足迹"
+
+            if (lat != null && lng != null && id != null) {
+                val options = MarkerOptions().position(LatLng(lat, lng)).title(title).snippet(id.toString())
+                
+                if (currentMode == "CAPSULE") {
+                    // 胶囊模式下，普通足迹点显示为发光的小圆点
+                    options.anchor(0.5f, 0.5f)
+                    options.icon(BitmapDescriptorFactory.fromBitmap(createNeonDotBitmap(Color.parseColor("#00B0FF"))))
+                } else {
+                    // 标准/迷雾模式下使用默认图钉
+                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+                }
+                
+                val marker = aMap?.addMarker(options)
+                marker?.let { markerList.add(it) }
+            }
+        }
+    }
+
+    private fun updateCapsuleMarkers() {
+        capsuleMarkers.forEach { it.remove() }
+        capsuleMarkers.clear()
+
+        // 胶囊只在“胶囊模式”或“标准模式”下显示，但在胶囊模式下更显著
+        if (currentMode != "CAPSULE" && currentMode != "STANDARD") return
+
+        rawCapsules.forEach { data ->
+            val id = (data["id"] as? Number)?.toLong() ?: return@forEach
+            val lat = (data["latitude"] as? Number)?.toDouble() ?: return@forEach
+            val lng = (data["longitude"] as? Number)?.toDouble() ?: return@forEach
+            val message = data["message"] as? String ?: "时光胶囊"
+            val isUnlocked = data["isUnlocked"] as? Boolean ?: false
+
+            val options = MarkerOptions().position(LatLng(lat, lng))
+                    .title("CAPSULE")
+                    .snippet(id.toString())
+            
+            if (currentMode == "CAPSULE") {
+                // 胶囊模式下显示大型设计款胶囊
+                options.anchor(0.5f, 0.5f)
+                options.icon(BitmapDescriptorFactory.fromBitmap(createCapsuleBitmap(message, isUnlocked)))
+            } else {
+                // 标准模式下显示缩小版的胶囊图标
+                options.anchor(0.5f, 0.5f)
+                options.icon(BitmapDescriptorFactory.fromBitmap(createSmallCapsuleBitmap(isUnlocked)))
+            }
+            
+            val marker = aMap?.addMarker(options)
+            marker?.let { capsuleMarkers.add(it) }
+        }
+    }
+
+    private fun createCapsuleBitmap(message: String, isUnlocked: Boolean): Bitmap {
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 30f
+            color = Color.WHITE
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val displayMessage = if (message.length > 8) message.take(7) + "..." else message
+        val textWidth = textPaint.measureText(displayMessage)
+        val h = 70f
+        val padding = 35f
+        val w = textWidth + h + padding 
+        
+        val bitmap = Bitmap.createBitmap(w.toInt() + 20, h.toInt() + 20, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Glow effect
+        paint.setShadowLayer(12f, 0f, 0f, if (isUnlocked) Color.parseColor("#00E5FF") else Color.GRAY)
+        
+        // Background
+        paint.color = if (isUnlocked) Color.parseColor("#0091EA") else Color.parseColor("#424242")
+        val rect = RectF(10f, 10f, w + 10f, h + 10f)
+        canvas.drawRoundRect(rect, h / 2, h / 2, paint)
+
+        // Icon area
+        paint.setShadowLayer(0f, 0f, 0f, 0)
+        paint.color = Color.WHITE
+        paint.alpha = 60
+        canvas.drawCircle(h / 2 + 10f, h / 2 + 10f, h / 2 - 8f, paint)
+        
+        // Text
+        canvas.drawText(displayMessage, h + 15f, h / 2 + 10f - (textPaint.descent() + textPaint.ascent()) / 2, textPaint)
+        
+        return bitmap
+    }
+
+    private fun createSmallCapsuleBitmap(isUnlocked: Boolean): Bitmap {
+        val size = 48
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        
+        paint.color = if (isUnlocked) Color.parseColor("#0091EA") else Color.parseColor("#757575")
+        val rect = RectF(4f, 12f, size - 4f, size - 12f)
+        canvas.drawRoundRect(rect, size / 2f, size / 2f, paint)
+        
+        paint.color = Color.WHITE
+        paint.strokeWidth = 2f
+        paint.style = Paint.Style.STROKE
+        canvas.drawRoundRect(rect, size / 2f, size / 2f, paint)
+        
+        return bitmap
+    }
+
+    private fun createNeonDotBitmap(color: Int): Bitmap {
+        val size = 40
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        
+        paint.setShadowLayer(10f, 0f, 0f, color)
+        paint.color = color
+        canvas.drawCircle(size / 2f, size / 2f, 8f, paint)
+        
+        paint.setShadowLayer(0f, 0f, 0f, 0)
+        paint.color = Color.WHITE
+        canvas.drawCircle(size / 2f, size / 2f, 4f, paint)
+        
+        return bitmap
     }
 
     private fun updateHeatmap() {
@@ -217,7 +375,9 @@ class FlutterMapView(
             }
             "setMapMode" -> {
                 val mode = call.arguments as? String ?: "STANDARD"
+                currentMode = mode
                 updateMapStyle(mode)
+                updateMarkers()
                 fogOverlay.visibility = if (mode == "FOG") View.VISIBLE else View.GONE
                 
                 if (mode == "HEATMAP") {
@@ -229,101 +389,49 @@ class FlutterMapView(
                 result.success(true)
             }
             "setEntries" -> {
-                val entries = call.arguments as? List<*>
-                for (marker in markerList) {
-                    marker.remove()
-                }
-                markerList.clear()
-
-                entries?.forEach { it ->
-                    val entry = it as? Map<*, *> ?: return@forEach
-                    val lat = (entry["latitude"] as? Number)?.toDouble()
-                    val lng = (entry["longitude"] as? Number)?.toDouble()
-                    val id = (entry["id"] as? Number)?.toLong()
-                    val title = entry["title"] as? String ?: "足迹"
-
-                    if (lat != null && lng != null && id != null) {
-                        val marker =
-                                aMap?.addMarker(
-                                        MarkerOptions()
-                                                .position(LatLng(lat, lng))
-                                                .title(title)
-                                                .snippet(id.toString())
-                                                .icon(
-                                                        BitmapDescriptorFactory.defaultMarker(
-                                                                BitmapDescriptorFactory.HUE_AZURE
-                                                        )
-                                                )
-                                )
-                        marker?.let { markerList.add(it) }
-                    }
-                }
-
-                // historyPoints is now managed exclusively by "setHistoryPoints" hook.
-
-                fogOverlay.invalidate()
+                @Suppress("UNCHECKED_CAST")
+                rawEntries = call.arguments as? List<Map<*, *>> ?: emptyList()
+                updateEntryMarkers()
+                result.success(true)
+            }
+            "setCapsules" -> {
+                @Suppress("UNCHECKED_CAST")
+                rawCapsules = call.arguments as? List<Map<*, *>> ?: emptyList()
+                updateCapsuleMarkers()
                 result.success(true)
             }
             "setHistoryPoints" -> {
-                // 用于加载历史数据的接口 (迷雾挖洞)
+                // 用于加载历史数据的接口 (同时用于迷雾挖洞和历史轨迹线绘制)
                 val points = call.arguments as? List<*>
-                historyPoints =
-                        points?.mapNotNull {
-                            val itMap = it as? Map<*, *> ?: return@mapNotNull null
-                            val lat =
-                                    (itMap["lat"] as? Number)?.toDouble()
-                                            ?: (itMap["latitude"] as? Number)?.toDouble()
-                            val lng =
-                                    (itMap["lng"] as? Number)?.toDouble()
-                                            ?: (itMap["longitude"] as? Number)?.toDouble()
-                            if (lat != null && lng != null) LatLng(lat, lng) else null
-                        }
-                                ?: emptyList()
+                val latLngPoints = points?.mapNotNull {
+                    val itMap = it as? Map<*, *> ?: return@mapNotNull null
+                    val lat = (itMap["lat"] as? Number)?.toDouble() ?: (itMap["latitude"] as? Number)?.toDouble()
+                    val lng = (itMap["lng"] as? Number)?.toDouble() ?: (itMap["longitude"] as? Number)?.toDouble()
+                    if (lat != null && lng != null) LatLng(lat, lng) else null
+                } ?: emptyList()
+
+                // 更新迷雾挖洞点位
+                historyPoints = latLngPoints
                 fogOverlay.updateHistoryMercatorCache()
                 fogOverlay.invalidate()
-                if (heatmapOverlay != null) updateHeatmap()
-                result.success(true)
-            }
-            "setTrackingPath" -> {
-                val points = call.arguments as? List<*>
-                val latLngPoints =
-                        points?.mapNotNull {
-                            val itMap = it as? Map<*, *> ?: return@mapNotNull null
-                            val lat =
-                                    (itMap["lat"] as? Number)?.toDouble()
-                                            ?: (itMap["latitude"] as? Number)?.toDouble()
-                            val lng =
-                                    (itMap["lng"] as? Number)?.toDouble()
-                                            ?: (itMap["longitude"] as? Number)?.toDouble()
-                            if (lat != null && lng != null) LatLng(lat, lng) else null
-                        }
-                                ?: emptyList()
 
+                // 更新热力图（如果开启）
+                if (heatmapOverlay != null) updateHeatmap()
+
+                // 更新历史轨迹线
                 historyPolyline?.remove()
                 historyPolyline = null
-
                 if (latLngPoints.isNotEmpty()) {
-                    val prefs = com.footprint.utils.PreferenceManager(context)
-                    val historyColorHex =
-                            when (prefs.artColorStyle) {
-                                "Deep Blue" -> "#007AFF"
-                                "Cyber Pink" -> "#FF2D55"
-                                "Neon Green" -> "#00FF9F"
-                                "Gold" -> "#FFCC00"
-                                else -> "#42A5F5"
-                            }
-                    historyPolyline =
-                            aMap?.addPolyline(
-                                    PolylineOptions()
-                                            .addAll(latLngPoints)
-                                            .width(18f)
-                                            .color(Color.parseColor(historyColorHex))
-                                            .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                            .lineJoinType(
-                                                    PolylineOptions.LineJoinType.LineJoinRound
-                                            )
-                                            .zIndex(90f)
-                            )
+                    val pathColor = getPathColor(false)
+                    historyPolyline = aMap?.addPolyline(
+                        PolylineOptions()
+                            .addAll(latLngPoints)
+                            .width(if (currentMode == "CAPSULE") 15f else 18f)
+                            .color(pathColor)
+                            .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                            .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                            .zIndex(90f)
+                    )
                 }
                 result.success(true)
             }

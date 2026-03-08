@@ -2516,6 +2516,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   int? _lastPointTime;
   int _lastSaveTime = 0;
   String _lastAddress = '';
+  List<dynamic> _capsules = [];
   double? _lastAltitude;
   Timer? _durationTimer;
   String _durationStr = '00:00:00';
@@ -2685,9 +2686,11 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     try {
       final String jsonStr = await dataChannel.invokeMethod('getAllEntries');
       final String fogPointsJson = await dataChannel.invokeMethod('getAllFogPoints');
+      final String capsulesJson = await dataChannel.invokeMethod('getAllTimeCapsules');
       setState(() {
         _allEntries = jsonDecode(jsonStr);
         _fogPoints = jsonDecode(fogPointsJson);
+        _capsules = jsonDecode(capsulesJson);
       });
       _updateNativeMap();
     } catch (e) {
@@ -2710,9 +2713,64 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
             ),
           );
         }
+      } else if (call.method == 'onCapsuleClick') {
+        int capsuleId = call.arguments;
+        _showCapsuleDialog(capsuleId);
       }
     });
     _updateNativeMap();
+  }
+
+  void _showCapsuleDialog(int capsuleId) {
+    if (!mounted) return;
+    final capsule = _capsules.firstWhere((c) => c['id'] == capsuleId, orElse: () => null);
+    if (capsule == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.timer, color: Colors.cyan),
+            const SizedBox(width: 10),
+            Text(
+              capsule['isUnlocked'] ? "时光胶囊已开启" : "时光胶囊锁定中",
+              style: const TextStyle(color: Colors.white, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (capsule['isUnlocked']) ...[
+              Text(
+                capsule['message'],
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              const SizedBox(height: 15),
+              Text(
+                "埋藏时间: ${DateTime.fromMillisecondsSinceEpoch(capsule['creationTime']).toString().split('.')[0]}",
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ] else ...[
+              const Text(
+                "这是一颗未来的胶囊，还没到开启时刻，或者您还没到达预设位置。",
+                style: TextStyle(color: Colors.white70),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("我知道了", style: TextStyle(color: Colors.cyan)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _updateNativeMap() {
@@ -2721,6 +2779,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _mapChannel?.invokeMethod('setMapMode', mapMode);
     _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
     _mapChannel?.invokeMethod('setEntries', _allEntries);
+    _mapChannel?.invokeMethod('setCapsules', _capsules);
     if (_fogPoints.isNotEmpty) {
       _mapChannel?.invokeMethod('setHistoryPoints', _fogPoints);
     }

@@ -20,6 +20,9 @@ interface TimeCapsuleDao {
     @Query("SELECT * FROM time_capsules ORDER BY creationTime DESC")
     fun getAllCapsules(): Flow<List<TimeCapsuleEntity>>
 
+    @Query("SELECT * FROM time_capsules ORDER BY creationTime DESC")
+    suspend fun getAllCapsulesOnce(): List<TimeCapsuleEntity>
+
     @Query("UPDATE time_capsules SET isUnlocked = 1 WHERE id = :id")
     suspend fun unlockCapsule(id: Long)
 
