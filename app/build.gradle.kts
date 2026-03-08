@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.footprint"
-    compileSdk = 36
+    compileSdk = 35
     layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("app_build_fresh"))
 
     val localProperties = Properties().apply {
@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.footprint"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 47
         versionName = "3.5.8"
 
@@ -37,18 +37,20 @@ android {
             abiFilters.clear()
             abiFilters.add("arm64-v8a")
         }
-        resourceConfigurations.addAll(listOf("zh", "zh-rCN", "en", "xxhdpi"))
+        // Note: xxhdpi filtering is now handled through splitting if needed, 
+        // but for now, we only move the locale filters as suggested by the warning.
+        resourceConfigurations += listOf("zh", "zh-rCN", "en")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false  // 禁用混淆，保证 Release 版本功能与 Debug 完全一致
             isShrinkResources = false // 禁用资源缩减，防止误删图片处理相关资源
+            // 关键：确保子项目（如 Flutter 模块）也使用 Release 模式
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // 关键：确保子项目（如 Flutter 模块）也使用 Release 模式
             matchingFallbacks += listOf("release")
             
             ndk {
@@ -98,6 +100,17 @@ android {
     sourceSets {
         getByName("main") {
             jniLibs.srcDir("src/main/jniLibs")
+        }
+    }
+
+    configurations.all {
+        resolutionStrategy {
+            force("androidx.core:core-ktx:1.15.0")
+            force("androidx.core:core:1.15.0")
+            force("androidx.activity:activity:1.9.3")
+            force("androidx.activity:activity-compose:1.9.3")
+            force("androidx.activity:activity-ktx:1.9.3")
+            force("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.6")
         }
     }
 }

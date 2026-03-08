@@ -1,7 +1,8 @@
 import com.android.build.gradle.BaseExtension
 
 plugins {
-    id("com.android.application") version "8.13.2" apply false
+    id("com.android.application") version "8.7.3" apply false
+    id("com.android.library") version "8.7.3" apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
     id("org.jetbrains.kotlin.kapt") version "1.9.22" apply false
 }
@@ -15,9 +16,9 @@ subprojects {
     // We use a Map so Groovy can access it via property syntax (flutter.compileSdkVersion)
     if (project.name == "flutter_plugin_android_lifecycle" || project.name.contains("city_picker")) {
         project.extensions.extraProperties.set("flutter", mapOf(
-            "compileSdkVersion" to 36,
+            "compileSdkVersion" to 35,
             "minSdkVersion" to 21,
-            "targetSdkVersion" to 36
+            "targetSdkVersion" to 35
         ))
     }
 
@@ -61,17 +62,17 @@ subprojects {
                     } catch (e2: Exception) {}
                 }
 
-                if (currentSdkVersion != null && currentSdkVersion < 36) {
+                if (currentSdkVersion != null && currentSdkVersion < 35) {
                     // Try setCompileSdk(int) first
                     try {
                         val setCompileSdk = android.javaClass.getMethod("setCompileSdk", java.lang.Integer.TYPE)
-                        setCompileSdk.invoke(android, 36)
-                        println("Forced compileSdk to 36 for ${project.name} (was $currentSdkVersion)")
+                        setCompileSdk.invoke(android, 35)
+                        println("Forced compileSdk to 35 for ${project.name} (was $currentSdkVersion)")
                     } catch (e: Exception) {
                         // Fallback to setCompileSdkVersion(String)
                         val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", String::class.java)
-                        setCompileSdkVersion.invoke(android, "android-36")
-                        println("Forced compileSdkVersion to android-36 for ${project.name} (was $currentSdkVersion)")
+                        setCompileSdkVersion.invoke(android, "android-35")
+                        println("Forced compileSdkVersion to android-35 for ${project.name} (was $currentSdkVersion)")
                     }
                 }
             } catch (e: Exception) {}
