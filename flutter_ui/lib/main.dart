@@ -2426,30 +2426,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
-          title: const Text("关于 Footprint"),
+          backgroundColor: isDark ? const Color(0xFF1A1A1A) : null,
+          title: const Center(child: Text("关于 Footprint")),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Center(
-                child: Icon(Icons.explore, size: 64, color: Colors.blue),
+                child: Icon(Icons.explore, size: 72, color: Colors.blueAccent),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  "Footprint v3.5.8\n记录足迹，遇见更好的自己。",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  "Footprint v3.6.0",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.blueAccent),
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text("一款基于 Flutter 构建的 Material Design 3 风格足迹探索应用。"),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  "记录足迹，遇见更好的自己。",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  "一款基于 Flutter 构建的 Material Design 3 风格足迹探索应用。",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: isDark ? Colors.white60 : Colors.black54),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.person_outline),
-                title: const Text("作者主页"),
-                subtitle: const Text("StarsUnsurpass"),
+                leading: const Icon(Icons.person_outline, color: Colors.blueAccent),
+                title: const Text("作者主页", style: TextStyle(fontSize: 14)),
+                subtitle: const Text("StarsUnsurpass", style: TextStyle(fontSize: 12)),
                 onTap: () {
                   const channel = MethodChannel('com.footprint/data');
                   channel.invokeMethod('openUrl', "https://github.com/StarsUnsurpass");
