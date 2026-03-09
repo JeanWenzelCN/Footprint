@@ -181,8 +181,27 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         }
     }
 
-    // Playback Speed State
-    var playbackSpeed by remember { mutableFloatStateOf(0.005f) }
+    // Playback Speed State (km/h)
+    var playbackSpeedKmH by remember { mutableFloatStateOf(60f) }
+
+    val cumulativeDistances = remember(points) {
+        if (points.isEmpty()) return@remember emptyList<Double>()
+        val dists = mutableListOf<Double>(0.0)
+        var currentTotal = 0.0
+        val results = FloatArray(1)
+        for (i in 0 until points.size - 1) {
+            try {
+                android.location.Location.distanceBetween(
+                    points[i].latitude, points[i].longitude,
+                    points[i+1].latitude, points[i+1].longitude,
+                    results
+                )
+                currentTotal += results[0] / 1000.0
+            } catch (e: Exception) {}
+            dists.add(currentTotal)
+        }
+        dists
+    }
 
     // Unified Map Rendering: Iterative path, static markers, and roaming indicator
     LaunchedEffect(points, entriesInRange, playbackProgress, currentPlaybackPoint) {
@@ -234,27 +253,63 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         }
     }
 
-    // Playback Logic
-    LaunchedEffect(isPlaying) {
-        if (isPlaying && points.size > 1) {
+    // Playback Logic: Time-based Velocity Movement
+    LaunchedEffect(isPlaying, points, cumulativeDistances, playbackSpeedKmH) {
+        if (isPlaying && points.size > 1 && cumulativeDistances.size == points.size) {
+            val totalDist = cumulativeDistances.last()
+            if (totalDist <= 0) {
+                isPlaying = false
+                return@LaunchedEffect
+            }
+
+            var lastTime = System.currentTimeMillis()
             while (isPlaying && playbackProgress < 1f) {
-                playbackProgress += playbackSpeed
-                val index = (playbackProgress * (points.size - 1)).toInt()
-                val point = points[index]
-                val currentLatLng = LatLng(point.latitude, point.longitude)
-                currentPlaybackPoint = currentLatLng
+                val currentTime = System.currentTimeMillis()
+                val deltaMs = (currentTime - lastTime).coerceAtMost(500) // Prevent huge jumps if suspended
+                lastTime = currentTime
                 
-                // Animate Camera to follow with cinematic feel
-                mapView.map.animateCamera(CameraUpdateFactory.newCameraPosition(
-                    com.amap.api.maps.model.CameraPosition.builder()
-                        .target(currentLatLng)
-                        .zoom(16f)
-                        .tilt(60f) // Dynamic Tilt
-                        .bearing(mapView.map.cameraPosition.bearing + 1.0f) // Cinematic rotation
-                        .build()
-                ), 200, null)
+                val dtHours = deltaMs / 1000.0 / 3600.0
+                val distanceStep = playbackSpeedKmH * dtHours
                 
-                kotlinx.coroutines.delay(100)
+                val currentD = (playbackProgress * totalDist) + distanceStep
+                playbackProgress = (currentD / totalDist).toFloat().coerceIn(0f, 1f)
+                
+                // Find correct segment using binary search for performance
+                val searchRes = cumulativeDistances.binarySearch(currentD)
+                val index = when {
+                    searchRes >= 0 -> searchRes
+                    else -> (-searchRes - 2).coerceIn(0, points.size - 2)
+                }
+
+                if (index < points.size - 1) {
+                    val p1 = points[index]
+                    val p2 = points[index+1]
+                    val d1 = cumulativeDistances[index]
+                    val d2 = cumulativeDistances[index+1]
+                    
+                    val segmentProgress = if (d2 > d1) (currentD - d1) / (d2 - d1) else 0.0
+                    val clampedProg = segmentProgress.coerceIn(0.0, 1.0)
+                    
+                    val interpLat = p1.latitude + (p2.latitude - p1.latitude) * clampedProg
+                    val interpLng = p1.longitude + (p2.longitude - p1.longitude) * clampedProg
+                    val targetLatLng = LatLng(interpLat, interpLng)
+                    
+                    currentPlaybackPoint = targetLatLng
+                    
+                    // Animate Camera to follow with constant velocity feel
+                    try {
+                        mapView.map.animateCamera(CameraUpdateFactory.newCameraPosition(
+                            com.amap.api.maps.model.CameraPosition.builder()
+                                .target(targetLatLng)
+                                .zoom(16f)
+                                .tilt(60f) 
+                                .bearing(mapView.map.cameraPosition.bearing + 0.3f) 
+                                .build()
+                        ), 100, null)
+                    } catch (e: Exception) {}
+                }
+                
+                kotlinx.coroutines.delay(50) 
             }
             if (playbackProgress >= 1f) {
                 isPlaying = false
@@ -347,8 +402,8 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     Column(Modifier.padding(12.dp)) {
                         Text("漫游统计", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(4.dp))
-                        StatRow("总里程", "%.2f km".format(points.size * 0.05)) 
-                        StatRow("记录点", "${points.size}")
+                        StatRow("总里程", "%.2f km".format(cumulativeDistances.lastOrNull() ?: 0.0)) 
+                        StatRow("漫游航速", "${playbackSpeedKmH.toInt()} km/h")
                         StatRow("足迹数", "${entriesInRange.size}")
                     }
                 }
@@ -378,8 +433,8 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                             mapView.map.moveCamera(CameraUpdateFactory.newLatLng(currentPlaybackPoint!!))
                         }
                     },
-                    playbackSpeed = playbackSpeed,
-                    onPlaybackSpeedChange = { playbackSpeed = it },
+                    playbackSpeed = playbackSpeedKmH,
+                    onPlaybackSpeedChange = { playbackSpeedKmH = it },
                     entries = entriesInRange,
                     onEntryClick = { entry ->
                         if (entry.latitude != null && entry.longitude != null) {
@@ -468,14 +523,14 @@ fun ControlPanel(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Speed, null, size = 18.dp, tint = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.width(8.dp))
-                Text("回放速度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                Text("漫游航速", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                 Slider(
                     value = playbackSpeed,
                     onValueChange = onPlaybackSpeedChange,
-                    valueRange = 0.001f..0.05f,
+                    valueRange = 5f..800f,
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
                 )
-                Text("${(playbackSpeed * 1000).toInt()}x", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text("${playbackSpeed.toInt()} km/h", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
 
