@@ -90,7 +90,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 
     // Control Panel State
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showControls by remember { mutableStateOf(false) }
+    var showControls by remember { mutableStateOf(true) } // Default to true so it's not "blank"
     var mapType by remember { mutableStateOf(AMap.MAP_TYPE_NORMAL) }
 
     // Data points
@@ -108,6 +108,11 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     // Map LifeCycle
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
+        // CRITICAL: Call onCreate for AMap to display correctly
+        try {
+            mapView.onCreate(null)
+        } catch (e: Exception) {}
+
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
                 androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapView.onResume()
@@ -128,16 +133,23 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 
     // Sync Map Type and Theme
     LaunchedEffect(isDark, mapType) {
-        mapView.map.mapType = if (mapType == AMap.MAP_TYPE_NORMAL && isDark) {
-            AMap.MAP_TYPE_NIGHT
-        } else {
-            mapType
+        mapView.map.apply {
+            this.mapType = if (mapType == AMap.MAP_TYPE_NORMAL && isDark) {
+                AMap.MAP_TYPE_NIGHT
+            } else {
+                mapType
+            }
+            // Enhance 3D Visuals
+            showBuildings(true)
+            showIndoorMap(true)
+            isTrafficEnabled = false
+            uiSettings.apply {
+                isRotateGesturesEnabled = true
+                isTiltGesturesEnabled = true
+                isZoomControlsEnabled = false
+                isCompassEnabled = false
+            }
         }
-        // Enable 3D view and show buildings
-        mapView.map.showBuildings(true)
-        mapView.map.showIndoorMap(true)
-        mapView.map.uiSettings.isRotateGesturesEnabled = true
-        mapView.map.uiSettings.isTiltGesturesEnabled = true
     }
 
     // Fetch Track Data
@@ -280,21 +292,46 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                MapControlBtn(Icons.Rounded.Layers, "Type") {
+                MapControlBtn(Icons.Rounded.Layers, "图层") {
                     mapType = if (mapType == AMap.MAP_TYPE_NORMAL) AMap.MAP_TYPE_SATELLITE else AMap.MAP_TYPE_NORMAL
                 }
-                MapControlBtn(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play") {
+                MapControlBtn(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "回放") {
                     if (points.isNotEmpty()) isPlaying = !isPlaying
+                    else showControls = true // Open panel to select dates if no data
                 }
-                MapControlBtn(Icons.Rounded.FilterList, "Filter") {
+                MapControlBtn(Icons.Rounded.FilterList, "设置") {
                     showControls = true
+                }
+            }
+
+            // Empty State Hint
+            if (points.isEmpty()) {
+                Card(
+                    modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(0.9f)),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Column(
+                        Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Rounded.Place, null, size = 48.dp, tint = MaterialTheme.colorScheme.primary.copy(0.6f))
+                        Text("当前时段暂无漫游轨迹", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "点击右侧 “设置” 按钮调整日期范围，\n或在主页面开启足迹记录。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
             }
 
             // Stats Overlays
             if (points.isNotEmpty()) {
                 Card(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp).width(160.dp),
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 48.dp).width(160.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(0.85f)),
                     shape = RoundedCornerShape(20.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.3f))
@@ -302,7 +339,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     Column(Modifier.padding(12.dp)) {
                         Text("漫游统计", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(4.dp))
-                        StatRow("总里程", "%.2f km".format(points.size * 0.05)) // Placeholder for real distance
+                        StatRow("总里程", "%.2f km".format(points.size * 0.05)) 
                         StatRow("记录点", "${points.size}")
                         StatRow("足迹数", "${entriesInRange.size}")
                     }
