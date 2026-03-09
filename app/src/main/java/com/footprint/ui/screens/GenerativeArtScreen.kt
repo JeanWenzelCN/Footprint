@@ -396,7 +396,6 @@ private fun drawArt(
                     val x = projectX(pt.longitude)
                     val y = projectY(pt.latitude)
                     val progress = index.toFloat() / total
-                    val color = Color.hsv(progress * 360f, 0.7f, 1f)
                     
                     if (index > 0) {
                         val prev = trackPoints[index - 1]

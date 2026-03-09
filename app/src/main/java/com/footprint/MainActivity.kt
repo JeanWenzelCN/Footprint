@@ -128,10 +128,10 @@ class MainActivity : FlutterActivity() {
                                     // 合并两个数据源
                                     val allPoints = mutableListOf<Map<String, Double>>()
                                     trackLocations.forEach {
-                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude, "sessionId" to it.sessionId.toDouble()))
+                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude, "sessionId" to it.sessionId.toDouble(), "timestamp" to it.timestamp.toDouble()))
                                     }
                                     entries.filter { it.latitude != null && it.longitude != null }.forEach {
-                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!))
+                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!, "sessionId" to (-(it.id ?: 0L)).toDouble(), "timestamp" to 0.0))
                                     }
                                     
                                     val json = gson.toJson(allPoints)

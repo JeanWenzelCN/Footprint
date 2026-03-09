@@ -48,6 +48,7 @@ interface TrackPointDao {
                NULL as adcode, sessionId as sessionId
         FROM track_points 
         GROUP BY ROUND(latitude, 3), ROUND(longitude, 3), sessionId
+        ORDER BY sessionId, timestamp ASC
         """
         )
         suspend fun getAllDistinctLocations(): List<TrackPointEntity>

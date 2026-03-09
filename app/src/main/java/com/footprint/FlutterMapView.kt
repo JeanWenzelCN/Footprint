@@ -402,47 +402,76 @@ class FlutterMapView(
                 result.success(true)
             }
             "setHistoryPoints" -> {
-                // 用于加载历史数据的接口 (同时用于迷雾挖洞和历史轨迹线绘制)
                 val points: List<Any?> = (call.arguments as? List<*>) ?: emptyList()
                 
-                // 1. 解析带 SessionId 的点位
-                val sessionGroups = LinkedHashMap<Long, MutableList<LatLng>>()
+                // 1. 解析点位并按 SessionId 分组
+                // 使用 LinkedHashMap 保持 Session 间的顺序，每个 Session 内部是一个或多个分段的列表
+                val sessionSegments = mutableListOf<MutableList<LatLng>>()
                 val allPointsForFog = mutableListOf<LatLng>()
+                
+                var currentSid: Long? = null
+                var lastSegment: MutableList<LatLng>? = null
+                var lastLatLng: LatLng? = null
+                var lastTimestamp: Long = 0
 
                 points.forEach {
                     val itMap = it as? Map<*, *> ?: return@forEach
                     val lat = (itMap["lat"] as? Number)?.toDouble() ?: (itMap["latitude"] as? Number)?.toDouble()
                     val lng = (itMap["lng"] as? Number)?.toDouble() ?: (itMap["longitude"] as? Number)?.toDouble()
                     val sid = (itMap["sessionId"] as? Number)?.toLong() ?: 0L
+                    val ts = (itMap["timestamp"] as? Number)?.toLong() ?: 0L
                     
                     if (lat != null && lng != null) {
                         val latLng = LatLng(lat, lng)
                         allPointsForFog.add(latLng)
-                        // Group by sessionId to separate lines
-                        sessionGroups.getOrPut(sid) { mutableListOf() }.add(latLng)
+
+                        // 逻辑：如果 SessionId 变了，或者时间跨度太大（>1小时），或者距离跨度太大（>5公里且非连续点）
+                        // 则开启新的线段 (Segment)
+                        var needsNewSegment = (sid != currentSid)
+                        if (!needsNewSegment && lastLatLng != null) {
+                            val timeGap = Math.abs(ts - lastTimestamp)
+                            // 距离检查：如果两个坐标点距离超过 5km，认为是不连续的记录（可能是 GPS 跳跃或中间没记上）
+                            val results = FloatArray(1)
+                            android.location.Location.distanceBetween(lastLatLng!!.latitude, lastLatLng!!.longitude, lat, lng, results)
+                            val distGap = results[0]
+                            
+                            // 只要时间超过1小时或距离超过5km，就断开，避免产生跨越城市的大长线
+                            if (timeGap > 3600_000 || distGap > 5000) {
+                                needsNewSegment = true
+                            }
+                        }
+
+                        if (needsNewSegment) {
+                            val nextSegment = mutableListOf<LatLng>()
+                            nextSegment.add(latLng)
+                            sessionSegments.add(nextSegment)
+                            lastSegment = nextSegment
+                            currentSid = sid
+                        } else {
+                            lastSegment?.add(latLng)
+                        }
+
+                        lastLatLng = latLng
+                        lastTimestamp = ts
                     }
                 }
 
-                // 更新迷雾挖洞点位
                 historyPoints = allPointsForFog
                 fogOverlay.updateHistoryMercatorCache()
                 fogOverlay.invalidate()
 
-                // 更新热力图（如果开启）
                 if (heatmapOverlay != null) updateHeatmap()
 
-                // 更新历史轨迹线：清除旧线并为每个 session 绘制新线
                 historyPolylines.forEach { it.remove() }
                 historyPolylines.clear()
                 
-                // 在热力图模式下，不显示轨迹折线，避免视觉冲突
                 if (currentMode != "HEATMAP") {
                     val pathColor = getPathColor(false)
-                    for ((_, segmentPoints) in sessionGroups) {
-                        if (segmentPoints.size >= 2) {
+                    for (segment in sessionSegments) {
+                        if (segment.size >= 2) {
                             val polyline = aMap?.addPolyline(
                                 PolylineOptions()
-                                    .addAll(segmentPoints)
+                                    .addAll(segment)
                                     .width(if (currentMode == "CAPSULE") 10f else 12f)
                                     .color(pathColor)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
