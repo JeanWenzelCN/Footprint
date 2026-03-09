@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FootprintDao {
-    @Query("SELECT * FROM footprints ORDER BY happened_on DESC")
+    @Query("SELECT * FROM footprints ORDER BY happened_on DESC, id DESC")
     fun observeEntries(): Flow<List<FootprintEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -27,7 +27,7 @@ interface FootprintDao {
     @Query("SELECT COUNT(*) FROM footprints")
     suspend fun count(): Int
 
-    @Query("SELECT * FROM footprints")
+    @Query("SELECT * FROM footprints ORDER BY happened_on DESC, id DESC")
     suspend fun getAll(): List<FootprintEntity>
 
     @Query("SELECT * FROM footprints ORDER BY happened_on ASC LIMIT :limit OFFSET :offset")
