@@ -62,17 +62,17 @@ subprojects {
                     } catch (e2: Exception) {}
                 }
 
-                if (currentSdkVersion != null && currentSdkVersion < 35) {
+                if (currentSdkVersion != null && currentSdkVersion < 36) {
                     // Try setCompileSdk(int) first
                     try {
                         val setCompileSdk = android.javaClass.getMethod("setCompileSdk", java.lang.Integer.TYPE)
-                        setCompileSdk.invoke(android, 35)
-                        println("Forced compileSdk to 35 for ${project.name} (was $currentSdkVersion)")
+                        setCompileSdk.invoke(android, 36)
+                        println("Forced compileSdk to 36 for ${project.name} (was $currentSdkVersion)")
                     } catch (e: Exception) {
                         // Fallback to setCompileSdkVersion(String)
                         val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", String::class.java)
-                        setCompileSdkVersion.invoke(android, "android-35")
-                        println("Forced compileSdkVersion to android-35 for ${project.name} (was $currentSdkVersion)")
+                        setCompileSdkVersion.invoke(android, "android-36")
+                        println("Forced compileSdkVersion to android-36 for ${project.name} (was $currentSdkVersion)")
                     }
                 }
             } catch (e: Exception) {}
