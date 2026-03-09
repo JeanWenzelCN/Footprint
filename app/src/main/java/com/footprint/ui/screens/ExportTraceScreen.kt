@@ -238,7 +238,29 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             }
         }
 
-        // 3. Draw Roaming "Boat" Marker
+        // 3. Draw Persistent "Visual Footprints" (breadcrumbs along the way)
+        if (points.isNotEmpty()) {
+            val currentIndex = (playbackProgress * (points.size - 1)).toInt().coerceIn(0, points.size - 1)
+            // Show a footprint marker every 20 nodes to avoid overcrowding at high speeds
+            val step = if (points.size > 200) points.size / 50 else 10
+            for (i in 0 until currentIndex step step.coerceIn(1, 100)) {
+                map.addMarker(
+                    com.amap.api.maps.model.MarkerOptions()
+                        .position(LatLng(points[i].latitude, points[i].longitude))
+                        .anchor(0.5f, 0.5f)
+                        .icon(com.amap.api.maps.model.BitmapDescriptorFactory.fromBitmap(
+                            android.graphics.Bitmap.createBitmap(12, 12, android.graphics.Bitmap.Config.ARGB_8888).apply {
+                                android.graphics.Canvas(this).drawCircle(6f, 6f, 6f, android.graphics.Paint().apply {
+                                    color = android.graphics.Color.parseColor("#00E5FF")
+                                    alpha = 150
+                                })
+                            }
+                        ))
+                )
+            }
+        }
+
+        // 4. Draw Roaming "Boat" Marker
         currentPlaybackPoint?.let { pos ->
             map.addMarker(
                 com.amap.api.maps.model.MarkerOptions()
@@ -296,16 +318,17 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     
                     currentPlaybackPoint = targetLatLng
                     
-                    // Animate Camera to follow with constant velocity feel
+                    // Stabilized Camera: Slower rotation and smooth target centering
                     try {
+                        val currentBearing = mapView.map.cameraPosition.bearing
                         mapView.map.animateCamera(CameraUpdateFactory.newCameraPosition(
                             com.amap.api.maps.model.CameraPosition.builder()
                                 .target(targetLatLng)
                                 .zoom(16f)
                                 .tilt(60f) 
-                                .bearing(mapView.map.cameraPosition.bearing + 0.3f) 
+                                .bearing(currentBearing + 0.15f) // Reduced rotation speed for stability
                                 .build()
-                        ), 100, null)
+                        ), 120, null) // Slightly longer animation for smoothness
                     } catch (e: Exception) {}
                 }
                 
@@ -527,7 +550,7 @@ fun ControlPanel(
                 Slider(
                     value = playbackSpeed,
                     onValueChange = onPlaybackSpeedChange,
-                    valueRange = 5f..800f,
+                    valueRange = 5f..5000f,
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
                 )
                 Text("${playbackSpeed.toInt()} km/h", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
