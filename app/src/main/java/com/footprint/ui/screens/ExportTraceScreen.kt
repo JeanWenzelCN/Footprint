@@ -184,23 +184,32 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     // Playback Speed State
     var playbackSpeed by remember { mutableFloatStateOf(0.005f) }
 
-    // Static Traces Draw
-    LaunchedEffect(points, entriesInRange) {
-        mapView.map.clear()
+    // Unified Map Rendering: Iterative path, static markers, and roaming indicator
+    LaunchedEffect(points, entriesInRange, playbackProgress, currentPlaybackPoint) {
+        val map = try { mapView.map } catch (e: Exception) { return@LaunchedEffect }
+        map.clear()
+
+        // 1. Draw Iterative Path (only up to current progress)
         if (points.isNotEmpty()) {
-            val latLngs = points.map { LatLng(it.latitude, it.longitude) }
-            mapView.map.addPolyline(
-                PolylineOptions()
-                    .addAll(latLngs)
-                    .width(16f)
-                    .useGradient(true)
-                    .color(android.graphics.Color.parseColor("#4DEEBB"))
-                    .lineJoinType(com.amap.api.maps.model.PolylineOptions.LineJoinType.LineJoinRound)
-            )
+            val currentIndex = (playbackProgress * (points.size - 1)).toInt().coerceIn(0, points.size - 1)
+            val partialLatLngs = points.take(currentIndex + 1).map { LatLng(it.latitude, it.longitude) }
+
+            if (partialLatLngs.size >= 2) {
+                map.addPolyline(
+                    PolylineOptions()
+                        .addAll(partialLatLngs)
+                        .width(18f)
+                        .useGradient(true)
+                        .color(android.graphics.Color.parseColor("#00E5FF")) // A more vibrant cyan
+                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                )
+            }
         }
+
+        // 2. Draw Static Footprint Markers
         entriesInRange.forEach { entry ->
             if (entry.latitude != null && entry.longitude != null) {
-                mapView.map.addMarker(
+                map.addMarker(
                     com.amap.api.maps.model.MarkerOptions()
                         .position(LatLng(entry.latitude, entry.longitude))
                         .title(entry.title)
@@ -208,6 +217,20 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                         .icon(com.amap.api.maps.model.BitmapDescriptorFactory.defaultMarker(com.amap.api.maps.model.BitmapDescriptorFactory.HUE_AZURE))
                 )
             }
+        }
+
+        // 3. Draw Roaming "Boat" Marker
+        currentPlaybackPoint?.let { pos ->
+            map.addMarker(
+                com.amap.api.maps.model.MarkerOptions()
+                    .position(pos)
+                    .anchor(0.5f, 0.5f)
+                    .title("漫游焦点")
+                    .icon(com.amap.api.maps.model.BitmapDescriptorFactory.defaultMarker(com.amap.api.maps.model.BitmapDescriptorFactory.HUE_ORANGE))
+            )
+
+            // If we are just starting or point changed, ensure camera follows if play is active
+            // Note: Camera animation is handled in the playback loop for smoothness
         }
     }
 
@@ -240,24 +263,9 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         }
     }
 
-    // Playback Marker
-    val playbackMarker = remember { 
-        mutableStateOf<com.amap.api.maps.model.Marker?>(null) 
-    }
-    LaunchedEffect(currentPlaybackPoint) {
-        currentPlaybackPoint?.let { pos ->
-            if (playbackMarker.value == null) {
-                playbackMarker.value = mapView.map.addMarker(
-                    com.amap.api.maps.model.MarkerOptions()
-                        .position(pos)
-                        .anchor(0.5f, 0.5f)
-                        .icon(com.amap.api.maps.model.BitmapDescriptorFactory.defaultMarker(com.amap.api.maps.model.BitmapDescriptorFactory.HUE_RED))
-                )
-            } else {
-                playbackMarker.value?.position = pos
-            }
-        }
-    }
+    // Playback Marker State is now integrated into the unified draw effect.
+    // We can remove the old independent marker effect to avoid conflicts.
+
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -464,7 +472,7 @@ fun ControlPanel(
                 Slider(
                     value = playbackSpeed,
                     onValueChange = onPlaybackSpeedChange,
-                    valueRange = 0.001f..0.02f,
+                    valueRange = 0.001f..0.05f,
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
                 )
                 Text("${(playbackSpeed * 1000).toInt()}x", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
