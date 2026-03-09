@@ -131,7 +131,7 @@ class MainActivity : FlutterActivity() {
                                         allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude, "sessionId" to it.sessionId.toDouble(), "timestamp" to it.timestamp.toDouble()))
                                     }
                                     entries.filter { it.latitude != null && it.longitude != null }.forEach {
-                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!, "sessionId" to (-(it.id ?: 0L)).toDouble(), "timestamp" to 0.0))
+                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!, "sessionId" to (-it.id).toDouble(), "timestamp" to 0.0))
                                     }
                                     
                                     val json = gson.toJson(allPoints)
