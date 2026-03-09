@@ -1286,8 +1286,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return false;
         }).toList();
         
-        // Sort chronologically (newest first)
-        yearEntries.sort((a,b) => (b['happenedOn'] ?? '').compareTo(a['happenedOn'] ?? ''));
+        // Sort chronologically (newest first, then highest ID first if on same day)
+        yearEntries.sort((a,b) {
+          int cmp = (b['happenedOn'] ?? '').compareTo(a['happenedOn'] ?? '');
+          if (cmp != 0) return cmp;
+          return (b['id'] as int? ?? 0).compareTo(a['id'] as int? ?? 0);
+        });
 
         double dist = 0.0;
         double energySum = 0.0;
@@ -2439,7 +2443,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  "Footprint v3.6.2",
+                  "Footprint v3.6.3",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.blueAccent),
                 ),
               ),
