@@ -2561,6 +2561,14 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         if (data['type'] == 'status') {
           setState(() {
             _isTracking = data['isTracking'];
+            _isPaused = data['isPaused'] ?? false;
+            
+            // 如果 native 传回了持续时间，我们优先用它来校准 sessionStartTime
+            if (data['durationMs'] != null && _isTracking) {
+              _lastKnownDurationMs = (data['durationMs'] as num).toInt();
+              _sessionStartTime = DateTime.now().millisecondsSinceEpoch - _lastKnownDurationMs;
+            }
+
             _updateNativeLocationState();
             _updateNativeMap();
             if (!_isTracking) {
@@ -2622,7 +2630,22 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _durationTimer?.cancel();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || !_isTracking || _isPaused) return;
-      setState(() => _durationStr = _formatDuration(DateTime.now().millisecondsSinceEpoch - _sessionStartTime));
+      
+      // 安全检查：如果 _sessionStartTime 尚未初始化（为0），或者是异常值，
+      // 避免计算出几百万个小时。
+      int now = DateTime.now().millisecondsSinceEpoch;
+      if (_sessionStartTime <= 0 || _sessionStartTime > now) {
+        // 尝试使用最近已知的持续时间
+        _sessionStartTime = now - _lastKnownDurationMs;
+      }
+      
+      int elapsed = now - _sessionStartTime;
+      // 这里的 1000 小时是一个合理的上限检查（约为 41 天），超过此值认为初始化有问题
+      if (elapsed > 3600000 * 1000) {
+        elapsed = _lastKnownDurationMs;
+      }
+
+      setState(() => _durationStr = _formatDuration(elapsed));
     });
   }
 

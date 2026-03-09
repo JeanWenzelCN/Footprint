@@ -549,12 +549,14 @@ class MainActivity : FlutterActivity() {
                                         lifecycleScope.launch {
                                             com.footprint.service.LocationTrackingService.isTracking
                                                     .collect { isTracking ->
+                                                        val service = com.footprint.service.LocationTrackingService
                                                         events.success(
                                                                 gson.toJson(
                                                                         mapOf(
                                                                                 "type" to "status",
-                                                                                "isTracking" to
-                                                                                        isTracking
+                                                                                "isTracking" to isTracking,
+                                                                                "isPaused" to service.isPaused.value,
+                                                                                "durationMs" to service.totalDurationMs
                                                                         )
                                                                 )
                                                         )
