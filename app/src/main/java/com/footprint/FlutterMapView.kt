@@ -8,15 +8,8 @@ import android.view.View
 import android.widget.FrameLayout
 import com.amap.api.maps.AMap
 import com.amap.api.maps.MapView
-import com.amap.api.maps.model.*
-import com.amap.api.maps.model.MyLocationStyle
-import com.footprint.service.LocationTrackingService
-import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.platform.PlatformView
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collectLatest
+import com.footprint.ui.effects.ETERNAL_CLOUD_SHADER
+import java.util.Calendar
 
 class FlutterMapView(
         private val context: Context,
@@ -48,9 +41,14 @@ class FlutterMapView(
     private var heatmapOverlay: TileOverlay? = null
     private val markerList = mutableListOf<Marker>()
     private val capsuleMarkers = mutableListOf<Marker>()
+    private val eternalMarkers = mutableListOf<Marker>()
     private var rawCapsules: List<Map<*, *>> = emptyList()
     private var rawEntries: List<Map<*, *>> = emptyList()
     private var currentMode: String = "STANDARD"
+
+    // 专属渲染层
+    private val distanceThreadView = DistanceThreadView(context)
+    private var yunnanMask: Polygon? = null
 
     init {
         channel.setMethodCallHandler(this)
@@ -92,6 +90,10 @@ class FlutterMapView(
             }
 
             setOnMarkerClickListener { marker ->
+                if (marker.title == "ETERNAL_POI") {
+                    channel.invokeMethod("onMarkerClick", marker.snippet)
+                    return@setOnMarkerClickListener true
+                }
                 val markerId = marker.snippet?.toLongOrNull()
                 if (markerId != null) {
                     if (marker.title == "CAPSULE") {
@@ -105,9 +107,11 @@ class FlutterMapView(
         }
 
         container.addView(mapView)
+        container.addView(distanceThreadView)
         container.addView(fogOverlay)
 
         fogOverlay.visibility = View.GONE
+        distanceThreadView.visibility = View.GONE
 
         // 1. 监听实时轨迹流 (来自 Kotlin Service)
         scope.launch {
@@ -183,6 +187,46 @@ class FlutterMapView(
         
         // 胶囊模式下可以显示路况图层来增加现代感
         aMap?.isTrafficEnabled = (modeToUse == "CAPSULE")
+
+        if (modeToUse == "ETERNAL_REALM") {
+            applyEternalRealmStyle()
+        } else {
+            yunnanMask?.remove()
+            yunnanMask = null
+        }
+    }
+
+    private fun applyEternalRealmStyle() {
+        val map = aMap ?: return
+        map.mapType = AMap.MAP_TYPE_NORMAL
+        
+        // 云南省大致边界 (简化版)
+        val yunnanBoundary = listOf(
+            LatLng(29.23, 98.13), LatLng(28.43, 99.45), LatLng(28.23, 101.45),
+            LatLng(28.85, 103.02), LatLng(27.95, 104.32), LatLng(27.42, 105.15),
+            LatLng(25.62, 105.15), LatLng(24.95, 106.18), LatLng(22.85, 105.52),
+            LatLng(22.51, 104.45), LatLng(21.15, 101.55), LatLng(21.45, 99.98),
+            LatLng(23.62, 98.85), LatLng(24.52, 97.52), LatLng(25.95, 98.05),
+            LatLng(28.25, 97.95)
+        )
+
+        // 外围遮罩 (全世界遮罩，中间留洞给云南)
+        val hole = yunnanBoundary
+        val world = listOf(
+            LatLng(85.0, -180.0), LatLng(85.0, 180.0), 
+            LatLng(-85.0, 180.0), LatLng(-85.0, -180.0)
+        )
+        
+        yunnanMask?.remove()
+        yunnanMask = map.addPolygon(
+            PolygonOptions().addAll(world).addHoles(hole)
+                .fillColor(Color.parseColor("#4D000000")) // 30% black
+                .strokeWidth(0f)
+                .zIndex(10f)
+        )
+
+        // 缩放至云南
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(25.04, 101.5), 6.5f))
     }
 
     private fun updateMarkers() {
@@ -387,6 +431,16 @@ class FlutterMapView(
                     heatmapOverlay?.remove()
                     heatmapOverlay = null
                 }
+                
+                distanceThreadView.visibility = if (mode == "ETERNAL_REALM") View.VISIBLE else View.GONE
+                if (mode == "ETERNAL_REALM") {
+                    distanceThreadView.startAnimation()
+                    fogOverlay.setEternalMode(true)
+                    updateEternalMarkers()
+                } else {
+                    fogOverlay.setEternalMode(false)
+                    clearEternalMarkers()
+                }
                 result.success(true)
             }
             "setEntries" -> {
@@ -581,6 +635,89 @@ class FlutterMapView(
                 // 都没有位置信息
                 result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
             }
+        }
+    }
+
+    private fun updateEternalMarkers() {
+        clearEternalMarkers()
+        val pois = listOf(
+            Triple(LatLng(25.04, 102.71), "KUNMING", "昆明"),
+            Triple(LatLng(25.69, 100.16), "DALI", "大理"),
+            Triple(LatLng(26.87, 100.22), "LIJIANG", "丽江")
+        )
+        pois.forEach { (pos, tag, desc) ->
+            val opt = MarkerOptions().position(pos).title("ETERNAL_POI").snippet(tag)
+            opt.anchor(0.5f, 0.5f)
+            opt.icon(BitmapDescriptorFactory.fromBitmap(createEternalMarkerBitmap(tag)))
+            val m = aMap?.addMarker(opt)
+            m?.let { eternalMarkers.add(it) }
+        }
+    }
+
+    private fun clearEternalMarkers() {
+        eternalMarkers.forEach { it.remove() }
+        eternalMarkers.clear()
+    }
+
+    private fun createEternalMarkerBitmap(tag: String): Bitmap {
+        val size = 64
+        val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        when (tag) {
+            "KUNMING" -> {
+                c.drawRect(15f, 15f, 49f, 49f, p)
+                c.drawLine(15f, 32f, 49f, 32f, p)
+            }
+            "DALI" -> {
+                c.drawCircle(32f, 32f, 18f, p)
+                c.drawLine(32f, 14f, 32f, 50f, p)
+                c.drawLine(14f, 32f, 50f, 32f, p)
+            }
+            else -> {
+                c.drawCircle(32f, 32f, 12f, p)
+            }
+        }
+        return b
+    }
+
+    inner class DistanceThreadView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 8f
+        }
+        private val kunming = LatLng(25.04, 102.71)
+        private var pulsePos = 0f
+        fun startAnimation() { postInvalidateOnAnimation() }
+        override fun onDraw(canvas: Canvas) {
+            if (currentMode != "ETERNAL_REALM") return
+            val map = aMap ?: return
+            val start = if (cachedLat > 1.0) LatLng(cachedLat, cachedLng) else LatLng(39.9, 116.4)
+            val p1 = map.projection.toScreenLocation(start)
+            val p2 = map.projection.toScreenLocation(kunming)
+            val path = Path()
+            path.moveTo(p1.x.toFloat(), p1.y.toFloat())
+            val cx = (p1.x + p2.x) / 2f
+            val cy = Math.min(p1.y, p2.y) - 300f
+            path.quadTo(cx, cy, p2.x.toFloat(), p2.y.toFloat())
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            paint.color = if (hour in 8..17) Color.parseColor("#FFD700") else Color.parseColor("#00BFFF")
+            paint.alpha = 150
+            canvas.drawPath(path, paint)
+            pulsePos = (System.currentTimeMillis() % 2000) / 2000f
+            paint.alpha = 255
+            val pm = PathMeasure(path, false)
+            val segmentPath = Path()
+            pm.getSegment(pm.length * pulsePos, pm.length * (pulsePos + 0.1f), segmentPath, true)
+            canvas.drawPath(segmentPath, paint)
+            postInvalidateOnAnimation()
+        }
+    }
+            }
             "setLocationEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false
                 aMap?.isMyLocationEnabled = enabled
@@ -645,6 +782,19 @@ class FlutterMapView(
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
             color = Color.BLACK
+        }
+
+        private var isEternalMode = false
+        private var eternalShader: RuntimeShader? = null
+        
+        fun setEternalMode(enabled: Boolean) {
+            isEternalMode = enabled
+            if (enabled && eternalShader == null) {
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    eternalShader = RuntimeShader(ETERNAL_CLOUD_SHADER)
+                }
+            }
+            invalidate()
         }
         
         private var lastBlurRadius: Float = -1f
@@ -800,6 +950,10 @@ class FlutterMapView(
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            if (isEternalMode) {
+                drawEternalClouds(canvas)
+                return
+            }
             val map = aMap ?: return
             val projection = map.projection ?: return
 
@@ -1048,8 +1202,28 @@ class FlutterMapView(
             }
 
             if (isAnimating && visibility == VISIBLE) {
-                postInvalidateOnAnimation() // 以显示器刷新率循环重绘实现60fps动画
+                postInvalidateOnAnimation()
             }
+        }
+
+        private fun drawEternalClouds(canvas: Canvas) {
+            if (android.os.Build.VERSION.SDK_INT >= 33 && eternalShader != null) {
+                val shader = eternalShader!!
+                shader.setFloatUniform("uResolution", width.toFloat(), height.toFloat())
+                shader.setFloatUniform("uTime", (System.currentTimeMillis() % 1000000L).toFloat() / 1000f)
+                shader.setFloatUniform("uTimeOfDay", Calendar.getInstance().get(Calendar.HOUR_OF_DAY) / 24f)
+                
+                val center = aMap?.cameraPosition?.target ?: LatLng(25.0, 102.0)
+                shader.setFloatUniform("uWindOffset", center.longitude.toFloat(), center.latitude.toFloat())
+                shader.setFloatUniform("uMapScale", (20f - (aMap?.cameraPosition?.zoom ?: 10f)).coerceAtLeast(1f) * 2f)
+                
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), Paint().apply { this.shader = shader })
+            } else {
+                // Fallback: draw a very light tint
+                canvas.drawColor(Color.parseColor("#1AFFFFFF"))
+            }
+
+            if (isAnimating) postInvalidateOnAnimation()
         }
     }
 }

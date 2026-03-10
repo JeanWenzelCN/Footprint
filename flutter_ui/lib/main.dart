@@ -4199,20 +4199,43 @@ class EternalRealmScreen extends StatefulWidget {
   State<EternalRealmScreen> createState() => _EternalRealmScreenState();
 }
 
-class _EternalRealmScreenState extends State<EternalRealmScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProviderStateMixin {
+  late AnimationController _starController;
+  bool showMap = false;
+  Map<String, dynamic>? selectedPOI;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+    _starController = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _starController.dispose();
     super.dispose();
   }
+
+  final poiDetails = {
+    'KUNMING': {
+      'title': '昆明 · 翠湖',
+      'font': 'Ma Shan Zheng',
+      'msg': '在这里，你曾陪我看过红嘴鸥飞过海埂大坝。那些风里带来的不仅是季节的迁徙，还有你眼底温柔的湖光。',
+      'date': 'Spring, Memory'
+    },
+    'DALI': {
+      'title': '大理 · 古城',
+      'font': 'Brush Script',
+      'msg': '上关花，下关风，苍山雪，洱海月。风花雪月里，只有你的笑是万物生辉的注脚。在南诏的古砖里，我们藏过一个永恒的秘密。',
+      'date': 'Autumn, Silence'
+    },
+    'LIJIANG': {
+      'title': '丽江 · 玉龙',
+      'font': 'Ma Shan Zheng',
+      'msg': '雪山下的誓言，被云雾半遮半掩。那时候你说，未来的路像这里的石板路一样，虽然曲折，但终点总有光。',
+      'date': 'Winter, Eternal'
+    }
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -4220,17 +4243,33 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with SingleTick
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Animated Star Field Background
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return CustomPaint(
-                painter: StarFieldPainter(_controller.value),
-                size: Size.infinite,
-              );
-            },
-          ),
-          // Content
+          // Background Map or Stars
+          if (showMap)
+            _EternalMapDisplay(
+              onMarkerClick: (tag) {
+                setState(() => selectedPOI = poiDetails[tag]);
+              },
+            )
+          else
+            AnimatedBuilder(
+              animation: _starController,
+              builder: (ctx, _) => CustomPaint(painter: StarFieldPainter(_starController.value), size: Size.infinite),
+            ),
+
+          // Cloud Overlay for Map
+          if (showMap)
+            IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [Colors.black.withOpacity(0.2), Colors.transparent, Colors.black.withOpacity(0.4)],
+                  ),
+                ),
+              ),
+            ),
+
+          // Content Overlay
           SafeArea(
             child: Column(
               children: [
@@ -4238,89 +4277,178 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with SingleTick
                   alignment: Alignment.topLeft,
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      if (selectedPOI != null) {
+                        setState(() => selectedPOI = null);
+                      } else if (showMap) {
+                        setState(() => showMap = false);
+                      } else {
+                        Navigator.pop(context);
+                      }
+                    },
                   ),
                 ),
-                Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.favorite, color: Colors.pinkAccent, size: 80),
-                          const SizedBox(height: 48),
-                          const Text(
-                            "永恒之境",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 4,
+                if (!showMap)
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.favorite, color: Colors.pinkAccent, size: 80),
+                            const SizedBox(height: 48),
+                            const Text("永恒之境", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4)),
+                            const SizedBox(height: 16),
+                            Container(height: 2, width: 60, color: Colors.pinkAccent.withOpacity(0.5)),
+                            const SizedBox(height: 48),
+                            const Text("“山河远阔，人间星河。”", style: TextStyle(color: Colors.white, fontSize: 18, fontStyle: FontStyle.italic)),
+                            const SizedBox(height: 64),
+                            OutlinedButton(
+                              onPressed: () => setState(() => showMap = true),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.pinkAccent),
+                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              ),
+                              child: const Text("开启记忆地图", style: TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold)),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            height: 2,
-                            width: 60,
-                            color: Colors.pinkAccent.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 48),
-                          const Text(
-                            "“山河远阔，人间星河。”",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontStyle: FontStyle.italic,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-                          const Text(
-                            "Lucas,\n这里是专属于你的时空胶囊。\n在无数个经纬度的跳动中，\n你是那个唯一的稳态。\n\n愿脚下的每一寸土地，\n都开出重逢的花。",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                              height: 2.0,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 64),
-                          // A special "Memory" button
-                          OutlinedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("功能维护中：记忆存储模块正在加载...")),
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.pinkAccent),
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                            ),
-                            child: const Text(
-                              "开启记忆地图",
-                              style: TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 24),
-                  child: Text(
-                    "Est. 1999.09.16",
-                    style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 2),
-                  ),
-                ),
               ],
             ),
           ),
+
+          // Letterfold Dialog
+          if (selectedPOI != null)
+             Positioned.fill(
+               child: GestureDetector(
+                 onTap: () => setState(() => selectedPOI = null),
+                 child: Container(
+                   color: Colors.black45,
+                   alignment: Alignment.center,
+                   child: AstrolabeLetter(details: selectedPOI!),
+                 ),
+               ),
+             ),
+          
+          if (!showMap)
+            const Positioned(
+              bottom: 24, left: 0, right: 0,
+              child: Center(child: Text("Est. 1999.09.16", style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 2))),
+            ),
         ],
       ),
+    );
+  }
+}
+
+class _EternalMapDisplay extends StatelessWidget {
+  final Function(String) onMarkerClick;
+  const _EternalMapDisplay({required this.onMarkerClick});
+
+  @override
+  Widget build(BuildContext context) {
+    return AndroidView(
+      viewType: 'com.footprint/amap',
+      creationParams: {'mode': 'ETERNAL_REALM'},
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: (id) {
+        final channel = MethodChannel('com.footprint/amap_$id');
+        channel.setMethodCallHandler((call) async {
+          if (call.method == 'onMarkerClick') {
+            final tag = call.arguments as String?;
+            if (tag != null) onMarkerClick(tag);
+          }
+        });
+        channel.invokeMethod('setMapMode', 'ETERNAL_REALM');
+      },
+    );
+  }
+}
+
+class AstrolabeLetter extends StatefulWidget {
+  final Map<String, dynamic> details;
+  const AstrolabeLetter({super.key, required this.details});
+
+  @override
+  State<AstrolabeLetter> createState() => _AstrolabeLetterState();
+}
+
+class _AstrolabeLetterState extends State<AstrolabeLetter> with SingleTickerProviderStateMixin {
+  late AnimationController _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))..forward();
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, child) {
+        final val = _anim.value;
+        return Transform(
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateX((1 - val) * 0.5),
+          alignment: Alignment.center,
+          child: Opacity(
+            opacity: val,
+            child: Container(
+              margin: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9F5F1), // Old Paper Color
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   Text(
+                    widget.details['title'],
+                    style: TextStyle(
+                      fontFamily: widget.details['font'],
+                      fontSize: 32,
+                      color: const Color(0xFF2C3E50),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    widget.details['msg'],
+                    style: const TextStyle(
+                      color: Color(0xFF5D6D7E),
+                      fontSize: 16,
+                      height: 1.8,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Text(
+                      widget.details['date'],
+                      style: const TextStyle(color: Colors.black26, fontSize: 12, letterSpacing: 2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
