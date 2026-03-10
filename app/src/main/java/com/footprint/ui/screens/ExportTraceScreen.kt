@@ -293,7 +293,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         var lastFrameTime = System.currentTimeMillis()
         
         while (isPlaying && playbackProgress < 1f) {
-            withFrameMillis { frameTime ->
+            withFrameMillis { _ ->
                 val currentTime = System.currentTimeMillis()
                 val deltaMs = (currentTime - lastFrameTime).coerceAtMost(50)
                 lastFrameTime = currentTime
@@ -515,19 +515,6 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     endDate = endDate,
                     onStartDateChange = { startDate = it },
                     onEndDateChange = { endDate = it },
-                    isPlaying = isPlaying,
-                    progress = playbackProgress,
-                    onTogglePlay = { if (smoothPoints.isNotEmpty()) isPlaying = !isPlaying },
-                    onProgressChange = { 
-                        playbackProgress = it
-                        if (smoothPoints.isNotEmpty()) {
-                            val idx = (it * (smoothPoints.size-1)).toInt().coerceIn(0, smoothPoints.size-1)
-                            currentPlaybackPoint = smoothPoints[idx]
-                            mapView.map.moveCamera(CameraUpdateFactory.newLatLng(currentPlaybackPoint!!))
-                        }
-                    },
-                    playbackSpeed = playbackSpeedKmH,
-                    onPlaybackSpeedChange = { playbackSpeedKmH = it },
                     mapType = mapType,
                     onMapTypeChange = { mapType = it },
                     entries = entriesInRange,
@@ -569,12 +556,6 @@ fun ControlPanelContent(
     endDate: LocalDate,
     onStartDateChange: (LocalDate) -> Unit,
     onEndDateChange: (LocalDate) -> Unit,
-    isPlaying: Boolean,
-    progress: Float,
-    onTogglePlay: () -> Unit,
-    onProgressChange: (Float) -> Unit,
-    playbackSpeed: Float,
-    onPlaybackSpeedChange: (Float) -> Unit,
     mapType: Int,
     onMapTypeChange: (Int) -> Unit,
     entries: List<com.footprint.data.model.FootprintEntry>,
