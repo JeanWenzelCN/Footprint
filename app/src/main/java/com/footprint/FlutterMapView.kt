@@ -212,7 +212,7 @@ class FlutterMapView(
         map.mapType = AMap.MAP_TYPE_NORMAL
         map.showBuildings(false)
         map.isTrafficEnabled = false
-        map.isIndoorEnabled = false
+        map.showIndoorMap(false)
         fogOverlay.setEternalMode(true)
         distanceThreadView.visibility = View.VISIBLE
         distanceThreadView.startAnimation()
