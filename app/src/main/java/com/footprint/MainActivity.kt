@@ -218,8 +218,8 @@ class MainActivity : FlutterActivity() {
                                             "nickname" to prefs.nickname,
                                             "avatarId" to prefs.avatarId,
                                             "themeMode" to prefs.themeMode.name,
-                                            "themeStyle" to prefs.themeStyle.name,
-                                            "hapticEnabled" to prefs.hapticFeedbackEnabled
+                                            "hapticEnabled" to prefs.hapticFeedbackEnabled,
+                                            "isMaintValid" to prefs.isMaintenanceModeValidated
                                     )
                             result.success(gson.toJson(settings))
                         }
@@ -250,6 +250,10 @@ class MainActivity : FlutterActivity() {
                         "updateHaptic" -> {
                             com.footprint.utils.PreferenceManager(this).hapticFeedbackEnabled =
                                     call.arguments as Boolean
+                            result.success(true)
+                        }
+                        "syncMaintMode" -> {
+                            com.footprint.utils.PreferenceManager(this).isMaintenanceModeValidated = true
                             result.success(true)
                         }
                         "getAppCredentials" -> {

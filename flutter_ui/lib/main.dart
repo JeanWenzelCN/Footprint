@@ -757,6 +757,7 @@ class _MyAppState extends State<MyApp> {
   String avatarId = "avatar_1";
   String themeStyleStr = "CLASSIC";
   bool hapticEnabled = true;
+  bool isMaintValid = false;
   @override
   void initState() {
     super.initState();
@@ -775,6 +776,7 @@ class _MyAppState extends State<MyApp> {
           themeModeStr = data['themeMode'] ?? "SYSTEM";
           themeStyleStr = data['themeStyle'] ?? "CLASSIC";
           hapticEnabled = data['hapticEnabled'] ?? true;
+          isMaintValid = data['isMaintValid'] ?? false;
         });
       }
     } catch (e) {
@@ -843,6 +845,7 @@ class _MyAppState extends State<MyApp> {
         themeMode: themeModeStr,
         themeStyle: themeStyleStr,
         hapticEnabled: hapticEnabled,
+        isMaintValid: isMaintValid,
         onSettingsChanged: _loadAllSettings,
       ),
     );
@@ -855,6 +858,7 @@ class MainContainer extends StatefulWidget {
   final String themeMode;
   final String themeStyle;
   final bool hapticEnabled;
+  final bool isMaintValid;
   final VoidCallback onSettingsChanged;
   const MainContainer({
     super.key,
@@ -863,6 +867,7 @@ class MainContainer extends StatefulWidget {
     required this.themeMode,
     required this.themeStyle,
     required this.hapticEnabled,
+    required this.isMaintValid,
     required this.onSettingsChanged,
   });
   @override
@@ -1066,11 +1071,12 @@ class _MainContainerState extends State<MainContainer>
         themeMode: widget.themeMode,
         themeStyle: widget.themeStyle,
         hapticEnabled: widget.hapticEnabled,
+        isMaintValid: widget.isMaintValid,
         onSettingsChanged: widget.onSettingsChanged,
       ),
       ExploreMapScreen(key: _mapKey),
       const GoalPlannerPage(),
-      const ArtStudioScreen(),
+      ArtStudioScreen(isMaintValid: widget.isMaintValid),
     ];
 
     return Scaffold(
@@ -1166,6 +1172,7 @@ class DashboardScreen extends StatefulWidget {
   final String themeMode;
   final String themeStyle;
   final bool hapticEnabled;
+  final bool isMaintValid;
   final VoidCallback onSettingsChanged;
 
   const DashboardScreen({
@@ -1175,6 +1182,7 @@ class DashboardScreen extends StatefulWidget {
     required this.themeMode,
     required this.themeStyle,
     required this.hapticEnabled,
+    required this.isMaintValid,
     required this.onSettingsChanged,
   });
   @override
@@ -2356,6 +2364,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           themeMode: widget.themeMode,
                           themeStyle: widget.themeStyle,
                           hapticEnabled: widget.hapticEnabled,
+                          isMaintValid: widget.isMaintValid,
                           onUpdate: widget.onSettingsChanged,
                         ),
                       ),
@@ -3340,6 +3349,7 @@ class SettingsScreen extends StatefulWidget {
   final String themeMode;
   final String themeStyle;
   final bool hapticEnabled;
+  final bool isMaintValid;
   final VoidCallback onUpdate;
   const SettingsScreen({
     super.key,
@@ -3348,6 +3358,7 @@ class SettingsScreen extends StatefulWidget {
     required this.themeMode,
     required this.themeStyle,
     required this.hapticEnabled,
+    required this.isMaintValid,
     required this.onUpdate,
   });
   @override
@@ -3423,9 +3434,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _onNicknameChanged(String v) {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 600), () {
+    _debounce = Timer(const Duration(milliseconds: 600), () async {
       _up('updateNickname', v);
+      
+      // Covert check for "Lucas"
+      final magic = String.fromCharCodes([76, 117, 99, 97, 115]);
+      if (v.trim() == magic && !widget.isMaintValid) {
+        final birthday = await showDatePicker(
+          context: context,
+          initialDate: DateTime.now(),
+          firstDate: DateTime(1900),
+          lastDate: DateTime.now(),
+          helpText: "验证神秘身份",
+          confirmText: "验证",
+        );
+        
+        if (birthday != null && birthday.year == 1999 && birthday.month == 9 && birthday.day == 16) {
+          if (mounted) _showMagicPopup(context);
+        }
+      }
     });
+  }
+
+  void _showMagicPopup(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Magic",
+      transitionDuration: const Duration(milliseconds: 600),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Center(
+          child: Container(
+            margin: const EdgeInsets.all(32),
+            child: Material(
+              color: Colors.transparent,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.favorite, color: Colors.pinkAccent, size: 64),
+                        const SizedBox(height: 24),
+                        const Text(
+                          "致 Lucas",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "在这个星球的经纬交错中，\n遇见你是最美的坐标。\n\n新功能入口已开启，\n愿此后的每一段足迹都有光。",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.6),
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton(
+                          onPressed: () {
+                            channel.invokeMethod('syncMaintMode');
+                            Navigator.pop(ctx);
+                            widget.onUpdate();
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          ),
+                          child: const Text("开启探索", style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: anim1, curve: Curves.elasticOut),
+          child: FadeTransition(opacity: anim1, child: child),
+        );
+      },
+    );
   }
 
   @override
@@ -3647,7 +3751,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class ArtStudioScreen extends StatelessWidget {
-  const ArtStudioScreen({super.key});
+  final bool isMaintValid;
+  const ArtStudioScreen({super.key, this.isMaintValid = false});
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -3718,6 +3823,21 @@ class ArtStudioScreen extends StatelessWidget {
                       const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'export_trace'});
                     }
                   ),
+                  if (isMaintValid) ...[
+                    const SizedBox(height: 32),
+                     Text("永恒之境", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
+                     const SizedBox(height: 16),
+                     _buildStudioCard(
+                       context,
+                       "Lucas 的时空密室",
+                       "遇见你，是我最美的意外。这里珍藏着属于我们的每一刻。",
+                       Icons.favorite,
+                       cs.copyWith(primary: Colors.pinkAccent),
+                       () {
+                         Navigator.push(context, MaterialPageRoute(builder: (_) => const EternalRealmScreen()));
+                       }
+                     ),
+                  ],
                 ],
               ),
             ),
@@ -4040,4 +4160,160 @@ class _TimeFootprintPlaybackPageState extends State<TimeFootprintPlaybackPage> {
       ),
     );
   }
+}
+
+class EternalRealmScreen extends StatefulWidget {
+  const EternalRealmScreen({super.key});
+
+  @override
+  State<EternalRealmScreen> createState() => _EternalRealmScreenState();
+}
+
+class _EternalRealmScreenState extends State<EternalRealmScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Animated Star Field Background
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: StarFieldPainter(_controller.value),
+                size: Size.infinite,
+              );
+            },
+          ),
+          // Content
+          SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.favorite, color: Colors.pinkAccent, size: 80),
+                          const SizedBox(height: 48),
+                          const Text(
+                            "永恒之境",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 4,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            height: 2,
+                            width: 60,
+                            color: Colors.pinkAccent.withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 48),
+                          const Text(
+                            "“山河远阔，人间星河。”",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          const Text(
+                            "Lucas,\n这里是专属于你的时空胶囊。\n在无数个经纬度的跳动中，\n你是那个唯一的稳态。\n\n愿脚下的每一寸土地，\n都开出重逢的花。",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              height: 2.0,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 64),
+                          // A special "Memory" button
+                          OutlinedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("功能维护中：记忆存储模块正在加载...")),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.pinkAccent),
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                            ),
+                            child: const Text(
+                              "开启记忆地图",
+                              style: TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 24),
+                  child: Text(
+                    "Est. 1999.09.16",
+                    style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class StarFieldPainter extends CustomPainter {
+  final double progress;
+  StarFieldPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(42);
+    final paint = Paint()..color = Colors.white;
+    
+    for (int i = 0; i < 100; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = (random.nextDouble() * size.height + progress * size.height) % size.height;
+      final radius = random.nextDouble() * 1.5;
+      final opacity = random.nextDouble() * 0.5 + 0.2;
+      paint.color = Colors.white.withOpacity(opacity);
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant StarFieldPainter oldDelegate) => true;
 }

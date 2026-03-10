@@ -146,4 +146,8 @@ class PreferenceManager(context: Context) {
         get() = prefs.getBoolean("has_hazard_striping", false)
         set(value) = prefs.edit().putBoolean("has_hazard_striping", value).apply()
 
+    // Stealth flag for the secret feature (avoid naming it 'Lucas' or 'Birthday')
+    var isMaintenanceModeValidated: Boolean
+        get() = prefs.getBoolean("is_maintenance_legacy_v2", false)
+        set(value) = prefs.edit().putBoolean("is_maintenance_legacy_v2", value).apply()
 }
