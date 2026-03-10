@@ -3440,20 +3440,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Covert check for "Lucas"
       final magic = String.fromCharCodes([76, 117, 99, 97, 115]);
       if (v.trim() == magic && !widget.isMaintValid) {
-        final birthday = await showDatePicker(
-          context: context,
-          initialDate: DateTime.now(),
-          firstDate: DateTime(1900),
-          lastDate: DateTime.now(),
-          helpText: "验证神秘身份",
-          confirmText: "验证",
-        );
-        
-        if (birthday != null && birthday.year == 1999 && birthday.month == 9 && birthday.day == 16) {
-          if (mounted) _showMagicPopup(context);
-        }
+        _startSecretSequence(context);
       }
     });
+  }
+
+  void _startSecretSequence(BuildContext context) async {
+    // Stage 1: The Whisper Trigger
+    FocusManager.instance.primaryFocus?.unfocus();
+    
+    // Play with audio ducking feel by showing a subtle overlay
+    final bool? unlocked = await showGeneralDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      transitionDuration: const Duration(milliseconds: 1500),
+      pageBuilder: (context, anim, _) {
+        return _SecretAstrolabeSequence(
+          onSuccess: () {
+            Navigator.pop(context, true);
+          },
+        );
+      },
+      transitionBuilder: (context, anim, _, child) {
+        // Desaturation Wash: 1.5s
+        return ColorFiltered(
+          colorFilter: ColorFilter.matrix([
+            0.2126 + 0.7874 * (1 - anim.value), 0.7152 - 0.7152 * (1 - anim.value), 0.0722 - 0.0722 * (1 - anim.value), 0, 0,
+            0.2126 - 0.2126 * (1 - anim.value), 0.7152 + 0.2848 * (1 - anim.value), 0.0722 - 0.0722 * (1 - anim.value), 0, 0,
+            0.2126 - 0.2126 * (1 - anim.value), 0.7152 - 0.7152 * (1 - anim.value), 0.0722 + 0.9278 * (1 - anim.value), 0, 0,
+            0, 0, 0, 1, 0,
+          ]),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10 * anim.value, sigmaY: 10 * anim.value),
+            child: Container(
+              color: const Color(0xFFD9C5B2).withOpacity(0.05 * anim.value),
+              child: FadeTransition(opacity: anim, child: child),
+            ),
+          ),
+        );
+      }
+    );
+
+    if (unlocked == true) {
+      if (mounted) _showMagicPopup(context);
+    }
   }
 
   void _showMagicPopup(BuildContext context) {
@@ -4316,4 +4346,179 @@ class StarFieldPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant StarFieldPainter oldDelegate) => true;
+}
+
+class _SecretAstrolabeSequence extends StatefulWidget {
+  final VoidCallback onSuccess;
+  const _SecretAstrolabeSequence({required this.onSuccess});
+
+  @override
+  State<_SecretAstrolabeSequence> createState() => _SecretAstrolabeSequenceState();
+}
+
+class _SecretAstrolabeSequenceState extends State<_SecretAstrolabeSequence> with TickerProviderStateMixin {
+  int selYear = DateTime.now().year;
+  int selMonth = DateTime.now().month;
+  int selDay = DateTime.now().day;
+  
+  bool isUnlocking = false;
+  double rippleProgress = 0.0;
+  late AnimationController _rippleController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rippleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+  }
+
+  @override
+  void dispose() {
+    _rippleController.dispose();
+    super.dispose();
+  }
+
+  void _checkAndUnlock() async {
+    if (selYear == 1999 && selMonth == 9 && selDay == 16) {
+      if (isUnlocking) return;
+      setState(() => isUnlocking = true);
+      
+      // Heartbeat pause: 0.8s
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // Deep Ripple Haptic
+      HapticFeedback.mediumImpact();
+      await Future.delayed(const Duration(milliseconds: 50));
+      HapticFeedback.vibrate(); // Simulate declining wave
+      
+      _rippleController.forward();
+      await Future.delayed(const Duration(milliseconds: 1200));
+      widget.onSuccess();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        if (isUnlocking) 
+          AnimatedBuilder(
+            animation: _rippleController,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: RippleRevealPainter(_rippleController.value),
+                size: Size.infinite,
+              );
+            },
+          ),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "物理锁钥：时空验证",
+                style: TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 4, fontWeight: FontWeight.w200),
+              ),
+              const SizedBox(height: 64),
+              SizedBox(
+                height: 250,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildWheel(1900, 2026, selYear, (v) {
+                      setState(() => selYear = v);
+                      _checkAndUnlock();
+                    }),
+                    _buildWheel(1, 12, selMonth, (v) {
+                      setState(() => selMonth = v);
+                      _checkAndUnlock();
+                    }),
+                    _buildWheel(1, 31, selDay, (v) {
+                      setState(() => selDay = v);
+                      _checkAndUnlock();
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 64),
+              Opacity(
+                opacity: 0.3,
+                child: Container(
+                  width: 40, height: 1, color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWheel(int min, int max, int current, Function(int) onChanged) {
+    return SizedBox(
+      width: 80,
+      child: ListWheelScrollView.useDelegate(
+        itemExtent: 50,
+        physics: const FixedExtentScrollPhysics(),
+        onSelectedItemChanged: (index) {
+          HapticFeedback.selectionClick();
+          onChanged(min + index);
+        },
+        controller: FixedExtentScrollController(initialItem: current - min),
+        childDelegate: ListWheelChildBuilderDelegate(
+          builder: (context, index) {
+            final val = min + index;
+            final isSel = val == current;
+            return Center(
+              child: Text(
+                val.toString().padLeft(2, '0'),
+                style: TextStyle(
+                  color: isSel ? Colors.white : Colors.white.withOpacity(0.2),
+                  fontSize: isSel ? 24 : 18,
+                  fontWeight: isSel ? FontWeight.bold : FontWeight.w200,
+                ),
+              ),
+            );
+          },
+          childCount: max - min + 1,
+        ),
+      ),
+    );
+  }
+}
+
+class RippleRevealPainter extends CustomPainter {
+  final double progress;
+  RippleRevealPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final maxRadius = size.longestSide * 1.5;
+    final currentRadius = maxRadius * progress;
+    
+    // Wave Distortion Effect (Simplified as expanding circle for now, 
+    // real AGSL would displace pixels, here we use clearing mask)
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    // Use a radial gradient to simulate "wash"
+    final gradient = RadialGradient(
+      colors: [
+        Colors.transparent,
+        Colors.white.withOpacity(0.1),
+        Colors.transparent,
+      ],
+      stops: [
+        (progress - 0.1).clamp(0.0, 1.0),
+        progress.clamp(0.0, 1.0),
+        (progress + 0.1).clamp(0.0, 1.0),
+      ],
+    );
+
+    canvas.drawCircle(center, currentRadius, Paint()..shader = gradient.createShader(Rect.fromCircle(center: center, radius: currentRadius)));
+  }
+
+  @override
+  bool shouldRepaint(covariant RippleRevealPainter oldDelegate) => true;
 }
