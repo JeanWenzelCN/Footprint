@@ -197,7 +197,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
         )
 
-        // Static Entry Markers
+        // Static Entry Markers - Start invisible
         entriesInRange.forEach { entry ->
             if (entry.latitude != null && entry.longitude != null) {
                 val m = map.addMarker(
@@ -205,6 +205,8 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                         .position(LatLng(entry.latitude, entry.longitude))
                         .title(entry.title)
                         .snippet(entry.location)
+                        .visible(false) // Start hidden
+                        .alpha(0f)      // Start transparent for fade-in
                         .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
                 )
                 entryMarkers.add(m)
@@ -221,7 +223,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         )
     }
 
-    // Dynamic Updates (Path extension and Breadcrumbs)
+    // Dynamic Updates (Path extension, Breadcrumbs, and Marker reveal)
     LaunchedEffect(playbackProgress, currentPlaybackPoint) {
         val poly = pathPolyline.value ?: return@LaunchedEffect
         val marker = roamingMarker.value ?: return@LaunchedEffect
@@ -229,11 +231,13 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 
         if (smoothPoints.isNotEmpty()) {
             val currentIndex = (playbackProgress * (smoothPoints.size - 1)).toInt().coerceIn(0, smoothPoints.size - 1)
-            val partial = smoothPoints.take(currentIndex + 1)
             
-            // 1. Update Path Smoothing look
-            if (partial.size >= 2) {
-                poly.points = partial
+            // 1. Update Path - Strictly only up to current index
+            // Performance: Only update if the point list significantly changed to reduce JNI calls
+            val currentPolyPoints = poly.points
+            if (currentIndex + 1 > currentPolyPoints.size) {
+                 // Optimization: Take points from smoothPoints directly
+                 poly.points = smoothPoints.subList(0, currentIndex + 1)
             }
 
             // 2. Update Roaming Marker
@@ -242,7 +246,25 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 marker.isVisible = true
             }
 
-            // 3. Leave Footprints (Breadcrumbs)
+            // 3. Reveal nearby entry markers
+            entryMarkers.forEach { em ->
+                if (!em.isVisible && currentPlaybackPoint != null) {
+                    val distResults = FloatArray(1)
+                    android.location.Location.distanceBetween(
+                        em.position.latitude, em.position.longitude,
+                        currentPlaybackPoint!!.latitude, currentPlaybackPoint!!.longitude,
+                        distResults
+                    )
+                    if (distResults[0] < 200.0) { // Show if within 200m
+                        em.isVisible = true
+                        em.alpha = 1.0f
+                        // Could add a small animation here if AMap supports it easily, 
+                        // but visible=true is the core requirement.
+                    }
+                }
+            }
+
+            // 4. Leave Footprints (Breadcrumbs)
             val lastDotPos = breadcrumbDots.lastOrNull()?.position
             val shouldAddDot = lastDotPos == null || run {
                 val distResults = FloatArray(1)
@@ -251,7 +273,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     currentPlaybackPoint?.latitude ?: 0.0, currentPlaybackPoint?.longitude ?: 0.0,
                     distResults
                 )
-                distResults[0] > 30.0 // Add dot every 30 meters
+                distResults[0] > 40.0 // Add dot every 40 meters
             }
 
             if (shouldAddDot && currentPlaybackPoint != null) {
@@ -263,13 +285,13 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                             android.graphics.Bitmap.createBitmap(14, 14, android.graphics.Bitmap.Config.ARGB_8888).apply {
                                 android.graphics.Canvas(this).drawCircle(7f, 7f, 5f, android.graphics.Paint().apply {
                                     color = android.graphics.Color.parseColor("#00E5FF")
-                                    alpha = 140
+                                    alpha = 160
                                 })
                             }
                         ))
                 )
                 breadcrumbDots.add(dot)
-                if (breadcrumbDots.size > 800) {
+                if (breadcrumbDots.size > 1000) {
                     breadcrumbDots.removeAt(0).remove()
                 }
             }
@@ -318,15 +340,29 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     currentPlaybackPoint = targetLatLng
                     
                     try {
-                        val currentBearing = mapView.map.cameraPosition.bearing
-                        mapView.map.animateCamera(CameraUpdateFactory.newCameraPosition(
+                        // Smoothing Camera: Calculate bearing based on forward points for "look-ahead" feel
+                        val forwardIndex = (index + 8).coerceAtMost(smoothPoints.size - 1)
+                        val lookAheadPoint = smoothPoints[forwardIndex]
+                        
+                        // Calculate target bearing to face the next point
+                        val targetBearing = if (index < smoothPoints.size - 1) {
+                            calculateBearing(targetLatLng, lookAheadPoint)
+                        } else {
+                            mapView.map.cameraPosition.bearing
+                        }
+
+                        // Smoothly merge current bearing with target bearing
+                        val newBearing = lerpBearing(mapView.map.cameraPosition.bearing, targetBearing, 0.05f)
+
+                        val cameraUpdate = CameraUpdateFactory.newCameraPosition(
                             CameraPosition.builder()
                                 .target(targetLatLng)
                                 .zoom(16.5f)
                                 .tilt(55f) 
-                                .bearing(currentBearing + 0.1f)
+                                .bearing(newBearing)
                                 .build()
-                        ), 35, null)
+                        )
+                        mapView.map.animateCamera(cameraUpdate, 120, null)
                     } catch (e: Exception) {}
                 }
                 
@@ -628,4 +664,25 @@ fun EntryListCard(entry: com.footprint.data.model.FootprintEntry, onClick: () ->
             Text("%.1f".format(entry.distanceKm) + " km", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
     }
+}
+
+// Utility for smooth bearing calculation
+fun calculateBearing(start: LatLng, end: LatLng): Float {
+    val lat1 = Math.toRadians(start.latitude)
+    val lon1 = Math.toRadians(start.longitude)
+    val lat2 = Math.toRadians(end.latitude)
+    val lon2 = Math.toRadians(end.longitude)
+
+    val dLon = lon2 - lon1
+    val y = Math.sin(dLon) * Math.cos(lat2)
+    val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+    
+    return ((Math.toDegrees(Math.atan2(y, x)) + 360) % 360).toFloat()
+}
+
+fun lerpBearing(start: Float, end: Float, fraction: Float): Float {
+    var diff = end - start
+    while (diff < -180f) diff += 360f
+    while (diff > 180f) diff -= 360f
+    return (start + diff * fraction + 360f) % 360f
 }
