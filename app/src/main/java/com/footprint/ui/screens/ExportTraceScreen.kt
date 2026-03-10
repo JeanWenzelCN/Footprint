@@ -223,30 +223,13 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         )
     }
 
-    // Dynamic Updates (Path extension, Breadcrumbs, and Marker reveal)
-    LaunchedEffect(playbackProgress, currentPlaybackPoint) {
-        val poly = pathPolyline.value ?: return@LaunchedEffect
-        val marker = roamingMarker.value ?: return@LaunchedEffect
+    // Dynamic Updates (Breadcrumbs and Marker reveal)
+    // Synchronized Path and Roamer position are now handled in the Master Loop for 1:1 alignment.
+    LaunchedEffect(playbackProgress) {
         val map = try { mapView.map } catch (e: Exception) { return@LaunchedEffect }
 
         if (smoothPoints.isNotEmpty()) {
-            val currentIndex = (playbackProgress * (smoothPoints.size - 1)).toInt().coerceIn(0, smoothPoints.size - 1)
-            
-            // 1. Update Path - Strictly only up to current index
-            // Performance: Only update if the point list significantly changed to reduce JNI calls
-            val currentPolyPoints = poly.points
-            if (currentIndex + 1 > currentPolyPoints.size) {
-                 // Optimization: Take points from smoothPoints directly
-                 poly.points = smoothPoints.subList(0, currentIndex + 1)
-            }
-
-            // 2. Update Roaming Marker
-            currentPlaybackPoint?.let { pos ->
-                marker.position = pos
-                marker.isVisible = true
-            }
-
-            // 3. Reveal nearby entry markers
+            // 1. Reveal nearby entry markers
             entryMarkers.forEach { em ->
                 if (!em.isVisible && currentPlaybackPoint != null) {
                     val distResults = FloatArray(1)
@@ -255,16 +238,14 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                         currentPlaybackPoint!!.latitude, currentPlaybackPoint!!.longitude,
                         distResults
                     )
-                    if (distResults[0] < 200.0) { // Show if within 200m
+                    if (distResults[0] < 200.0) { 
                         em.isVisible = true
                         em.alpha = 1.0f
-                        // Could add a small animation here if AMap supports it easily, 
-                        // but visible=true is the core requirement.
                     }
                 }
             }
 
-            // 4. Leave Footprints (Breadcrumbs)
+            // 2. Leave Footprints (Breadcrumbs)
             val lastDotPos = breadcrumbDots.lastOrNull()?.position
             val shouldAddDot = lastDotPos == null || run {
                 val distResults = FloatArray(1)
@@ -273,7 +254,7 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     currentPlaybackPoint?.latitude ?: 0.0, currentPlaybackPoint?.longitude ?: 0.0,
                     distResults
                 )
-                distResults[0] > 40.0 // Add dot every 40 meters
+                distResults[0] > 45.0 
             }
 
             if (shouldAddDot && currentPlaybackPoint != null) {
@@ -298,20 +279,23 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         }
     }
 
-    // Playback Loop
+    // Ultra-Smooth Master Playback Loop (Choreographer Powered)
     LaunchedEffect(isPlaying, smoothPoints, cumulativeDistances, playbackSpeedKmH) {
-        if (isPlaying && smoothPoints.size > 1 && cumulativeDistances.size == smoothPoints.size) {
-            val totalDist = cumulativeDistances.last()
-            if (totalDist <= 0) {
-                isPlaying = false
-                return@LaunchedEffect
-            }
+        if (!isPlaying || smoothPoints.size < 2 || cumulativeDistances.isEmpty()) return@LaunchedEffect
+        
+        val map = try { mapView.map } catch (e: Exception) { return@LaunchedEffect }
+        val poly = pathPolyline.value ?: return@LaunchedEffect
+        val marker = roamingMarker.value ?: return@LaunchedEffect
+        val totalDist = cumulativeDistances.last()
+        if (totalDist <= 0) { isPlaying = false; return@LaunchedEffect }
 
-            var lastTime = System.currentTimeMillis()
-            while (isPlaying && playbackProgress < 1f) {
+        var lastFrameTime = System.currentTimeMillis()
+        
+        while (isPlaying && playbackProgress < 1f) {
+            withFrameMillis { frameTime ->
                 val currentTime = System.currentTimeMillis()
-                val deltaMs = (currentTime - lastTime).coerceAtMost(200)
-                lastTime = currentTime
+                val deltaMs = (currentTime - lastFrameTime).coerceAtMost(50)
+                lastFrameTime = currentTime
                 
                 val dtHours = deltaMs / 1000.0 / 3600.0
                 val distanceStep = playbackSpeedKmH * dtHours
@@ -319,8 +303,8 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 val nextDist = (playbackProgress * totalDist) + distanceStep
                 playbackProgress = (nextDist / totalDist).toFloat().coerceIn(0f, 1f)
                 
-                // Find segment
-                val searchRes = Collections.binarySearch(cumulativeDistances, nextDist)
+                // Binary search for segment
+                val searchRes = Collections.binarySearch(cumulativeDistances, nextDist.toDouble())
                 val index = when {
                     searchRes >= 0 -> searchRes
                     else -> (-searchRes - 2).coerceIn(0, smoothPoints.size - 2)
@@ -333,26 +317,31 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     val d2 = cumulativeDistances[index+1]
                     
                     val segmentProgress = if (d2 > d1) (nextDist - d1) / (d2 - d1) else 0.0
-                    val interpLat = p1.latitude + (p2.latitude - p1.latitude) * segmentProgress
-                    val interpLng = p1.longitude + (p2.longitude - p1.longitude) * segmentProgress
-                    val targetLatLng = LatLng(interpLat, interpLng)
+                    val targetLatLng = LatLng(
+                        p1.latitude + (p2.latitude - p1.latitude) * segmentProgress,
+                        p1.longitude + (p2.longitude - p1.longitude) * segmentProgress
+                    )
                     
+                    // Direct Map Component Updates
+                    marker.position = targetLatLng
+                    marker.isVisible = true
                     currentPlaybackPoint = targetLatLng
-                    
-                    try {
-                        // Smoothing Camera: Calculate bearing based on forward points for "look-ahead" feel
-                        val forwardIndex = (index + 8).coerceAtMost(smoothPoints.size - 1)
-                        val lookAheadPoint = smoothPoints[forwardIndex]
-                        
-                        // Calculate target bearing to face the next point
-                        val targetBearing = if (index < smoothPoints.size - 1) {
-                            calculateBearing(targetLatLng, lookAheadPoint)
-                        } else {
-                            mapView.map.cameraPosition.bearing
-                        }
 
-                        // Smoothly merge current bearing with target bearing
-                        val newBearing = lerpBearing(mapView.map.cameraPosition.bearing, targetBearing, 0.05f)
+                    // Fixed: Path synchronization - Add current interpolated position to the points list
+                    // This creates a list up to the integer index and appends the "head" point
+                    val pathPoints = mutableListOf<LatLng>()
+                    for (i in 0..index) {
+                        pathPoints.add(smoothPoints[i])
+                    }
+                    pathPoints.add(targetLatLng)
+                    poly.points = pathPoints
+
+                    // Fixed Centering: Lock the roamer in the screen center
+                    try {
+                        val forwardIndex = (index + 12).coerceAtMost(smoothPoints.size - 1)
+                        val lookAheadPoint = smoothPoints[forwardIndex]
+                        val targetBearing = calculateBearing(targetLatLng, lookAheadPoint)
+                        val newBearing = lerpBearing(map.cameraPosition.bearing, targetBearing, 0.08f)
 
                         val cameraUpdate = CameraUpdateFactory.newCameraPosition(
                             CameraPosition.builder()
@@ -362,16 +351,12 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                                 .bearing(newBearing)
                                 .build()
                         )
-                        mapView.map.animateCamera(cameraUpdate, 120, null)
+                        map.moveCamera(cameraUpdate) 
                     } catch (e: Exception) {}
                 }
-                
-                kotlinx.coroutines.delay(35) 
-            }
-            if (playbackProgress >= 1f) {
-                isPlaying = false
             }
         }
+        if (playbackProgress >= 1f) { isPlaying = false }
     }
 
     Scaffold(
@@ -421,19 +406,83 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                 }
             }
 
-            // Stats Card
-            if (smoothPoints.isNotEmpty()) {
-                Surface(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).width(180.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(0.85f),
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.2f))
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("漫游状态", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        StatItem("总里数", "%.2f km".format(cumulativeDistances.lastOrNull() ?: 0.0))
-                        StatItem("当前航速", "${playbackSpeedKmH.toInt()} km/h")
-                        StatItem("记录足迹", "${entriesInRange.size} 篇")
+            // Bottom Panel: Info and HUD Controls
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Stats Card (Left)
+                    if (smoothPoints.isNotEmpty()) {
+                        Surface(
+                            modifier = Modifier.width(170.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(0.85f),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.2f))
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("漫游状态", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                StatItem("总里程", "%.2f km".format(cumulativeDistances.lastOrNull() ?: 0.0))
+                                StatItem("记录数", "${entriesInRange.size} 篇")
+                            }
+                        }
+                    }
+                }
+
+                // Global Control Console
+                if (smoothPoints.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surface.copy(0.92f),
+                        shape = RoundedCornerShape(24.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.3f))
+                    ) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LargeFloatingActionButton(
+                                    onClick = { isPlaying = !isPlaying },
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(52.dp)
+                                ) {
+                                    Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
+                                }
+                                Spacer(Modifier.width(16.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("时光回放", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                        Text("${(playbackProgress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                    Slider(
+                                        value = playbackProgress,
+                                        onValueChange = { 
+                                            playbackProgress = it
+                                            val idx = (it * (smoothPoints.size-1)).toInt().coerceIn(0, smoothPoints.size-1)
+                                            currentPlaybackPoint = smoothPoints[idx]
+                                            mapView.map.moveCamera(CameraUpdateFactory.newLatLng(currentPlaybackPoint!!))
+                                        },
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Speed, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Text("漫游航速", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                Slider(
+                                    value = playbackSpeedKmH,
+                                    onValueChange = { playbackSpeedKmH = it },
+                                    valueRange = 5f..2500f,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+                                )
+                                Text("${playbackSpeedKmH.toInt()} km/h", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -553,44 +602,6 @@ fun ControlPanelContent(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DateSelector(modifier = Modifier.weight(1f), label = "起点日期", date = startDate) { showStartPicker = true }
             DateSelector(modifier = Modifier.weight(1f), label = "截止日期", date = endDate) { showEndPicker = true }
-        }
-
-        // Playback Controller
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
-            shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onTogglePlay, 
-                        modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
-                    ) {
-                        Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("回放进度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        Slider(value = progress, onValueChange = onProgressChange)
-                    }
-                }
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Speed, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline)
-                    Spacer(Modifier.width(8.dp))
-                    Text("漫游航速", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    Slider(
-                        value = playbackSpeed,
-                        onValueChange = onPlaybackSpeedChange,
-                        valueRange = 5f..2000f,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                    )
-                    Text("${playbackSpeed.toInt()} km/h", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                }
-            }
         }
 
         if (entries.isNotEmpty()) {
