@@ -204,6 +204,7 @@ class FlutterMapView(
             yunnanMask = null
             fogOverlay.setEternalMode(false)
             distanceThreadView.visibility = View.GONE
+            aMap?.setCustomMapStyle(CustomMapStyleOptions().apply { isEnable = false }) // 禁用自定义样式
         }
     }
 
@@ -216,7 +217,19 @@ class FlutterMapView(
         fogOverlay.setEternalMode(true)
         distanceThreadView.visibility = View.VISIBLE
         distanceThreadView.startAnimation()
-        
+
+        // 应用极简水彩风自定义样式
+        try {
+            val styleJson = context.assets.open("map_style_eternal.json").bufferedReader().readText()
+            val styleOptions = CustomMapStyleOptions().apply {
+                isEnable = true
+                styleData = styleJson.toByteArray()
+            }
+            map.setCustomMapStyle(styleOptions)
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMapView", "Failed to load eternal map style: ${e.message}")
+        }
+
         // 云南省大致边界 (简化版)
         val yunnanBoundary = listOf(
             LatLng(29.23, 98.13), LatLng(28.43, 99.45), LatLng(28.23, 101.45),
@@ -1169,7 +1182,7 @@ class FlutterMapView(
             Triple(LatLng(25.69, 100.16), "DALI", "大理"),
             Triple(LatLng(26.87, 100.22), "LIJIANG", "丽江")
         )
-        pois.forEach { (pos, tag, desc) ->
+        pois.forEach { (pos, tag, _) ->
             val opt = MarkerOptions().position(pos).title("ETERNAL_POI").snippet(tag)
             opt.anchor(0.5f, 0.5f)
             opt.icon(BitmapDescriptorFactory.fromBitmap(createEternalMarkerBitmap(tag)))

@@ -1,0 +1,58 @@
+[
+  {
+    "featureType": "land",
+    "elementType": "geometry",
+    "stylers": {
+      "color": "#f9f1e7"
+    }
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": {
+      "color": "#d4eaf7"
+    }
+  },
+  {
+    "featureType": "green",
+    "elementType": "geometry",
+    "stylers": {
+      "color": "#e3eedd"
+    }
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry",
+    "stylers": {
+      "visibility": "off"
+    }
+  },
+  {
+    "featureType": "building",
+    "elementType": "geometry",
+    "stylers": {
+      "visibility": "off"
+    }
+  },
+  {
+    "featureType": "poilabel",
+    "elementType": "labels",
+    "stylers": {
+      "visibility": "off"
+    }
+  },
+  {
+    "featureType": "districtlabel",
+    "elementType": "labels",
+    "stylers": {
+      "visibility": "off"
+    }
+  },
+  {
+    "featureType": "boundary",
+    "elementType": "geometry",
+    "stylers": {
+      "color": "#dcdcdc"
+    }
+  }
+]
