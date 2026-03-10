@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.scale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -346,8 +347,8 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                         val cameraUpdate = CameraUpdateFactory.newCameraPosition(
                             CameraPosition.builder()
                                 .target(targetLatLng)
-                                .zoom(16.5f)
-                                .tilt(55f) 
+                                .zoom(17.5f) // Slightly closer for better 3D building details
+                                .tilt(65f) // Increased tilt for stronger 3D perspective
                                 .bearing(newBearing)
                                 .build()
                         )
@@ -527,6 +528,8 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                     },
                     playbackSpeed = playbackSpeedKmH,
                     onPlaybackSpeedChange = { playbackSpeedKmH = it },
+                    mapType = mapType,
+                    onMapTypeChange = { mapType = it },
                     entries = entriesInRange,
                     onEntryClick = { entry ->
                         if (entry.latitude != null && entry.longitude != null) {
@@ -572,6 +575,8 @@ fun ControlPanelContent(
     onProgressChange: (Float) -> Unit,
     playbackSpeed: Float,
     onPlaybackSpeedChange: (Float) -> Unit,
+    mapType: Int,
+    onMapTypeChange: (Int) -> Unit,
     entries: List<com.footprint.data.model.FootprintEntry>,
     onEntryClick: (com.footprint.data.model.FootprintEntry) -> Unit
 ) {
@@ -602,6 +607,42 @@ fun ControlPanelContent(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DateSelector(modifier = Modifier.weight(1f), label = "起点日期", date = startDate) { showStartPicker = true }
             DateSelector(modifier = Modifier.weight(1f), label = "截止日期", date = endDate) { showEndPicker = true }
+        }
+
+        // Map View Settings
+        Text("地图视觉设置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                modifier = Modifier.weight(1f).clickable { 
+                    onMapTypeChange(if (mapType == AMap.MAP_TYPE_NORMAL) AMap.MAP_TYPE_SATELLITE else AMap.MAP_TYPE_NORMAL)
+                },
+                color = if (mapType == AMap.MAP_TYPE_SATELLITE) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
+                shape = RoundedCornerShape(16.dp),
+                border = if (mapType == AMap.MAP_TYPE_SATELLITE) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.SatelliteAlt, null, tint = if (mapType == AMap.MAP_TYPE_SATELLITE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
+                    Spacer(Modifier.width(12.dp))
+                    Text("卫星地图", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Surface(
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.ViewInAr, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text("3D 建筑", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    Switch(checked = true, onCheckedChange = {}, modifier = Modifier.scale(0.8f)) // Default ON for "Stereo" request
+                }
+            }
         }
 
         if (entries.isNotEmpty()) {
