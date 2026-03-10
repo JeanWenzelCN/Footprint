@@ -635,95 +635,11 @@ class FlutterMapView(
                 // 都没有位置信息
                 result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
             }
-        }
-    }
-
-    private fun updateEternalMarkers() {
-        clearEternalMarkers()
-        val pois = listOf(
-            Triple(LatLng(25.04, 102.71), "KUNMING", "昆明"),
-            Triple(LatLng(25.69, 100.16), "DALI", "大理"),
-            Triple(LatLng(26.87, 100.22), "LIJIANG", "丽江")
-        )
-        pois.forEach { (pos, tag, desc) ->
-            val opt = MarkerOptions().position(pos).title("ETERNAL_POI").snippet(tag)
-            opt.anchor(0.5f, 0.5f)
-            opt.icon(BitmapDescriptorFactory.fromBitmap(createEternalMarkerBitmap(tag)))
-            val m = aMap?.addMarker(opt)
-            m?.let { eternalMarkers.add(it) }
-        }
-    }
-
-    private fun clearEternalMarkers() {
-        eternalMarkers.forEach { it.remove() }
-        eternalMarkers.clear()
-    }
-
-    private fun createEternalMarkerBitmap(tag: String): Bitmap {
-        val size = 64
-        val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val c = Canvas(b)
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 3f
-        }
-        when (tag) {
-            "KUNMING" -> {
-                c.drawRect(15f, 15f, 49f, 49f, p)
-                c.drawLine(15f, 32f, 49f, 32f, p)
-            }
-            "DALI" -> {
-                c.drawCircle(32f, 32f, 18f, p)
-                c.drawLine(32f, 14f, 32f, 50f, p)
-                c.drawLine(14f, 32f, 50f, 32f, p)
-            }
-            else -> {
-                c.drawCircle(32f, 32f, 12f, p)
-            }
-        }
-        return b
-    }
-
-    inner class DistanceThreadView(context: Context) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 8f
-        }
-        private val kunming = LatLng(25.04, 102.71)
-        private var pulsePos = 0f
-        fun startAnimation() { postInvalidateOnAnimation() }
-        override fun onDraw(canvas: Canvas) {
-            if (currentMode != "ETERNAL_REALM") return
-            val map = aMap ?: return
-            val start = if (cachedLat > 1.0) LatLng(cachedLat, cachedLng) else LatLng(39.9, 116.4)
-            val p1 = map.projection.toScreenLocation(start)
-            val p2 = map.projection.toScreenLocation(kunming)
-            val path = Path()
-            path.moveTo(p1.x.toFloat(), p1.y.toFloat())
-            val cx = (p1.x + p2.x) / 2f
-            val cy = Math.min(p1.y, p2.y) - 300f
-            path.quadTo(cx, cy, p2.x.toFloat(), p2.y.toFloat())
-            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            paint.color = if (hour in 8..17) Color.parseColor("#FFD700") else Color.parseColor("#00BFFF")
-            paint.alpha = 150
-            canvas.drawPath(path, paint)
-            pulsePos = (System.currentTimeMillis() % 2000) / 2000f
-            paint.alpha = 255
-            val pm = PathMeasure(path, false)
-            val segmentPath = Path()
-            pm.getSegment(pm.length * pulsePos, pm.length * (pulsePos + 0.1f), segmentPath, true)
-            canvas.drawPath(segmentPath, paint)
-            postInvalidateOnAnimation()
-        }
-    }
-            }
             "setLocationEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false
                 aMap?.isMyLocationEnabled = enabled
                 result.success(true)
             }
-            else -> result.notImplemented()
         }
     }
 
@@ -1224,6 +1140,86 @@ class FlutterMapView(
             }
 
             if (isAnimating) postInvalidateOnAnimation()
+        }
+    }
+
+    private fun updateEternalMarkers() {
+        clearEternalMarkers()
+        val pois = listOf(
+            Triple(LatLng(25.04, 102.71), "KUNMING", "昆明"),
+            Triple(LatLng(25.69, 100.16), "DALI", "大理"),
+            Triple(LatLng(26.87, 100.22), "LIJIANG", "丽江")
+        )
+        pois.forEach { (pos, tag, desc) ->
+            val opt = MarkerOptions().position(pos).title("ETERNAL_POI").snippet(tag)
+            opt.anchor(0.5f, 0.5f)
+            opt.icon(BitmapDescriptorFactory.fromBitmap(createEternalMarkerBitmap(tag)))
+            val m = aMap?.addMarker(opt)
+            m?.let { eternalMarkers.add(it) }
+        }
+    }
+
+    private fun clearEternalMarkers() {
+        eternalMarkers.forEach { it.remove() }
+        eternalMarkers.clear()
+    }
+
+    private fun createEternalMarkerBitmap(tag: String): Bitmap {
+        val size = 64
+        val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        when (tag) {
+            "KUNMING" -> {
+                c.drawRect(15f, 15f, 49f, 49f, p)
+                c.drawLine(15f, 32f, 49f, 32f, p)
+            }
+            "DALI" -> {
+                c.drawCircle(32f, 32f, 18f, p)
+                c.drawLine(32f, 14f, 32f, 50f, p)
+                c.drawLine(14f, 32f, 50f, 32f, p)
+            }
+            else -> {
+                c.drawCircle(32f, 32f, 12f, p)
+            }
+        }
+        return b
+    }
+
+    inner class DistanceThreadView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 8f
+        }
+        private val kunming = LatLng(25.04, 102.71)
+        private var pulsePos = 0f
+        fun startAnimation() { postInvalidateOnAnimation() }
+        override fun onDraw(canvas: Canvas) {
+            if (currentMode != "ETERNAL_REALM") return
+            val map = aMap ?: return
+            val start = if (cachedLat > 1.0) LatLng(cachedLat, cachedLng) else LatLng(39.9, 116.4)
+            val p1 = map.projection.toScreenLocation(start)
+            val p2 = map.projection.toScreenLocation(kunming)
+            val path = Path()
+            path.moveTo(p1.x.toFloat(), p1.y.toFloat())
+            val cx = (p1.x + p2.x) / 2f
+            val cy = Math.min(p1.y, p2.y) - 300f
+            path.quadTo(cx, cy, p2.x.toFloat(), p2.y.toFloat())
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            paint.color = if (hour in 8..17) Color.parseColor("#FFD700") else Color.parseColor("#00BFFF")
+            paint.alpha = 150
+            canvas.drawPath(path, paint)
+            pulsePos = (System.currentTimeMillis() % 2000) / 2000f
+            paint.alpha = 255
+            val pm = PathMeasure(path, false)
+            val segmentPath = Path()
+            pm.getSegment(pm.length * pulsePos, pm.length * (pulsePos + 0.1f), segmentPath, true)
+            canvas.drawPath(segmentPath, paint)
+            postInvalidateOnAnimation()
         }
     }
 }

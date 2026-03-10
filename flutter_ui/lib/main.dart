@@ -1076,7 +1076,10 @@ class _MainContainerState extends State<MainContainer>
       ),
       ExploreMapScreen(key: _mapKey),
       const GoalPlannerPage(),
-      ArtStudioScreen(isMaintValid: widget.isMaintValid),
+      ArtStudioScreen(
+        nickname: widget.nickname,
+        isMaintValid: widget.isMaintValid,
+      ),
     ];
 
     return Scaffold(
@@ -3438,8 +3441,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _up('updateNickname', v);
       
       // Covert check for "Lucas"
+      // Requirement: Only "Lucas" can trigger the cosmic secret.
       final magic = String.fromCharCodes([76, 117, 99, 97, 115]);
-      if (v.trim() == magic && !widget.isMaintValid) {
+      if (widget.nickname == magic && v.trim() == magic && !widget.isMaintValid) {
         _startSecretSequence(context);
       }
     });
@@ -3781,8 +3785,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class ArtStudioScreen extends StatelessWidget {
+  final String nickname;
   final bool isMaintValid;
-  const ArtStudioScreen({super.key, this.isMaintValid = false});
+  const ArtStudioScreen({
+    super.key,
+    required this.nickname,
+    this.isMaintValid = false,
+  });
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -3853,7 +3862,7 @@ class ArtStudioScreen extends StatelessWidget {
                       const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'export_trace'});
                     }
                   ),
-                  if (isMaintValid) ...[
+                  if (isMaintValid && nickname == String.fromCharCodes([76, 117, 99, 97, 115])) ...[
                     const SizedBox(height: 32),
                      Text("永恒之境", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
                      const SizedBox(height: 16),
