@@ -1,6 +1,5 @@
 package com.footprint.ui.screens
 
-import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,28 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.LargeFloatingActionButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,28 +20,20 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.border
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Layers
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.Speed
-import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.amap.api.maps.AMap
 import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.MapView
-import com.amap.api.maps.model.LatLng
-import com.amap.api.maps.model.LatLngBounds
-import com.amap.api.maps.model.PolylineOptions
+import com.amap.api.maps.model.*
 import com.footprint.FootprintViewModel
+import com.footprint.utils.PathInterpolator
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
+import java.util.Collections
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,17 +56,23 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 
     // Playback State
     var isPlaying by remember { mutableStateOf(false) }
-    var playbackProgress by remember { mutableStateOf(0f) }
+    var playbackProgress by remember { mutableFloatStateOf(0f) }
     var currentPlaybackPoint by remember { mutableStateOf<LatLng?>(null) }
+    var playbackSpeedKmH by remember { mutableFloatStateOf(120f) }
 
     // Control Panel State
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showControls by remember { mutableStateOf(true) } // Default to true so it's not "blank"
+    var showControls by remember { mutableStateOf(true) }
     var mapType by remember { mutableStateOf(AMap.MAP_TYPE_NORMAL) }
 
-    // Data points
-    var points by remember {
+    // Data points & Smooth Path
+    var rawPoints by remember {
         mutableStateOf<List<com.footprint.data.local.TrackPointEntity>>(emptyList())
+    }
+    val smoothPoints = remember(rawPoints) {
+        if (rawPoints.isEmpty()) return@remember emptyList<LatLng>()
+        val latLngs = rawPoints.map { LatLng(it.latitude, it.longitude) }
+        PathInterpolator.interpolate(latLngs, multiplier = 10)
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -108,7 +85,6 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     // Map LifeCycle
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
-        // CRITICAL: Call onCreate for AMap to display correctly
         try {
             mapView.onCreate(null)
         } catch (e: Exception) {}
@@ -139,7 +115,6 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             } else {
                 mapType
             }
-            // Enhance 3D Visuals
             showBuildings(true)
             showIndoorMap(true)
             isTrafficEnabled = false
@@ -154,10 +129,10 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 
     // Fetch Track Data
     val startTimestamp = remember(startDate) {
-        startDate.atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        startDate.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
     }
     val endTimestamp = remember(endDate) {
-        endDate.atTime(23, 59, 59).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        endDate.atTime(23, 59, 59).toInstant(ZoneOffset.UTC).toEpochMilli()
     }
 
     val tracePointsFlow = remember(startTimestamp, endTimestamp) {
@@ -166,10 +141,10 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
     val tracePoints by tracePointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
     LaunchedEffect(tracePoints) {
-        points = tracePoints.filter { it.latitude != 0.0 && it.longitude != 0.0 }
-        if (points.isNotEmpty()) {
+        rawPoints = tracePoints.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+        if (rawPoints.isNotEmpty()) {
             val builder = LatLngBounds.builder()
-            points.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
+            rawPoints.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
             entriesInRange.forEach { e ->
                 if (e.latitude != null && e.longitude != null) {
                     builder.include(LatLng(e.latitude, e.longitude))
@@ -181,19 +156,16 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         }
     }
 
-    // Playback Speed State (km/h)
-    var playbackSpeedKmH by remember { mutableFloatStateOf(60f) }
-
-    val cumulativeDistances = remember(points) {
-        if (points.isEmpty()) return@remember emptyList<Double>()
+    val cumulativeDistances = remember(smoothPoints) {
+        if (smoothPoints.isEmpty()) return@remember emptyList<Double>()
         val dists = mutableListOf<Double>(0.0)
         var currentTotal = 0.0
         val results = FloatArray(1)
-        for (i in 0 until points.size - 1) {
+        for (i in 0 until smoothPoints.size - 1) {
             try {
                 android.location.Location.distanceBetween(
-                    points[i].latitude, points[i].longitude,
-                    points[i+1].latitude, points[i+1].longitude,
+                    smoothPoints[i].latitude, smoothPoints[i].longitude,
+                    smoothPoints[i+1].latitude, smoothPoints[i+1].longitude,
                     results
                 )
                 currentTotal += results[0] / 1000.0
@@ -203,81 +175,110 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
         dists
     }
 
-    // Unified Map Rendering: Iterative path, static markers, and roaming indicator
-    LaunchedEffect(points, entriesInRange, playbackProgress, currentPlaybackPoint) {
+    // Overlay Management
+    val pathPolyline = remember { mutableStateOf<Polyline?>(null) }
+    val roamingMarker = remember { mutableStateOf<Marker?>(null) }
+    val entryMarkers = remember { mutableStateListOf<Marker>() }
+    val breadcrumbDots = remember { mutableStateListOf<Marker>() }
+
+    // Initialize Map Overlays when data points change
+    LaunchedEffect(smoothPoints, entriesInRange) {
         val map = try { mapView.map } catch (e: Exception) { return@LaunchedEffect }
         map.clear()
+        entryMarkers.clear()
+        breadcrumbDots.clear()
 
-        // 1. Draw Iterative Path (only up to current progress)
-        if (points.isNotEmpty()) {
-            val currentIndex = (playbackProgress * (points.size - 1)).toInt().coerceIn(0, points.size - 1)
-            val partialLatLngs = points.take(currentIndex + 1).map { LatLng(it.latitude, it.longitude) }
+        // Persistent Path
+        pathPolyline.value = map.addPolyline(
+            PolylineOptions()
+                .width(16f)
+                .useGradient(true)
+                .color(android.graphics.Color.parseColor("#00E5FF"))
+                .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+        )
 
-            if (partialLatLngs.size >= 2) {
-                map.addPolyline(
-                    PolylineOptions()
-                        .addAll(partialLatLngs)
-                        .width(18f)
-                        .useGradient(true)
-                        .color(android.graphics.Color.parseColor("#00E5FF")) // A more vibrant cyan
-                        .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                )
-            }
-        }
-
-        // 2. Draw Static Footprint Markers
+        // Static Entry Markers
         entriesInRange.forEach { entry ->
             if (entry.latitude != null && entry.longitude != null) {
-                map.addMarker(
-                    com.amap.api.maps.model.MarkerOptions()
+                val m = map.addMarker(
+                    MarkerOptions()
                         .position(LatLng(entry.latitude, entry.longitude))
                         .title(entry.title)
                         .snippet(entry.location)
-                        .icon(com.amap.api.maps.model.BitmapDescriptorFactory.defaultMarker(com.amap.api.maps.model.BitmapDescriptorFactory.HUE_AZURE))
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
                 )
+                entryMarkers.add(m)
             }
         }
 
-        // 3. Draw Persistent "Visual Footprints" (breadcrumbs along the way)
-        if (points.isNotEmpty()) {
-            val currentIndex = (playbackProgress * (points.size - 1)).toInt().coerceIn(0, points.size - 1)
-            // Show a footprint marker every 20 nodes to avoid overcrowding at high speeds
-            val step = if (points.size > 200) points.size / 50 else 10
-            for (i in 0 until currentIndex step step.coerceIn(1, 100)) {
-                map.addMarker(
-                    com.amap.api.maps.model.MarkerOptions()
-                        .position(LatLng(points[i].latitude, points[i].longitude))
+        // Roaming indicator
+        roamingMarker.value = map.addMarker(
+            MarkerOptions()
+                .position(LatLng(0.0, 0.0))
+                .anchor(0.5f, 0.5f)
+                .visible(false)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE))
+        )
+    }
+
+    // Dynamic Updates (Path extension and Breadcrumbs)
+    LaunchedEffect(playbackProgress, currentPlaybackPoint) {
+        val poly = pathPolyline.value ?: return@LaunchedEffect
+        val marker = roamingMarker.value ?: return@LaunchedEffect
+        val map = try { mapView.map } catch (e: Exception) { return@LaunchedEffect }
+
+        if (smoothPoints.isNotEmpty()) {
+            val currentIndex = (playbackProgress * (smoothPoints.size - 1)).toInt().coerceIn(0, smoothPoints.size - 1)
+            val partial = smoothPoints.take(currentIndex + 1)
+            
+            // 1. Update Path Smoothing look
+            if (partial.size >= 2) {
+                poly.points = partial
+            }
+
+            // 2. Update Roaming Marker
+            currentPlaybackPoint?.let { pos ->
+                marker.position = pos
+                marker.isVisible = true
+            }
+
+            // 3. Leave Footprints (Breadcrumbs)
+            val lastDotPos = breadcrumbDots.lastOrNull()?.position
+            val shouldAddDot = lastDotPos == null || run {
+                val distResults = FloatArray(1)
+                android.location.Location.distanceBetween(
+                    lastDotPos.latitude, lastDotPos.longitude,
+                    currentPlaybackPoint?.latitude ?: 0.0, currentPlaybackPoint?.longitude ?: 0.0,
+                    distResults
+                )
+                distResults[0] > 30.0 // Add dot every 30 meters
+            }
+
+            if (shouldAddDot && currentPlaybackPoint != null) {
+                val dot = map.addMarker(
+                    MarkerOptions()
+                        .position(currentPlaybackPoint!!)
                         .anchor(0.5f, 0.5f)
-                        .icon(com.amap.api.maps.model.BitmapDescriptorFactory.fromBitmap(
-                            android.graphics.Bitmap.createBitmap(12, 12, android.graphics.Bitmap.Config.ARGB_8888).apply {
-                                android.graphics.Canvas(this).drawCircle(6f, 6f, 6f, android.graphics.Paint().apply {
+                        .icon(BitmapDescriptorFactory.fromBitmap(
+                            android.graphics.Bitmap.createBitmap(14, 14, android.graphics.Bitmap.Config.ARGB_8888).apply {
+                                android.graphics.Canvas(this).drawCircle(7f, 7f, 5f, android.graphics.Paint().apply {
                                     color = android.graphics.Color.parseColor("#00E5FF")
-                                    alpha = 150
+                                    alpha = 140
                                 })
                             }
                         ))
                 )
+                breadcrumbDots.add(dot)
+                if (breadcrumbDots.size > 800) {
+                    breadcrumbDots.removeAt(0).remove()
+                }
             }
-        }
-
-        // 4. Draw Roaming "Boat" Marker
-        currentPlaybackPoint?.let { pos ->
-            map.addMarker(
-                com.amap.api.maps.model.MarkerOptions()
-                    .position(pos)
-                    .anchor(0.5f, 0.5f)
-                    .title("漫游焦点")
-                    .icon(com.amap.api.maps.model.BitmapDescriptorFactory.defaultMarker(com.amap.api.maps.model.BitmapDescriptorFactory.HUE_ORANGE))
-            )
-
-            // If we are just starting or point changed, ensure camera follows if play is active
-            // Note: Camera animation is handled in the playback loop for smoothness
         }
     }
 
-    // Playback Logic: Time-based Velocity Movement
-    LaunchedEffect(isPlaying, points, cumulativeDistances, playbackSpeedKmH) {
-        if (isPlaying && points.size > 1 && cumulativeDistances.size == points.size) {
+    // Playback Loop
+    LaunchedEffect(isPlaying, smoothPoints, cumulativeDistances, playbackSpeedKmH) {
+        if (isPlaying && smoothPoints.size > 1 && cumulativeDistances.size == smoothPoints.size) {
             val totalDist = cumulativeDistances.last()
             if (totalDist <= 0) {
                 isPlaying = false
@@ -287,63 +288,55 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             var lastTime = System.currentTimeMillis()
             while (isPlaying && playbackProgress < 1f) {
                 val currentTime = System.currentTimeMillis()
-                val deltaMs = (currentTime - lastTime).coerceAtMost(500) // Prevent huge jumps if suspended
+                val deltaMs = (currentTime - lastTime).coerceAtMost(200)
                 lastTime = currentTime
                 
                 val dtHours = deltaMs / 1000.0 / 3600.0
                 val distanceStep = playbackSpeedKmH * dtHours
                 
-                val currentD = (playbackProgress * totalDist) + distanceStep
-                playbackProgress = (currentD / totalDist).toFloat().coerceIn(0f, 1f)
+                val nextDist = (playbackProgress * totalDist) + distanceStep
+                playbackProgress = (nextDist / totalDist).toFloat().coerceIn(0f, 1f)
                 
-                // Find correct segment using binary search for performance
-                val searchRes = cumulativeDistances.binarySearch(currentD)
+                // Find segment
+                val searchRes = Collections.binarySearch(cumulativeDistances, nextDist)
                 val index = when {
                     searchRes >= 0 -> searchRes
-                    else -> (-searchRes - 2).coerceIn(0, points.size - 2)
+                    else -> (-searchRes - 2).coerceIn(0, smoothPoints.size - 2)
                 }
 
-                if (index < points.size - 1) {
-                    val p1 = points[index]
-                    val p2 = points[index+1]
+                if (index < smoothPoints.size - 1) {
+                    val p1 = smoothPoints[index]
+                    val p2 = smoothPoints[index+1]
                     val d1 = cumulativeDistances[index]
                     val d2 = cumulativeDistances[index+1]
                     
-                    val segmentProgress = if (d2 > d1) (currentD - d1) / (d2 - d1) else 0.0
-                    val clampedProg = segmentProgress.coerceIn(0.0, 1.0)
-                    
-                    val interpLat = p1.latitude + (p2.latitude - p1.latitude) * clampedProg
-                    val interpLng = p1.longitude + (p2.longitude - p1.longitude) * clampedProg
+                    val segmentProgress = if (d2 > d1) (nextDist - d1) / (d2 - d1) else 0.0
+                    val interpLat = p1.latitude + (p2.latitude - p1.latitude) * segmentProgress
+                    val interpLng = p1.longitude + (p2.longitude - p1.longitude) * segmentProgress
                     val targetLatLng = LatLng(interpLat, interpLng)
                     
                     currentPlaybackPoint = targetLatLng
                     
-                    // Stabilized Camera: Slower rotation and smooth target centering
                     try {
                         val currentBearing = mapView.map.cameraPosition.bearing
                         mapView.map.animateCamera(CameraUpdateFactory.newCameraPosition(
-                            com.amap.api.maps.model.CameraPosition.builder()
+                            CameraPosition.builder()
                                 .target(targetLatLng)
-                                .zoom(16f)
-                                .tilt(60f) 
-                                .bearing(currentBearing + 0.15f) // Reduced rotation speed for stability
+                                .zoom(16.5f)
+                                .tilt(55f) 
+                                .bearing(currentBearing + 0.1f)
                                 .build()
-                        ), 120, null) // Slightly longer animation for smoothness
+                        ), 35, null)
                     } catch (e: Exception) {}
                 }
                 
-                kotlinx.coroutines.delay(50) 
+                kotlinx.coroutines.delay(35) 
             }
             if (playbackProgress >= 1f) {
                 isPlaying = false
-                playbackProgress = 0f
             }
         }
     }
-
-    // Playback Marker State is now integrated into the unified draw effect.
-    // We can remove the old independent marker effect to avoid conflicts.
-
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -354,80 +347,71 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
                         onClick = onBack,
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface.copy(0.7f), CircleShape)
                     ) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                     Spacer(Modifier.width(12.dp))
-                    Text(
-                        "3D 时光漫游",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface.copy(0.5f), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface.copy(0.7f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            "3D 时光漫游",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
         }
     ) { _ ->
         Box(Modifier.fillMaxSize()) {
-            AndroidView(
-                factory = { mapView },
-                modifier = Modifier.fillMaxSize()
-            )
+            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-            // Right Map Controls
+            // Map HUD Controls
             Column(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                MapControlBtn(Icons.Rounded.Layers, "图层") {
+                MapActionBtn(Icons.Rounded.Layers) {
                     mapType = if (mapType == AMap.MAP_TYPE_NORMAL) AMap.MAP_TYPE_SATELLITE else AMap.MAP_TYPE_NORMAL
                 }
-                MapControlBtn(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "回放") {
-                    if (points.isNotEmpty()) isPlaying = !isPlaying
-                    else showControls = true // Open panel to select dates if no data
+                MapActionBtn(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow) {
+                    if (smoothPoints.isNotEmpty()) isPlaying = !isPlaying
+                    else showControls = true
                 }
-                MapControlBtn(Icons.Rounded.FilterList, "设置") {
+                MapActionBtn(Icons.Rounded.Settings) {
                     showControls = true
                 }
             }
 
-            // Empty State Hint
-            if (points.isEmpty()) {
-                Card(
-                    modifier = Modifier.align(Alignment.Center).padding(32.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(0.9f)),
-                    shape = RoundedCornerShape(24.dp)
+            // Stats Card
+            if (smoothPoints.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).width(180.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(0.85f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.2f))
                 ) {
-                    Column(
-                        Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Rounded.Place, null, size = 48.dp, tint = MaterialTheme.colorScheme.primary.copy(0.6f))
-                        Text("当前时段暂无漫游轨迹", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            "点击右侧 “设置” 按钮调整日期范围，\n或在主页面开启足迹记录。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("漫游状态", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        StatItem("总里数", "%.2f km".format(cumulativeDistances.lastOrNull() ?: 0.0))
+                        StatItem("当前航速", "${playbackSpeedKmH.toInt()} km/h")
+                        StatItem("记录足迹", "${entriesInRange.size} 篇")
                     }
                 }
             }
 
-            // Stats Overlays
-            if (points.isNotEmpty()) {
+            if (rawPoints.isEmpty()) {
                 Card(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 48.dp).width(160.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(0.85f)),
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.3f))
+                    modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(0.9f))
                 ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("漫游统计", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(4.dp))
-                        StatRow("总里程", "%.2f km".format(cumulativeDistances.lastOrNull() ?: 0.0)) 
-                        StatRow("漫游航速", "${playbackSpeedKmH.toInt()} km/h")
-                        StatRow("足迹数", "${entriesInRange.size}")
+                    Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Rounded.Inbox, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+                        Spacer(Modifier.height(12.dp))
+                        Text("暂无时光轨迹", fontWeight = FontWeight.Bold)
+                        Text("所选日期范围内没有记录足迹点", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                     }
                 }
             }
@@ -437,22 +421,22 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
             ModalBottomSheet(
                 onDismissRequest = { showControls = false },
                 sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.surface.copy(0.95f),
+                containerColor = MaterialTheme.colorScheme.surface,
                 dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
-                ControlPanel(
+                ControlPanelContent(
                     startDate = startDate,
                     endDate = endDate,
                     onStartDateChange = { startDate = it },
                     onEndDateChange = { endDate = it },
                     isPlaying = isPlaying,
                     progress = playbackProgress,
-                    onTogglePlay = { if (points.isNotEmpty()) isPlaying = !isPlaying },
+                    onTogglePlay = { if (smoothPoints.isNotEmpty()) isPlaying = !isPlaying },
                     onProgressChange = { 
                         playbackProgress = it
-                        if (points.isNotEmpty()) {
-                            val idx = (it * (points.size-1)).toInt().coerceIn(0, points.size-1)
-                            currentPlaybackPoint = LatLng(points[idx].latitude, points[idx].longitude)
+                        if (smoothPoints.isNotEmpty()) {
+                            val idx = (it * (smoothPoints.size-1)).toInt().coerceIn(0, smoothPoints.size-1)
+                            currentPlaybackPoint = smoothPoints[idx]
                             mapView.map.moveCamera(CameraUpdateFactory.newLatLng(currentPlaybackPoint!!))
                         }
                     },
@@ -471,20 +455,20 @@ fun ExportTraceScreen(viewModel: FootprintViewModel, initialYear: Int? = null, o
 }
 
 @Composable
-fun MapControlBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    LargeFloatingActionButton(
+fun MapActionBtn(icon: ImageVector, onClick: () -> Unit) {
+    FloatingActionButton(
         onClick = onClick,
-        containerColor = MaterialTheme.colorScheme.surface.copy(0.8f),
+        containerColor = MaterialTheme.colorScheme.surface.copy(0.85f),
         contentColor = MaterialTheme.colorScheme.primary,
         shape = CircleShape,
-        modifier = Modifier.size(56.dp)
+        elevation = FloatingActionButtonDefaults.elevation(0.dp)
     ) {
-        Icon(icon, contentDescription = label)
+        Icon(icon, null)
     }
 }
 
 @Composable
-fun StatRow(label: String, value: String) {
+fun StatItem(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
         Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
@@ -492,7 +476,7 @@ fun StatRow(label: String, value: String) {
 }
 
 @Composable
-fun ControlPanel(
+fun ControlPanelContent(
     startDate: LocalDate,
     endDate: LocalDate,
     onStartDateChange: (LocalDate) -> Unit,
@@ -506,115 +490,142 @@ fun ControlPanel(
     entries: List<com.footprint.data.model.FootprintEntry>,
     onEntryClick: (com.footprint.data.model.FootprintEntry) -> Unit
 ) {
-    val context = LocalContext.current
-    
+    var showStartPicker by remember { mutableStateOf(false) }
+    var showEndPicker by remember { mutableStateOf(false) }
+
+    if (showStartPicker) {
+        ComposeDatePickerDialog(
+            initialDate = startDate,
+            onDateSelected = { onStartDateChange(it); showStartPicker = false },
+            onDismiss = { showStartPicker = false }
+        )
+    }
+    if (showEndPicker) {
+        ComposeDatePickerDialog(
+            initialDate = endDate,
+            onDateSelected = { onEndDateChange(it); showEndPicker = false },
+            onDismiss = { showEndPicker = false }
+        )
+    }
+
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text("时光回放实验室", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
 
-        // Date Selectors
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DateCard(modifier = Modifier.weight(1f), label = "起点", date = startDate) {
-                DatePickerDialog(context, { _, y, m, d -> onStartDateChange(LocalDate.of(y, m + 1, d)) }, startDate.year, startDate.monthValue - 1, startDate.dayOfMonth).show()
-            }
-            DateCard(modifier = Modifier.weight(1f), label = "终点", date = endDate) {
-                DatePickerDialog(context, { _, y, m, d -> onEndDateChange(LocalDate.of(y, m + 1, d)) }, endDate.year, endDate.monthValue - 1, endDate.dayOfMonth).show()
-            }
+            DateSelector(modifier = Modifier.weight(1f), label = "起点日期", date = startDate) { showStartPicker = true }
+            DateSelector(modifier = Modifier.weight(1f), label = "截止日期", date = endDate) { showEndPicker = true }
         }
 
-        // Playback Control & Speed
-        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(0.4f), RoundedCornerShape(20.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.5f), RoundedCornerShape(20.dp)).padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onTogglePlay, modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.primary, CircleShape)) {
-                    Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onPrimary)
+        // Playback Controller
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onTogglePlay, 
+                        modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
+                    ) {
+                        Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimary)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("回放进度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Slider(value = progress, onValueChange = onProgressChange)
+                    }
                 }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("再生进度", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                
+                Spacer(Modifier.height(16.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Speed, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline)
+                    Spacer(Modifier.width(8.dp))
+                    Text("漫游航速", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     Slider(
-                        value = progress,
-                        onValueChange = onProgressChange,
-                        modifier = Modifier.height(32.dp)
+                        value = playbackSpeed,
+                        onValueChange = onPlaybackSpeedChange,
+                        valueRange = 5f..2000f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
                     )
+                    Text("${playbackSpeed.toInt()} km/h", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                 }
-            }
-            
-            Spacer(Modifier.height(12.dp))
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Speed, null, size = 18.dp, tint = MaterialTheme.colorScheme.outline)
-                Spacer(Modifier.width(8.dp))
-                Text("漫游航速", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                Slider(
-                    value = playbackSpeed,
-                    onValueChange = onPlaybackSpeedChange,
-                    valueRange = 5f..5000f,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                )
-                Text("${playbackSpeed.toInt()} km/h", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
 
-        // Entries List
         if (entries.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("途经足迹 (${entries.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { /* Could add filter/sort */ }) {
-                    Text("全部轨迹", style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            LazyColumn(modifier = Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("途经足迹 (${entries.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            LazyColumn(modifier = Modifier.heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(entries) { entry ->
-                    EntrySmallCard(entry, onClick = { onEntryClick(entry) })
+                    EntryListCard(entry, onClick = { onEntryClick(entry) })
                 }
             }
-        } else {
-            Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                Text("该时段内暂无足迹记录", color = MaterialTheme.colorScheme.outline)
-            }
         }
-        
-        Spacer(Modifier.height(24.dp))
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DateCard(modifier: Modifier, label: String, date: LocalDate, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick).background(MaterialTheme.colorScheme.surfaceVariant.copy(0.4f), RoundedCornerShape(16.dp)).padding(12.dp)) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-        Text(date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun EntrySmallCard(entry: com.footprint.data.model.FootprintEntry, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.4f), RoundedCornerShape(16.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.3f), RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+fun ComposeDatePickerDialog(
+    initialDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                datePickerState.selectedDateMillis?.let {
+                    onDateSelected(LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it), ZoneOffset.UTC).toLocalDate())
+                }
+            }) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
     ) {
-        Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primary.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(entry.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(entry.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text("%.1f".format(entry.distanceKm), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
-            Text("km", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        DatePicker(state = datePickerState)
+    }
+}
+
+@Composable
+fun DateSelector(modifier: Modifier, label: String, date: LocalDate, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Text(date.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-fun Icon(imageVector: ImageVector, contentDescription: String?, size: androidx.compose.ui.unit.Dp, tint: Color) {
-    Icon(imageVector, contentDescription, modifier = Modifier.size(size), tint = tint)
+fun EntryListCard(entry: com.footprint.data.model.FootprintEntry, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(0.3f),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(entry.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(entry.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1)
+            }
+            Text("%.1f".format(entry.distanceKm) + " km", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        }
+    }
 }
