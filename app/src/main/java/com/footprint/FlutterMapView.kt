@@ -2,14 +2,23 @@ package com.footprint
 
 import android.content.Context
 import android.graphics.*
-import java.util.LinkedHashMap
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
 import com.amap.api.maps.AMap
 import com.amap.api.maps.MapView
+import com.amap.api.maps.CameraUpdateFactory
+import com.amap.api.maps.model.*
 import com.footprint.ui.effects.ETERNAL_CLOUD_SHADER
+import com.footprint.service.LocationTrackingService
+import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.platform.PlatformView
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 import java.util.Calendar
+import java.util.LinkedHashMap
 
 class FlutterMapView(
         private val context: Context,
@@ -193,12 +202,20 @@ class FlutterMapView(
         } else {
             yunnanMask?.remove()
             yunnanMask = null
+            fogOverlay.setEternalMode(false)
+            distanceThreadView.visibility = View.GONE
         }
     }
 
     private fun applyEternalRealmStyle() {
         val map = aMap ?: return
         map.mapType = AMap.MAP_TYPE_NORMAL
+        map.showBuildings(false)
+        map.isTrafficEnabled = false
+        map.isIndoorEnabled = false
+        fogOverlay.setEternalMode(true)
+        distanceThreadView.visibility = View.VISIBLE
+        distanceThreadView.startAnimation()
         
         // 云南省大致边界 (简化版)
         val yunnanBoundary = listOf(
@@ -211,7 +228,9 @@ class FlutterMapView(
         )
 
         // 外围遮罩 (全世界遮罩，中间留洞给云南)
-        val hole = yunnanBoundary
+        val holeOptions = PolygonHoleOptions()
+        holeOptions.addAll(yunnanBoundary)
+        
         val world = listOf(
             LatLng(85.0, -180.0), LatLng(85.0, 180.0), 
             LatLng(-85.0, 180.0), LatLng(-85.0, -180.0)
@@ -219,7 +238,7 @@ class FlutterMapView(
         
         yunnanMask?.remove()
         yunnanMask = map.addPolygon(
-            PolygonOptions().addAll(world).addHoles(hole)
+            PolygonOptions().addAll(world).addHoles(holeOptions)
                 .fillColor(Color.parseColor("#4D000000")) // 30% black
                 .strokeWidth(0f)
                 .zIndex(10f)
