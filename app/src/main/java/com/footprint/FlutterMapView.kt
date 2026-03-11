@@ -150,18 +150,49 @@ class FlutterMapView(
         livePolyline?.remove()
         livePolyline = null
         if (currentPathPoints.isNotEmpty()) {
-            val pathColor = getPathColor(true)
+            val smoothedPoints = com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8)
+            val gradientColors = getGradientColorsForSmoothedPoints(smoothedPoints)
             livePolyline =
                     map.addPolyline(
                             PolylineOptions()
-                                    .addAll(com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8))
+                                    .addAll(smoothedPoints)
                                     .width(if (currentMode == "CAPSULE") 10f else 12f)
-                                    .color(pathColor)
+                                    .useGradient(true)
+                                    .colorValues(gradientColors)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                     .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
                                     .zIndex(100f)
                     )
         }
+    }
+
+    private fun getGradientColorsForSmoothedPoints(points: List<LatLng>): List<Int> {
+        if (points.isEmpty()) return emptyList()
+        val colors = mutableListOf<Int>()
+        for (i in 0 until points.size) {
+            val current = points[i]
+            val prev = if (i > 0) points[i - 1] else current
+            val next = if (i < points.size - 1) points[i + 1] else current
+            
+            val results = FloatArray(1)
+            android.location.Location.distanceBetween(prev.latitude, prev.longitude, next.latitude, next.longitude, results)
+            
+            val dist = results[0]
+            // We're calculating distance between interpolated points.
+            // Using a heuristic to map this distance to speed (roughly)
+            val approxSpeedMs = dist / 1.25f
+            val speedKmh = approxSpeedMs * 3.6f
+            
+            val color = when {
+                speedKmh >= 40 -> Color.parseColor("#F44336") // Red
+                speedKmh >= 20 -> Color.parseColor("#FF9800") // Orange
+                speedKmh >= 10 -> Color.parseColor("#FFEB3B") // Yellow
+                speedKmh >= 4  -> Color.parseColor("#4CAF50") // Green
+                else           -> Color.parseColor("#2196F3") // Blue
+            }
+            colors.add(color)
+        }
+        return colors
     }
 
     private fun getPathColor(isLive: Boolean): Int {
@@ -550,14 +581,16 @@ class FlutterMapView(
                 historyPolylines.clear()
                 
                 if (currentMode != "HEATMAP") {
-                    val pathColor = getPathColor(false)
                     for (segment in sessionSegments) {
                         if (segment.size >= 2) {
+                            val smoothedSegment = com.footprint.utils.PathInterpolator.interpolate(segment, 8)
+                            val gradientColors = getGradientColorsForSmoothedPoints(smoothedSegment)
                             val polyline = aMap?.addPolyline(
                                 PolylineOptions()
-                                    .addAll(com.footprint.utils.PathInterpolator.interpolate(segment, 8))
+                                    .addAll(smoothedSegment)
                                     .width(if (currentMode == "CAPSULE") 10f else 12f)
-                                    .color(pathColor)
+                                    .useGradient(true)
+                                    .colorValues(gradientColors)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                     .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
                                     .zIndex(90f)
@@ -585,12 +618,14 @@ class FlutterMapView(
                 historyPolylines.clear()
                 
                 if (latLngs.size >= 2) {
-                    val pathColor = getPathColor(false)
+                    val smoothedPoints = com.footprint.utils.PathInterpolator.interpolate(latLngs, 8)
+                    val gradientColors = getGradientColorsForSmoothedPoints(smoothedPoints)
                     val polyline = aMap?.addPolyline(
                         PolylineOptions()
-                                .addAll(com.footprint.utils.PathInterpolator.interpolate(latLngs, 8))
+                                .addAll(smoothedPoints)
                                 .width(if (currentMode == "CAPSULE") 10f else 12f)
-                                .color(pathColor)
+                                .useGradient(true)
+                                .colorValues(gradientColors)
                                 .lineCapType(PolylineOptions.LineCapType.LineCapRound)
                                 .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
                                 .zIndex(95f)
