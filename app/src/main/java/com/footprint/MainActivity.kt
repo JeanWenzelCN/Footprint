@@ -253,7 +253,8 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                         "syncMaintMode" -> {
-                            com.footprint.utils.PreferenceManager(this).isMaintenanceModeValidated = true
+                            val active = call.arguments as? Boolean ?: true
+                            com.footprint.utils.PreferenceManager(this).isMaintenanceModeValidated = active
                             result.success(true)
                         }
                         "getAppCredentials" -> {

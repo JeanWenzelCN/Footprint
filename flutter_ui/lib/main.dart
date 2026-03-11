@@ -3444,8 +3444,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Covert check for "Lucas"
       // Requirement: Only "Lucas" can trigger the cosmic secret.
       final magic = String.fromCharCodes([76, 117, 99, 97, 115]);
-      if (widget.nickname == magic && v.trim() == magic && !widget.isMaintValid) {
-        _startSecretSequence(context);
+      if (v.trim() == magic) {
+        if (!widget.isMaintValid) {
+          _startSecretSequence(context);
+        }
+      } else {
+        if (widget.isMaintValid) {
+          await channel.invokeMethod('syncMaintMode', false);
+          widget.onUpdate();
+        }
       }
     });
   }
