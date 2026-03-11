@@ -1,8 +1,6 @@
 package com.footprint.data.local
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.Query
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -33,7 +31,7 @@ interface TrackPointDao {
         @Query("SELECT COUNT(*) FROM track_points WHERE timestamp BETWEEN :start AND :end")
         fun observeCountInRange(start: Long, end: Long): Flow<Int>
 
-        @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+        @Insert(onConflict = OnConflictStrategy.REPLACE)
         suspend fun insertAll(points: List<TrackPointEntity>)
 
         /**
@@ -45,11 +43,25 @@ interface TrackPointDao {
         SELECT ROUND(latitude, 3) as latitude, ROUND(longitude, 3) as longitude, 
                MIN(id) as id, MIN(timestamp) as timestamp,
                0.0 as speed, 0.0 as accuracy, 0.0 as altitude,
-               NULL as adcode, sessionId as sessionId
+               adcode as adcode, sessionId as sessionId
         FROM track_points 
         GROUP BY ROUND(latitude, 3), ROUND(longitude, 3), sessionId
         ORDER BY sessionId, timestamp ASC
         """
         )
         suspend fun getAllDistinctLocations(): List<TrackPointEntity>
+
+        @Query(
+                """
+        SELECT ROUND(latitude, 3) as latitude, ROUND(longitude, 3) as longitude, 
+               MIN(id) as id, MIN(timestamp) as timestamp,
+               0.0 as speed, 0.0 as accuracy, 0.0 as altitude,
+               adcode as adcode, sessionId as sessionId
+        FROM track_points 
+        WHERE adcode LIKE '53%'
+        GROUP BY ROUND(latitude, 3), ROUND(longitude, 3), sessionId
+        ORDER BY sessionId, timestamp ASC
+        """
+        )
+        suspend fun getAllYunnanDistinctLocations(): List<TrackPointEntity>
 }

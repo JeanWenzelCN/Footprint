@@ -56,9 +56,13 @@ class MainActivity : FlutterActivity() {
                 .setMethodCallHandler { call, result ->
                     when (call.method) {
                         "getAllEntries" -> {
+                            val args = call.arguments as? Map<*, *>
+                            val isEternal = args?.get("mode") == "ETERNAL_REALM"
                             lifecycleScope.launch {
                                 val entries =
-                                        withContext(Dispatchers.IO) { repository.getAllEntries() }
+                                        withContext(Dispatchers.IO) { 
+                                            if (isEternal) repository.getYunnanEntries() else repository.getAllEntries() 
+                                        }
                                 val json = withContext(Dispatchers.Default) { gson.toJson(entries) }
                                 result.success(json)
                             }
@@ -71,8 +75,12 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                         "getAllTimeCapsules" -> {
+                            val args = call.arguments as? Map<*, *>
+                            val isEternal = args?.get("mode") == "ETERNAL_REALM"
                             lifecycleScope.launch {
-                                val capsules = withContext(Dispatchers.IO) { repository.getAllTimeCapsules() }
+                                val capsules = withContext(Dispatchers.IO) { 
+                                    if (isEternal) repository.getYunnanTimeCapsules() else repository.getAllTimeCapsules() 
+                                }
                                 val json = withContext(Dispatchers.Default) { gson.toJson(capsules) }
                                 result.success(json)
                             }
@@ -118,20 +126,23 @@ class MainActivity : FlutterActivity() {
                         }
                         // 获取所有去重位置点（用于迷雾探索掩码）
                         "getAllFogPoints" -> {
+                            val args = call.arguments as? Map<*, *>
+                            val isEternal = args?.get("mode") == "ETERNAL_REALM"
+
                             lifecycleScope.launch(Dispatchers.IO) {
                                 try {
-                                    // 1. 从 track_points 表获取去重后的坐标
-                                    val trackLocations = repository.getAllDistinctLocations()
+                                    // 1. 从 track_points 表获取坐标
+                                    val trackLocations = if (isEternal) repository.getAllYunnanDistinctLocations() else repository.getAllDistinctLocations()
                                     // 2. 从 footprints 表获取足迹坐标
-                                    val entries = repository.getAllEntries()
+                                    val entries = if (isEternal) repository.getYunnanEntries() else repository.getAllEntries()
                                     
                                     // 合并两个数据源
-                                    val allPoints = mutableListOf<Map<String, Double>>()
+                                    val allPoints = mutableListOf<Map<String, Any?>>()
                                     trackLocations.forEach {
-                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude, "sessionId" to it.sessionId.toDouble(), "timestamp" to it.timestamp.toDouble()))
+                                        allPoints.add(mapOf("lat" to it.latitude, "lng" to it.longitude, "sessionId" to it.sessionId, "timestamp" to it.timestamp, "adcode" to it.adcode))
                                     }
                                     entries.filter { it.latitude != null && it.longitude != null }.forEach {
-                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!, "sessionId" to (-it.id).toDouble(), "timestamp" to 0.0))
+                                        allPoints.add(mapOf("lat" to it.latitude!!, "lng" to it.longitude!!, "sessionId" to -it.id, "timestamp" to 0L, "adcode" to it.adcode))
                                     }
                                     
                                     val json = gson.toJson(allPoints)
@@ -313,9 +324,10 @@ class MainActivity : FlutterActivity() {
                             val spd = (args["speed"] as? Number)?.toFloat() ?: 0f
                             val ts = (args["timestamp"] as? Number)?.toLong() ?: 0L
                             val sid = (args["sessionId"] as? Number)?.toLong() ?: 0L
+                            val adcode = args["adcode"] as? String
                             lifecycleScope.launch(Dispatchers.IO) {
                                 try {
-                                    repository.saveTrackPointRaw(lat, lng, alt, acc, spd, ts, null, sid)
+                                    repository.saveTrackPointRaw(lat, lng, alt, acc, spd, ts, adcode, sid)
                                     withContext(Dispatchers.Main) { result.success(true) }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {

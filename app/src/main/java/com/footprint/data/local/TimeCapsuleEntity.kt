@@ -14,5 +14,6 @@ data class TimeCapsuleEntity(
         val unlockTime: Long, // Epoch Milliseconds
         val isUnlocked: Boolean = false,
         val radius: Double = 50.0, // Unlock radius in meters
+        val adcode: String? = null,
         val unlock_timestamp: Long? = null // For AES absolute time encryption
 )

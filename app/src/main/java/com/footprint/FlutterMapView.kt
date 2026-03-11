@@ -242,6 +242,14 @@ class FlutterMapView(
         map.showBuildings(false)
         map.isTrafficEnabled = false
         map.showIndoorMap(false)
+        map.uiSettings.isScrollGesturesEnabled = true
+        map.uiSettings.isZoomGesturesEnabled = true
+        map.uiSettings.isTiltGesturesEnabled = true
+        map.uiSettings.isRotateGesturesEnabled = true
+        map.uiSettings.isCompassEnabled = false
+        map.uiSettings.isScaleControlsEnabled = false
+        map.uiSettings.isZoomControlsEnabled = false
+        map.uiSettings.isMyLocationButtonEnabled = false
         fogOverlay.setEternalMode(true)
 
         // 应用极简水彩风自定义样式
@@ -502,12 +510,34 @@ class FlutterMapView(
         yunnanMask?.remove()
         yunnanMask = map.addPolygon(
             PolygonOptions().addAll(world).addHoles(holeOptions)
-                .fillColor(Color.parseColor("#D9F9F1E7")) // Solid paper color completely obscuring outside
+                .fillColor(Color.parseColor("#FF000000")) // Solid paper color completely obscuring outside
                 .strokeWidth(0f)
                 .zIndex(10f)
         )
         // 美化云南省边缘的描边
         val strokeColor = Color.parseColor("#B0C4DE")
+        // --- 孤岛沙盘特效 (Isolated Sandbox) ---
+        // 增加虚空背景的多层光影效果，产生悬浮厚度感
+        val layers = 5
+        for (i in 1..layers) {
+            val offsetColor = Color.argb(100 - i * 15, 176, 196, 222) // 淡蓝光影逐渐淡出
+            aMap?.addPolyline(PolylineOptions()
+                .addAll(yunnanBoundary)
+                .width(12f + i * 4f)
+                .color(offsetColor)
+                .zIndex(9f - i) // 放在遮罩下方实现发光层
+            )
+        }
+
+        // 核心发光边缘 (琥珀边缘)
+        aMap?.addPolyline(PolylineOptions()
+            .addAll(yunnanBoundary)
+            .width(10f)
+            .color(Color.parseColor("#80FFFFFF")) // 极细高光
+            .zIndex(11.1f)
+            .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+        )
+
         map.addPolyline(PolylineOptions()
             .addAll(yunnanBoundary)
             .width(8f)
@@ -517,13 +547,15 @@ class FlutterMapView(
         )
 
 
-        // 限制地图拖动范围仅为云南
-        val s = LatLng(21.14, 97.52)
-        val n = LatLng(29.23, 106.18)
+        // 限制地图拖动及缩放范围，将视野绝对锁定在云南省 (Isolated Bounds)
+        val s = LatLng(21.14, 97.40)
+        val n = LatLng(29.23, 106.20)
         map.setMapStatusLimits(LatLngBounds(s, n))
+        map.minZoomLevel = 5.5f
+        map.maxZoomLevel = 11.0f
 
-        // 缩放至云南
-        map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(25.04, 101.5), 6.5f))
+        // 缩放至云南全境，呈现出一种“俯瞰琥珀”的上帝视角
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(25.04, 101.8), 6.5f))
     }
 
     private fun updateMarkers() {
@@ -542,6 +574,13 @@ class FlutterMapView(
             val entry = it as? Map<*, *> ?: return@forEach
             val lat = (entry["latitude"] as? Number)?.toDouble()
             val lng = (entry["longitude"] as? Number)?.toDouble()
+            val adcode = entry["adcode"] as? String
+
+            // 数据隔离：如果处于永恒之境模式，只显示云南省(53开头的adcode)的数据
+            if (currentMode == "ETERNAL_REALM") {
+                val isYunnan = adcode?.startsWith("53") ?: (lat != null && lng != null && lat in 21.0..29.5 && lng in 97.0..106.5)
+                if (!isYunnan) return@forEach
+            }
             val id = (entry["id"] as? Number)?.toLong()
             val title = entry["title"] as? String ?: "足迹"
 
@@ -574,6 +613,13 @@ class FlutterMapView(
             val id = (data["id"] as? Number)?.toLong() ?: return@forEach
             val lat = (data["latitude"] as? Number)?.toDouble() ?: return@forEach
             val lng = (data["longitude"] as? Number)?.toDouble() ?: return@forEach
+            val adcode = data["adcode"] as? String
+
+            // 同样对时光胶囊进行地域隔离
+            if (currentMode == "ETERNAL_REALM") {
+                val isYunnan = adcode?.startsWith("53") ?: (lat in 21.0..29.5 && lng in 97.0..106.5)
+                if (!isYunnan) return@forEach
+            }
             val message = data["message"] as? String ?: "时光胶囊"
             val isUnlocked = data["isUnlocked"] as? Boolean ?: false
 

@@ -20,6 +20,7 @@ data class FootprintEntry(
     val temperature: Double? = null,
     val transportType: TransportType = TransportType.UNKNOWN,
     val carbonSavedKg: Double = 0.0,
+    val adcode: String? = null,
     val icon: String = "LocationOn"
 )
 

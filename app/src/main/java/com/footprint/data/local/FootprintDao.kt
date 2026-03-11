@@ -33,6 +33,12 @@ interface FootprintDao {
     @Query("SELECT * FROM footprints ORDER BY happened_on ASC LIMIT :limit OFFSET :offset")
     suspend fun getFootprintsPaged(limit: Int, offset: Int): List<FootprintEntity>
 
+    @Query("SELECT * FROM footprints WHERE adcode LIKE '53%' ORDER BY happened_on DESC, id DESC")
+    fun observeYunnanEntries(): Flow<List<FootprintEntity>>
+
+    @Query("SELECT * FROM footprints WHERE adcode LIKE '53%' ORDER BY happened_on DESC, id DESC")
+    suspend fun getYunnanEntriesOnce(): List<FootprintEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entries: List<FootprintEntity>)
 }

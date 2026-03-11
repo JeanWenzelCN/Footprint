@@ -40,6 +40,9 @@ class FootprintRepository(
         suspend fun getAllEntries(): List<FootprintEntry> =
                 footprintDao.getAll().map { it.toModel() }
 
+        suspend fun getYunnanEntries(): List<FootprintEntry> =
+                footprintDao.getYunnanEntriesOnce().map { it.toModel() }
+
         suspend fun getAllGoals(): List<TravelGoal> = travelGoalDao.getAll().map { it.toModel() }
 
         // --- Tracking ---
@@ -99,6 +102,11 @@ class FootprintRepository(
         /** Get all de-duplicated location points for fog exploration mask */
         suspend fun getAllDistinctLocations(): List<com.footprint.data.local.TrackPointEntity> {
                 return trackPointDao.getAllDistinctLocations()
+        }
+
+        /** Get all de-duplicated location points ONLY for Yunnan */
+        suspend fun getAllYunnanDistinctLocations(): List<com.footprint.data.local.TrackPointEntity> {
+                return trackPointDao.getAllYunnanDistinctLocations()
         }
 
         suspend fun getTrackPointCount(year: Int, month: Int? = null): Int {
@@ -171,6 +179,9 @@ class FootprintRepository(
 
         suspend fun getAllTimeCapsules(): List<com.footprint.data.local.TimeCapsuleEntity> =
                 timeCapsuleDao.getAllCapsulesOnce()
+
+        suspend fun getYunnanTimeCapsules(): List<com.footprint.data.local.TimeCapsuleEntity> =
+                timeCapsuleDao.getYunnanCapsulesOnce()
 
         suspend fun unlockCapsule(id: Long) = timeCapsuleDao.unlockCapsule(id)
 
@@ -266,6 +277,7 @@ class FootprintRepository(
                                         com.footprint.data.model.TransportType.UNKNOWN
                                 },
                         carbonSavedKg = carbonSaved,
+                        adcode = adcode,
                         icon = icon
                 )
 
@@ -288,6 +300,7 @@ class FootprintRepository(
                         temperature = temperature,
                         transportType = transportType.name,
                         carbonSaved = carbonSavedKg,
+                        adcode = adcode,
                         icon = icon
                 )
 

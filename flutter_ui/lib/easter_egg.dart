@@ -262,17 +262,12 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Background Map or Stars
+          // Background Map (The Void is handled by Scaffold and the Map mask)
           if (showMap)
             _EternalMapDisplay(
               onMarkerClick: (tag) {
                 setState(() => selectedPOI = poiDetails[tag]);
               },
-            )
-          else
-            AnimatedBuilder(
-              animation: _starController,
-              builder: (ctx, _) => CustomPaint(painter: StarFieldPainter(_starController.value), size: Size.infinite),
             ),
 
           // Cloud Overlay for Map
@@ -360,7 +355,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
           if (showMap && selectedPOI == null) 
              Positioned(
                right: 32,
-               bottom: 32,
+               bottom: 120, // Move up to make space for playback wheel
                child: GestureDetector(
                  onTap: () {
                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("时间锁充能中：2027年9月16日解封")));
@@ -371,6 +366,17 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
                  ),
                ),
              ),
+
+          // Spatiotemporal Playback Compass
+          if (showMap && selectedPOI == null)
+            Positioned(
+              left: 20, right: 20, bottom: 40,
+              child: _SpatiotemporalPlaybackCompass(
+                onChanged: (progress) {
+                  // This will eventually update the map playback
+                },
+              ),
+            ),
 
           if (!showMap)
             const Positioned(
@@ -493,29 +499,7 @@ class _AstrolabeLetterState extends State<AstrolabeLetter> with SingleTickerProv
   }
 }
 
-class StarFieldPainter extends CustomPainter {
-  final double progress;
-  StarFieldPainter(this.progress);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final random = math.Random(42);
-    final paint = Paint()..color = Colors.white;
-    
-    for (int i = 0; i < 100; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = (random.nextDouble() * size.height + progress * size.height) % size.height;
-      final radius = random.nextDouble() * 1.5;
-      final opacity = random.nextDouble() * 0.5 + 0.2;
-      paint.color = Colors.white.withValues(alpha: opacity);
-      canvas.drawCircle(Offset(x, y), radius, paint);
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant StarFieldPainter oldDelegate) => true;
-}
+// StarFieldPainter removed as requested.
 
 class _TimeCapsuleGlow extends StatefulWidget {
   const _TimeCapsuleGlow({Key? key}) : super(key: key);
@@ -649,4 +633,75 @@ class _ShaderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ShaderPainter oldDelegate) => true;
+}
+
+
+class _SpatiotemporalPlaybackCompass extends StatefulWidget {
+  final Function(double) onChanged;
+  const _SpatiotemporalPlaybackCompass({Key? key, required this.onChanged}) : super(key: key);
+
+  @override
+  State<_SpatiotemporalPlaybackCompass> createState() => _SpatiotemporalPlaybackCompassState();
+}
+
+class _SpatiotemporalPlaybackCompassState extends State<_SpatiotemporalPlaybackCompass> {
+  double progress = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 100,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(color: Colors.white10),
+        boxShadow: [BoxShadow(color: Colors.blueAccent.withValues(alpha: 0.1), blurRadius: 20)],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned(
+            top: 15,
+            child: Text(
+              '时空穿梭罗盘 · SPATIOTEMPORAL PLAYBACK',
+              style: TextStyle(color: Colors.white30, fontSize: 8, letterSpacing: 2, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: const Color(0xFFE5C07B),
+                inactiveTrackColor: Colors.white10,
+                thumbColor: Colors.white,
+                overlayColor: Colors.white10,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6, elevation: 5),
+                trackHeight: 1,
+              ),
+              child: Slider(
+                value: progress,
+                onChanged: (v) {
+                  setState(() => progress = v);
+                  widget.onChanged(v);
+                },
+              ),
+            ),
+          ),
+          const Positioned(
+            bottom: 12,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('2023.09.16', style: TextStyle(color: Colors.white24, fontSize: 10, fontFamily: 'monospace')),
+                SizedBox(width: 20),
+                Icon(Icons.history_toggle_off, color: Color(0xFFE5C07B), size: 14),
+                SizedBox(width: 20),
+                Text('2024.09.16', style: TextStyle(color: Colors.white24, fontSize: 10, fontFamily: 'monospace')),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
