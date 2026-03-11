@@ -3870,7 +3870,7 @@ class ArtStudioScreen extends StatelessWidget {
                       const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'export_trace'});
                     }
                   ),
-                  if (isMaintValid && nickname == String.fromCharCodes([76, 117, 99, 97, 115])) ...[
+                  if (isMaintValid) ...[
                     const SizedBox(height: 32),
                      Text("永恒之境", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
                      const SizedBox(height: 16),

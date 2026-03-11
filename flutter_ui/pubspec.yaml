@@ -64,6 +64,8 @@ flutter:
   shaders:
     - shaders/badge_material.frag
     - shaders/ripple_reveal.frag
+    - shaders/time_capsule_core.frag
+    - shaders/weather_resonance.frag
 
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package

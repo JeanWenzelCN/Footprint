@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
                         TimeCapsuleEntity::class,
                         UserBadgeEntity::class,
                         UserStatsEntity::class],
-        version = 11,
+        version = 12,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -219,6 +219,21 @@ abstract class FootprintDatabase : RoomDatabase() {
                                 }
                         }
 
+                val MIGRATION_11_12 =
+                        object : androidx.room.migration.Migration(11, 12) {
+                                override fun migrate(
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        try {
+                                                db.execSQL(
+                                                        "ALTER TABLE time_capsules ADD COLUMN unlock_timestamp INTEGER"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                }
+                        }
+
                 fun getInstance(context: Context): FootprintDatabase =
                         instance
                                 ?: synchronized(this) {
@@ -232,7 +247,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         "footprint-db"
                                 )
                                 .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-                                .addMigrations(MIGRATION_9_10, MIGRATION_10_11)
+                                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                                 .fallbackToDestructiveMigration()
                                 .build()
         }

@@ -56,7 +56,6 @@ class FlutterMapView(
     private var currentMode: String = "STANDARD"
 
     // 专属渲染层
-    private val distanceThreadView = DistanceThreadView(context)
     private var yunnanMask: Polygon? = null
 
     init {
@@ -116,11 +115,9 @@ class FlutterMapView(
         }
 
         container.addView(mapView)
-        container.addView(distanceThreadView)
         container.addView(fogOverlay)
 
         fogOverlay.visibility = View.GONE
-        distanceThreadView.visibility = View.GONE
 
         // 1. 监听实时轨迹流 (来自 Kotlin Service)
         scope.launch {
@@ -202,8 +199,8 @@ class FlutterMapView(
         } else {
             yunnanMask?.remove()
             yunnanMask = null
+            aMap?.setMapStatusLimits(null) // 取消边界限制
             fogOverlay.setEternalMode(false)
-            distanceThreadView.visibility = View.GONE
             aMap?.setCustomMapStyle(CustomMapStyleOptions().apply { isEnable = false }) // 禁用自定义样式
         }
     }
@@ -215,8 +212,6 @@ class FlutterMapView(
         map.isTrafficEnabled = false
         map.showIndoorMap(false)
         fogOverlay.setEternalMode(true)
-        distanceThreadView.visibility = View.VISIBLE
-        distanceThreadView.startAnimation()
 
         // 应用极简水彩风自定义样式
         try {
@@ -252,10 +247,15 @@ class FlutterMapView(
         yunnanMask?.remove()
         yunnanMask = map.addPolygon(
             PolygonOptions().addAll(world).addHoles(holeOptions)
-                .fillColor(Color.parseColor("#4D000000")) // 30% black
+                .fillColor(Color.parseColor("#F9F1E7")) // Solid paper color completely obscuring outside
                 .strokeWidth(0f)
                 .zIndex(10f)
         )
+
+        // 限制地图拖动范围仅为云南
+        val s = LatLng(21.14, 97.52)
+        val n = LatLng(29.23, 106.18)
+        map.setMapStatusLimits(LatLngBounds(s, n))
 
         // 缩放至云南
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(25.04, 101.5), 6.5f))
@@ -464,9 +464,7 @@ class FlutterMapView(
                     heatmapOverlay = null
                 }
                 
-                distanceThreadView.visibility = if (mode == "ETERNAL_REALM") View.VISIBLE else View.GONE
                 if (mode == "ETERNAL_REALM") {
-                    distanceThreadView.startAnimation()
                     fogOverlay.setEternalMode(true)
                     updateEternalMarkers()
                 } else {
@@ -1197,61 +1195,64 @@ class FlutterMapView(
     }
 
     private fun createEternalMarkerBitmap(tag: String): Bitmap {
-        val size = 64
+        val size = 72
         val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
         val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
+            color = Color.parseColor("#4A4A4A")
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 2.5f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
         }
+        val fillP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E5E0D8")
+            style = Paint.Style.FILL
+            alpha = 180
+        }
+        // Minimalist wireframe background circle
+        c.drawCircle(36f, 36f, 30f, fillP)
+        c.drawCircle(36f, 36f, 30f, p)
+        
         when (tag) {
-            "KUNMING" -> {
-                c.drawRect(15f, 15f, 49f, 49f, p)
-                c.drawLine(15f, 32f, 49f, 32f, p)
+            "KUNMING" -> { // Flower 🌺
+                c.save()
+                c.translate(36f, 36f)
+                for (i in 0..4) {
+                    val oval = RectF(-6f, -20f, 6f, 0f)
+                    c.drawOval(oval, p)
+                    c.rotate(72f)
+                }
+                c.restore()
+                c.drawCircle(36f, 36f, 4f, p)
             }
-            "DALI" -> {
-                c.drawCircle(32f, 32f, 18f, p)
-                c.drawLine(32f, 14f, 32f, 50f, p)
-                c.drawLine(14f, 32f, 50f, 32f, p)
+            "DALI" -> { // Book 📖
+                val path = Path()
+                path.moveTo(22f, 26f)
+                path.quadTo(28f, 22f, 36f, 26f)
+                path.quadTo(44f, 22f, 50f, 26f)
+                path.lineTo(50f, 44f)
+                path.quadTo(44f, 40f, 36f, 44f)
+                path.quadTo(28f, 40f, 22f, 44f)
+                path.close()
+                c.drawPath(path, p)
+                c.drawLine(36f, 26f, 36f, 44f, p)
             }
-            else -> {
-                c.drawCircle(32f, 32f, 12f, p)
+            "LIJIANG" -> { // Cat 🐈
+                val path = Path()
+                path.moveTo(26f, 28f)
+                path.lineTo(26f, 18f)
+                path.lineTo(32f, 24f)
+                path.lineTo(40f, 24f)
+                path.lineTo(46f, 18f)
+                path.lineTo(46f, 28f)
+                path.addArc(RectF(24f, 26f, 48f, 46f), 180f, -180f)
+                c.drawPath(path, p)
+                c.drawPoint(30f, 34f, p)
+                c.drawPoint(42f, 34f, p)
+                c.drawLine(34f, 38f, 38f, 38f, p)
             }
         }
         return b
-    }
-
-    inner class DistanceThreadView(context: Context) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 8f
-        }
-        private val kunming = LatLng(25.04, 102.71)
-        private var pulsePos = 0f
-        fun startAnimation() { postInvalidateOnAnimation() }
-        override fun onDraw(canvas: Canvas) {
-            if (currentMode != "ETERNAL_REALM") return
-            val map = aMap ?: return
-            val start = if (cachedLat > 1.0) LatLng(cachedLat, cachedLng) else LatLng(39.9, 116.4)
-            val p1 = map.projection.toScreenLocation(start)
-            val p2 = map.projection.toScreenLocation(kunming)
-            val path = Path()
-            path.moveTo(p1.x.toFloat(), p1.y.toFloat())
-            val cx = (p1.x + p2.x) / 2f
-            val cy = Math.min(p1.y, p2.y) - 300f
-            path.quadTo(cx, cy, p2.x.toFloat(), p2.y.toFloat())
-            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            paint.color = if (hour in 8..17) Color.parseColor("#FFD700") else Color.parseColor("#00BFFF")
-            paint.alpha = 150
-            canvas.drawPath(path, paint)
-            pulsePos = (System.currentTimeMillis() % 2000) / 2000f
-            paint.alpha = 255
-            val pm = PathMeasure(path, false)
-            val segmentPath = Path()
-            pm.getSegment(pm.length * pulsePos, pm.length * (pulsePos + 0.1f), segmentPath, true)
-            canvas.drawPath(segmentPath, paint)
-            postInvalidateOnAnimation()
-        }
     }
 }
