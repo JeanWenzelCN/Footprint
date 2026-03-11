@@ -519,9 +519,9 @@ class LocationTrackingService : Service(), AMapLocationListener {
         val newInterval =
                 when {
                     speedKmh > 30 -> 2000L // 快速移动 (开车/公交): 2s
-                    speedKmh > 5 -> 5000L // 正常跑步/骑行: 5s
-                    speedKmh > 0.5 -> 10000L // 走路: 10s
-                    else -> 30000L // 静止: 30s
+                    speedKmh > 5 -> 3000L // 正常跑步/骑行: 3s
+                    speedKmh > 0.5 -> 4000L // 走路: 4s
+                    else -> 10000L // 静止: 10s
                 }
 
         locationOption?.let { currentOption ->

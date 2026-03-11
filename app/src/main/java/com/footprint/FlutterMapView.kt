@@ -154,7 +154,7 @@ class FlutterMapView(
             livePolyline =
                     map.addPolyline(
                             PolylineOptions()
-                                    .addAll(currentPathPoints)
+                                    .addAll(com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8))
                                     .width(if (currentMode == "CAPSULE") 10f else 12f)
                                     .color(pathColor)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
@@ -409,7 +409,7 @@ class FlutterMapView(
 
         val allPoints = mutableListOf<LatLng>()
         allPoints.addAll(historyPoints)
-        allPoints.addAll(currentPathPoints)
+        allPoints.addAll(com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8))
 
         if (allPoints.isEmpty()) return
 
@@ -555,7 +555,7 @@ class FlutterMapView(
                         if (segment.size >= 2) {
                             val polyline = aMap?.addPolyline(
                                 PolylineOptions()
-                                    .addAll(segment)
+                                    .addAll(com.footprint.utils.PathInterpolator.interpolate(segment, 8))
                                     .width(if (currentMode == "CAPSULE") 10f else 12f)
                                     .color(pathColor)
                                     .lineCapType(PolylineOptions.LineCapType.LineCapRound)
@@ -588,7 +588,7 @@ class FlutterMapView(
                     val pathColor = getPathColor(false)
                     val polyline = aMap?.addPolyline(
                         PolylineOptions()
-                                .addAll(latLngs)
+                                .addAll(com.footprint.utils.PathInterpolator.interpolate(latLngs, 8))
                                 .width(if (currentMode == "CAPSULE") 10f else 12f)
                                 .color(pathColor)
                                 .lineCapType(PolylineOptions.LineCapType.LineCapRound)
