@@ -110,7 +110,17 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
       if (e['energyLevel'] != null) energyLevel = (e['energyLevel'] as num).toDouble();
       if (e['mood'] != null) selectedMood = moods.contains(e['mood']) ? e['mood'] : "愉快";
       if (e['weather'] != null) selectedWeather = weathers.contains(e['weather']) ? e['weather'] : "晴朗";
-      if (e['transportMethod'] != null) selectedTransport = transports.contains(e['transportMethod']) ? e['transportMethod'] : "步行";
+      final t = e['transportType'] ?? e['transportMethod'];
+      if (t != null) {
+        switch(t) {
+          case "WALK": selectedTransport = "步行"; break;
+          case "BIKE": selectedTransport = "骑行"; break;
+          case "CAR": selectedTransport = "自驾"; break;
+          case "TRAIN": selectedTransport = "铁路"; break;
+          case "PLANE": selectedTransport = "航空"; break;
+          default: selectedTransport = transports.contains(t) ? t : "步行";
+        }
+      }
       
       final dateStr = e['happenedOn'] as String?;
       if (dateStr != null) {
@@ -3442,11 +3452,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _up('updateNickname', v);
       
       // Covert check for "Lucas"
-      // Requirement: Only "Lucas" can trigger the cosmic secret.
-      final magic = String.fromCharCodes([76, 117, 99, 97, 115]);
-      if (v.trim() == magic) {
+      // Requirement: Only "Lucas" or "Ace" can trigger the cosmic secret.
+      final magicLucas = String.fromCharCodes([76, 117, 99, 97, 115]);
+      final magicAce = String.fromCharCodes([65, 99, 101]);
+      
+      if (v.trim() == magicLucas || v.trim() == magicAce) {
         if (!widget.isMaintValid) {
-          _startSecretSequence(context);
+          _startSecretSequence(context, v.trim());
         }
       } else {
         if (widget.isMaintValid) {
@@ -3457,7 +3469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-    void _startSecretSequence(BuildContext context) async {
+    void _startSecretSequence(BuildContext context, String username) async {
     // Stage 1: The Whisper Trigger
     FocusManager.instance.primaryFocus?.unfocus();
     
@@ -3468,6 +3480,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       transitionDuration: const Duration(milliseconds: 1500),
       pageBuilder: (context, anim, _) {
         return SecretAstrolabeSequence(
+          username: username,
           onSuccess: () {
             Navigator.pop(context, true);
           },
@@ -3494,11 +3507,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (unlocked == true) {
-      if (mounted) _showMagicPopup(context);
+      if (mounted) _showMagicPopup(context, username);
     }
   }
 
-  void _showMagicPopup(BuildContext context) {
+  void _showMagicPopup(BuildContext context, String username) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -3524,11 +3537,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.favorite, color: Colors.pinkAccent, size: 64),
+                         const Icon(
+                          Icons.bolt, 
+                          color: Colors.blueAccent, 
+                          size: 64
+                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          "致 Lucas",
-                          style: TextStyle(
+                        Text(
+                          "致 $username",
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
                             fontWeight: FontWeight.w900,

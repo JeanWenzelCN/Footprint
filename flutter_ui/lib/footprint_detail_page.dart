@@ -29,6 +29,8 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
   late double distance;
   late int energy;
   late List<String> photos;
+  late String travelMode;
+  late IconData travelIcon;
 
   @override
   void initState() {
@@ -72,6 +74,16 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
       photos = rawPhotos.split(',').map((s) => s.trim()).toList();
     } else {
       photos = [];
+    }
+
+    final t = entry['transportType'] ?? entry['transportMethod'] ?? "UNKNOWN";
+    switch(t) {
+      case "WALK": travelMode = "步行"; travelIcon = Icons.directions_walk; break;
+      case "BIKE": travelMode = "骑行"; travelIcon = Icons.directions_bike; break;
+      case "CAR": travelMode = "自驾"; travelIcon = Icons.directions_car; break;
+      case "TRAIN": travelMode = "铁路"; travelIcon = Icons.train; break;
+      case "PLANE": travelMode = "航空"; travelIcon = Icons.flight; break;
+      default: travelMode = "未知"; travelIcon = Icons.help_outline;
     }
   }
 
@@ -260,12 +272,9 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _statDrop("里程", "${distance.toStringAsFixed(1)} KM", Icons.directions_walk, cs, tt),
+                        _statDrop("里程", "${distance.toStringAsFixed(1)} KM", travelIcon, cs, tt),
+                        _statDrop("出行", travelMode, travelIcon, cs, tt),
                         _statDrop("能量", "$energy", Icons.bolt, cs, tt),
-                        if (entry['latitude'] != null && entry['longitude'] != null)
-                          _statDrop("坐标", "${(entry['latitude'] as num).toDouble().toStringAsFixed(3)}, ${(entry['longitude'] as num).toDouble().toStringAsFixed(3)}", Icons.location_on, cs, tt)
-                        else
-                          _statDrop("天气", _mapWeatherToChinese(weather), Icons.wb_sunny, cs, tt),
                         _statDrop("心情", mood, Icons.mood, cs, tt),
                       ],
                     ),

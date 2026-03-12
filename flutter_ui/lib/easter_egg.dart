@@ -8,7 +8,8 @@ import 'dart:math' as math;
 
 class SecretAstrolabeSequence extends StatefulWidget {
   final VoidCallback onSuccess;
-  const SecretAstrolabeSequence({Key? key, required this.onSuccess}) : super(key: key);
+  final String username;
+  const SecretAstrolabeSequence({Key? key, required this.onSuccess, this.username = ""}) : super(key: key);
 
   @override
   State<SecretAstrolabeSequence> createState() => _SecretAstrolabeSequenceState();
@@ -21,32 +22,55 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
   
   bool isUnlocking = false;
   late AnimationController _rippleController;
-  ui.FragmentProgram? _program;
+  ui.FragmentShader? _shader;
+
+  late FixedExtentScrollController _yearController;
+  late FixedExtentScrollController _monthController;
+  late FixedExtentScrollController _dayController;
 
   @override
   void initState() {
     super.initState();
     _rippleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+    
+    _yearController = FixedExtentScrollController(initialItem: selYear - 1900);
+    _monthController = FixedExtentScrollController(initialItem: selMonth - 1);
+    _dayController = FixedExtentScrollController(initialItem: selDay - 1);
+
     _loadShader();
   }
 
   void _loadShader() async {
     try {
-      _program = await ui.FragmentProgram.fromAsset('shaders/ripple_reveal.frag');
-      if (mounted) setState(() {});
+      final program = await ui.FragmentProgram.fromAsset('shaders/ripple_reveal.frag');
+      if (mounted) {
+        setState(() {
+          _shader = program.fragmentShader();
+        });
+      }
     } catch (e) {
-      debugPrint("Shader load error: \$e");
+      debugPrint("Shader load error: $e");
     }
   }
 
   @override
   void dispose() {
     _rippleController.dispose();
+    _yearController.dispose();
+    _monthController.dispose();
+    _dayController.dispose();
     super.dispose();
   }
 
   void _checkAndUnlock() async {
-    if (selYear == 1999 && selMonth == 9 && selDay == 16) {
+    bool match = false;
+    if (widget.username == "Lucas" || widget.username == "L\u0075\u0063\u0061\u0073") {
+      if (selYear == 1999 && selMonth == 9 && selDay == 16) match = true;
+    } else if (widget.username == "Ace") {
+      if (selYear == 2024 && selMonth == 4 && selDay == 8) match = true;
+    }
+
+    if (match) {
       if (isUnlocking) return;
       setState(() => isUnlocking = true);
       
@@ -60,7 +84,7 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
       
       _rippleController.forward();
       await Future.delayed(const Duration(milliseconds: 1500));
-      widget.onSuccess();
+      if (mounted) widget.onSuccess();
     }
   }
 
@@ -68,12 +92,12 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        if (isUnlocking && _program != null) 
+        if (isUnlocking && _shader != null) 
           AnimatedBuilder(
             animation: _rippleController,
             builder: (context, child) {
               return CustomPaint(
-                painter: RippleRevealPainter(_rippleController.value, _program!),
+                painter: RippleRevealPainter(_rippleController.value, _shader!),
                 size: Size.infinite,
               );
             },
@@ -92,15 +116,15 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildWheel(1900, 2026, selYear, (v) {
+                    _buildWheel(1900, 2026, selYear, _yearController, (v) {
                       setState(() => selYear = v);
                       _checkAndUnlock();
                     }),
-                    _buildWheel(1, 12, selMonth, (v) {
+                    _buildWheel(1, 12, selMonth, _monthController, (v) {
                       setState(() => selMonth = v);
                       _checkAndUnlock();
                     }),
-                    _buildWheel(1, 31, selDay, (v) {
+                    _buildWheel(1, 31, selDay, _dayController, (v) {
                       setState(() => selDay = v);
                       _checkAndUnlock();
                     }),
@@ -121,7 +145,7 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
     );
   }
 
-  Widget _buildWheel(int min, int max, int current, Function(int) onChanged) {
+  Widget _buildWheel(int min, int max, int current, FixedExtentScrollController controller, Function(int) onChanged) {
     return SizedBox(
       width: 90,
       child: Stack(
@@ -149,7 +173,7 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
               HapticFeedback.selectionClick();
               onChanged(min + index);
             },
-            controller: FixedExtentScrollController(initialItem: current - min),
+            controller: controller,
             childDelegate: ListWheelChildBuilderDelegate(
               builder: (context, index) {
                 final val = min + index;
@@ -181,25 +205,16 @@ class _SecretAstrolabeSequenceState extends State<SecretAstrolabeSequence> with 
 
 class RippleRevealPainter extends CustomPainter {
   final double progress;
-  final ui.FragmentProgram program;
-  RippleRevealPainter(this.progress, this.program);
+  final ui.FragmentShader shader;
+  RippleRevealPainter(this.progress, this.shader);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-    final shader = program.fragmentShader();
-    
     // Set uniforms: resolution (vec2), progress (float)
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
     shader.setFloat(2, progress);
-    
-    // Sample from nothing (or screen) - since Flutter doesn't easily let us sample the widget tree without RenderRepaintBoundary, 
-    // for this easter egg, we'll draw a pure colored wave distortion over the canvas instead, using standard paint tricks.
-    // Wait, the shader accepts inputTex. I haven't passed an image. Flutter FragmentShader texture mapping requires passing an Image.
-    // Since we don't have the frame buffer snapshot easily (requires RepaintBoundary capture which is async), 
-    // we'll emulate the visual effect by drawing a color that fades and distorts.
-    
+    final paint = Paint();
     paint.shader = shader;
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
   }
@@ -216,19 +231,16 @@ class EternalRealmScreen extends StatefulWidget {
 }
 
 class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProviderStateMixin {
-  late AnimationController _starController;
   bool showMap = false;
   Map<String, dynamic>? selectedPOI;
 
   @override
   void initState() {
     super.initState();
-    _starController = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
   }
 
   @override
   void dispose() {
-    _starController.dispose();
     super.dispose();
   }
 
@@ -281,9 +293,6 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
                   ),
                 ),
               ),
-            ),
-            const IgnorePointer(
-               child: _WeatherResonanceOverlay(),
             ),
           ],
 
@@ -561,66 +570,7 @@ class _TimeCapsuleGlowState extends State<_TimeCapsuleGlow> with SingleTickerPro
   }
 }
 
-class _WeatherResonanceOverlay extends StatefulWidget {
-  const _WeatherResonanceOverlay({Key? key}) : super(key: key);
 
-  @override
-  State<_WeatherResonanceOverlay> createState() => _WeatherResonanceOverlayState();
-}
-
-class _WeatherResonanceOverlayState extends State<_WeatherResonanceOverlay> with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  ui.FragmentShader? _shader;
-
-  // Assuming partner is in Kunming and it's raining (Weather Resonance)
-  final bool isPartnerRaining = true; 
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
-    if (isPartnerRaining) _loadShader();
-  }
-
-  Future<void> _loadShader() async {
-    try {
-      final program = await ui.FragmentProgram.fromAsset('shaders/weather_resonance.frag');
-      setState(() => _shader = program.fragmentShader());
-    } catch (e) {
-      debugPrint("Failed to load weather shader: \$e");
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!isPartnerRaining || _shader == null) return const SizedBox.shrink();
-
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: AnimatedBuilder(
-          animation: _ctrl,
-          builder: (context, _) {
-            final size = MediaQuery.of(context).size;
-            _shader!.setFloat(0, size.width); // resolution.x
-            _shader!.setFloat(1, size.height); // resolution.y
-            _shader!.setFloat(2, _ctrl.value * 10.0); // time
-            _shader!.setFloat(3, 0.85); // intensity
-            return CustomPaint(
-              size: Size.infinite,
-              painter: _ShaderPainter(_shader!),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
 
 class _ShaderPainter extends CustomPainter {
   final ui.FragmentShader shader;

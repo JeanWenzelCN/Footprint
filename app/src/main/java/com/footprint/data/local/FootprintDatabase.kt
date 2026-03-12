@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
                         TimeCapsuleEntity::class,
                         UserBadgeEntity::class,
                         UserStatsEntity::class],
-        version = 12,
+        version = 13,
         exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -234,6 +234,28 @@ abstract class FootprintDatabase : RoomDatabase() {
                                 }
                         }
 
+                val MIGRATION_12_13 =
+                        object : androidx.room.migration.Migration(12, 13) {
+                                override fun migrate(
+                                        db: androidx.sqlite.db.SupportSQLiteDatabase
+                                ) {
+                                        try {
+                                                db.execSQL(
+                                                        "ALTER TABLE footprints ADD COLUMN adcode TEXT"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                        try {
+                                                db.execSQL(
+                                                        "ALTER TABLE time_capsules ADD COLUMN adcode TEXT"
+                                                )
+                                        } catch (e: Exception) {
+                                                // Column might already exist
+                                        }
+                                }
+                        }
+
                 fun getInstance(context: Context): FootprintDatabase =
                         instance
                                 ?: synchronized(this) {
@@ -247,7 +269,7 @@ abstract class FootprintDatabase : RoomDatabase() {
                                         "footprint-db"
                                 )
                                 .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-                                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                                 .fallbackToDestructiveMigration()
                                 .build()
         }

@@ -178,21 +178,43 @@ class FlutterMapView(
             android.location.Location.distanceBetween(prev.latitude, prev.longitude, next.latitude, next.longitude, results)
             
             val dist = results[0]
-            // We're calculating distance between interpolated points.
-            // Using a heuristic to map this distance to speed (roughly)
             val approxSpeedMs = dist / 1.25f
             val speedKmh = approxSpeedMs * 3.6f
             
-            val color = when {
-                speedKmh >= 40 -> Color.parseColor("#F44336") // Red
-                speedKmh >= 20 -> Color.parseColor("#FF9800") // Orange
-                speedKmh >= 10 -> Color.parseColor("#FFEB3B") // Yellow
-                speedKmh >= 4  -> Color.parseColor("#4CAF50") // Green
-                else           -> Color.parseColor("#2196F3") // Blue
-            }
+            val color = getSmoothColorForSpeed(speedKmh)
             colors.add(color)
         }
         return colors
+    }
+
+    private fun getSmoothColorForSpeed(speedKmh: Float): Int {
+        val speedPoints = floatArrayOf(0f, 4f, 10f, 20f, 40f)
+        val colors = intArrayOf(
+            Color.parseColor("#2196F3"), // Blue (Walking slow/Standing)
+            Color.parseColor("#4CAF50"), // Green (Walking/Hiking)
+            Color.parseColor("#FFEB3B"), // Yellow (Cycling)
+            Color.parseColor("#FF9800"), // Orange (City Driving)
+            Color.parseColor("#F44336")  // Red (Highway)
+        )
+
+        if (speedKmh <= speedPoints[0]) return colors[0]
+        if (speedKmh >= speedPoints[speedPoints.size - 1]) return colors[colors.size - 1]
+
+        for (i in 0 until speedPoints.size - 1) {
+            if (speedKmh < speedPoints[i + 1]) {
+                val ratio = (speedKmh - speedPoints[i]) / (speedPoints[i + 1] - speedPoints[i])
+                return interpolateColor(colors[i], colors[i + 1], ratio)
+            }
+        }
+        return colors[colors.size - 1]
+    }
+
+    private fun interpolateColor(color1: Int, color2: Int, ratio: Float): Int {
+        val a = (Color.alpha(color1) * (1 - ratio) + Color.alpha(color2) * ratio).toInt()
+        val r = (Color.red(color1) * (1 - ratio) + Color.red(color2) * ratio).toInt()
+        val g = (Color.green(color1) * (1 - ratio) + Color.green(color2) * ratio).toInt()
+        val b = (Color.blue(color1) * (1 - ratio) + Color.blue(color2) * ratio).toInt()
+        return Color.argb(a, r, g, b)
     }
 
     private fun getPathColor(isLive: Boolean): Int {
