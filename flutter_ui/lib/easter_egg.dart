@@ -251,6 +251,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
       'msg': '在这里，你曾陪我看过红嘴鸥飞过海埂大坝。那些风里带来的不仅是季节的迁徙，还有你眼底温柔的湖光。',
       'date': 'Spring, Memory',
       'en_quote': 'The winds bring not only the migration of seasons, but the gentle reflection of lakes in your eyes.',
+      'cn_trans': '“风中不仅有季节的变换，还有你眼底那抹温柔。”'
     },
     'DALI': {
       'title': '大理 · 古城',
@@ -258,6 +259,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
       'msg': '上关花，下关风，苍山雪，洱海月。风花雪月里，只有你的笑是万物生辉的注脚。在南诏的古砖里，我们藏过一个永恒的秘密。',
       'date': 'Autumn, Silence',
       'en_quote': 'Amidst the wind, flowers, snow, and moon, your smile remains the radiant footnote to all creation.',
+      'cn_trans': '“风花雪月，都不如你的一抹浅笑。”'
     },
     'LIJIANG': {
       'title': '丽江 · 玉龙',
@@ -265,6 +267,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
       'msg': '雪山下的誓言，被云雾半遮半掩。那时候你说，未来的路像这里的石板路一样，虽然曲折，但终点总有光。',
       'date': 'Winter, Eternal',
       'en_quote': 'The path ahead may wind like these cobblestones, but there is always light at the end of the road.',
+      'cn_trans': '“前方的路或许如石阶般崎岖，但终点必定有光。”'
     }
   };
 
@@ -489,7 +492,10 @@ class _AstrolabeLetterState extends State<AstrolabeLetter> with SingleTickerProv
                     ),
                   ),
                   const SizedBox(height: 32),
-                  TypographyDuet.buildTranslatorBottomView(widget.details['en_quote'], ""),
+                  TypographyDuet.buildTranslatorBottomView(
+                    widget.details['en_quote'] ?? "", 
+                    widget.details['cn_trans'] ?? ""
+                  ),
                   const SizedBox(height: 38),
                   Align(
                     alignment: Alignment.bottomRight,

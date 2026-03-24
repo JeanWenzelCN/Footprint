@@ -42,30 +42,41 @@ class TypographyDuet {
   }
   
   /// A widget to render the Editorial Design magazine-like bottom text
+  /// 一个精致的弹框底部渲染视图，用于呈现 Editorial Design 杂志质感的叠加文字
   static Widget buildTranslatorBottomView(String englishText, String chineseText) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // English Hand-written background text
-        Positioned(
-          left: 10,
-          top: 0,
-          child: Text(
-            englishText,
-            style: englishHandwriting,
-            softWrap: true,
+    return Container(
+      constraints: const BoxConstraints(minHeight: 80),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 底层：轻盈、张扬的英文手写体底纹
+          Opacity(
+            opacity: 0.15,
+            child: Text(
+              englishText,
+              style: englishHandwriting.copyWith(
+                fontSize: 32,
+                color: const Color(0xFF2C3E50),
+              ),
+              softWrap: true,
+              maxLines: 2,
+              overflow: TextOverflow.visible,
+            ),
           ),
-        ),
-        // Chinese overlay translation in small sans-serif / minimal font
-        Positioned(
-          left: 16,
-          top: 24, // Overlap offset
-          child: Text(
-            chineseText,
-            style: chineseTranslation,
+          // 顶层：克制、精准的中文意译
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 12),
+            child: Text(
+              chineseText,
+              style: chineseTranslation.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF34495E),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
