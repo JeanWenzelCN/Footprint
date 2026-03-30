@@ -280,13 +280,32 @@ class MainActivity : FlutterActivity() {
                                                     (com.footprint.utils.ApiKeyManager.getApiKey(
                                                             this@MainActivity
                                                     )
-                                                            ?: "")
+                                                            ?: ""),
+                                            "googleKey" to
+                                                    (com.footprint.utils.ApiKeyManager.getGoogleApiKey(
+                                                            this@MainActivity
+                                                    )
+                                                            ?: ""),
+                                            "selectedMapType" to
+                                                    com.footprint.utils.ApiKeyManager.getSelectedMapType(
+                                                            this@MainActivity
+                                                    )
                                     )
                             result.success(gson.toJson(map))
                         }
                         "saveAmapKey" -> {
                             val key = call.arguments as String
                             com.footprint.utils.ApiKeyManager.setApiKey(this@MainActivity, key)
+                            result.success(true)
+                        }
+                        "saveGoogleKey" -> {
+                            val key = call.arguments as String
+                            com.footprint.utils.ApiKeyManager.setGoogleApiKey(this@MainActivity, key)
+                            result.success(true)
+                        }
+                        "saveMapType" -> {
+                            val type = call.arguments as String
+                            com.footprint.utils.ApiKeyManager.setSelectedMapType(this@MainActivity, type)
                             result.success(true)
                         }
 

@@ -3239,77 +3239,127 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       final creds = jsonDecode(jsonStr);
       final String pkgName = creds['packageName'] ?? "";
       final String sha1 = creds['sha1'] ?? "";
-      final String currentKey = creds['amapKey'] ?? "";
+      final String amapKey = creds['amapKey'] ?? "";
+      final String googleKey = creds['googleKey'] ?? "";
+      final String selectedType = creds['selectedMapType'] ?? "AMAP";
       
       if (!mounted) return;
       
-      final TextEditingController keyCtrl = TextEditingController(text: currentKey);
+      final TextEditingController amapCtrl = TextEditingController(text: amapKey);
+      final TextEditingController googleCtrl = TextEditingController(text: googleKey);
+      String currentType = selectedType;
       
       await showDialog(
         context: context,
         builder: (ctx) {
-          final colorScheme = Theme.of(context).colorScheme;
-          return AlertDialog(
-            title: const Text("API Key 设置"),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Package Name:",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  _buildCopyableRow(context, pkgName, "已复制包名"),
-                  const SizedBox(height: 12),
-                  Text(
-                    "SHA1:",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  _buildCopyableRow(context, sha1, "已复制 SHA1"),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: keyCtrl,
-                    style: const TextStyle(fontSize: 14),
-                    decoration: const InputDecoration(
-                      labelText: "AMAP Key",
-                      hintText: "请输入您的高德地图 API Key",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final colorScheme = Theme.of(context).colorScheme;
+              return AlertDialog(
+                title: const Text("地图 API 设置"),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("应用凭证 (用于申请 Key):", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                      const SizedBox(height: 8),
+                      Text("Package Name:", style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                      _buildCopyableRow(context, pkgName, "已复制包名"),
+                      const SizedBox(height: 8),
+                      Text("SHA1:", style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                      _buildCopyableRow(context, sha1, "已复制 SHA1"),
+                      const Divider(height: 32),
+                      
+                      const Text("选择默认地图类型:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'AMAP', label: Text('高德地图'), icon: Icon(Icons.map)),
+                          ButtonSegment(value: 'GOOGLE', label: Text('谷歌地图'), icon: Icon(Icons.language)),
+                        ],
+                        selected: {currentType},
+                        onSelectionChanged: (newSelection) {
+                          setDialogState(() => currentType = newSelection.first);
+                        },
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const SizedBox(height: 20),
+                      
+                      if (currentType == 'AMAP') ...[
+                        TextField(
+                          controller: amapCtrl,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: const InputDecoration(
+                            labelText: "AMAP Key (高德)",
+                            hintText: "请输入您的高德地图 API Key",
+                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text("提示: 请确保在控制台开启了 Android 平台的 SDK 权限。", 
+                          style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                      ] else ...[
+                        TextField(
+                          controller: googleCtrl,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: const InputDecoration(
+                            labelText: "Google Maps Key",
+                            hintText: "请输入您的 Google API Key",
+                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("如何获取 Google Key?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSecondaryContainer)),
+                              const SizedBox(height: 4),
+                              Text("1. 访问 Google Cloud Console\n2. 启用 'Maps SDK for Android'\n3. 创建 API Key 并限制为 Android 应用\n4. 添加上方的包名和 SHA1 指纹", 
+                                style: TextStyle(fontSize: 11, color: colorScheme.onSecondaryContainer)),
+                              TextButton.icon(
+                                onPressed: () => dataChannel.invokeMethod('openUrl', 'https://console.cloud.google.com/google/maps-apis/credentials'),
+                                icon: const Icon(Icons.open_in_new, size: 14),
+                                label: const Text("前往控制台", style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text("取消", style: TextStyle(color: colorScheme.outline)),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      dataChannel.invokeMethod('saveAmapKey', amapCtrl.text);
+                      dataChannel.invokeMethod('saveGoogleKey', googleCtrl.text);
+                      dataChannel.invokeMethod('saveMapType', currentType);
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("设置已保存，部分更改需重启应用生效"))
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
+                    child: const Text("保存"),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text("取消", style: TextStyle(color: colorScheme.outline)),
-              ),
-              FilledButton(
-                onPressed: () {
-                  dataChannel.invokeMethod('saveAmapKey', keyCtrl.text);
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("API Key 已保存，请重启应用生效"))
-                  );
-                },
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text("保存"),
-              ),
-            ],
+              );
+            }
           );
         }
       );

@@ -210,7 +210,6 @@ class RippleRevealPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Set uniforms: resolution (vec2), progress (float)
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
     shader.setFloat(2, progress);
@@ -233,16 +232,6 @@ class EternalRealmScreen extends StatefulWidget {
 class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProviderStateMixin {
   bool showMap = false;
   Map<String, dynamic>? selectedPOI;
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
 
   final poiDetails = {
     'KUNMING': {
@@ -277,16 +266,13 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Background Map (The Void is handled by Scaffold and the Map mask)
           if (showMap)
             _EternalMapDisplay(
               onMarkerClick: (tag) {
                 setState(() => selectedPOI = poiDetails[tag]);
               },
             ),
-
-          // Cloud Overlay for Map
-          if (showMap) ...[
+          if (showMap)
             IgnorePointer(
               child: Container(
                 decoration: BoxDecoration(
@@ -297,9 +283,6 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
                 ),
               ),
             ),
-          ],
-
-          // Content Overlay
           SafeArea(
             child: Column(
               children: [
@@ -350,8 +333,6 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
               ],
             ),
           ),
-
-          // Letterfold Dialog
           if (selectedPOI != null)
              Positioned.fill(
                child: GestureDetector(
@@ -363,33 +344,45 @@ class _EternalRealmScreenState extends State<EternalRealmScreen> with TickerProv
                  ),
                ),
              ),
-          
           if (showMap && selectedPOI == null) 
              Positioned(
                right: 32,
-               bottom: 120, // Move up to make space for playback wheel
+               bottom: 120,
                child: GestureDetector(
                  onTap: () {
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("时间锁充能中：2027年9月16日解封")));
+                   showGeneralDialog(
+                     context: context,
+                     barrierDismissible: true,
+                     barrierLabel: '',
+                     barrierColor: Colors.black26,
+                     transitionDuration: const Duration(milliseconds: 600),
+                     pageBuilder: (ctx, anim1, anim2) => const _QuantumTimeCapsuleDialog(),
+                     transitionBuilder: (ctx, anim1, anim2, child) {
+                       return FadeTransition(
+                         opacity: anim1,
+                         child: ScaleTransition(
+                           scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                             CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+                           ),
+                           child: child,
+                         ),
+                       );
+                     },
+                   );
                  },
                  child: const SizedBox(
                    width: 80, height: 80,
-                   child: _TimeCapsuleGlow(),
+                   child: _TimeCapsuleGlow(isUnlocked: true),
                  ),
                ),
              ),
-
-          // Spatiotemporal Playback Compass
           if (showMap && selectedPOI == null)
             Positioned(
               left: 20, right: 20, bottom: 40,
               child: _SpatiotemporalPlaybackCompass(
-                onChanged: (progress) {
-                  // This will eventually update the map playback
-                },
+                onChanged: (progress) {},
               ),
             ),
-
           if (!showMap)
             const Positioned(
               bottom: 24, left: 0, right: 0,
@@ -412,7 +405,7 @@ class _EternalMapDisplay extends StatelessWidget {
       creationParams: {'mode': 'ETERNAL_REALM'},
       creationParamsCodec: const StandardMessageCodec(),
       onPlatformViewCreated: (id) {
-        final channel = MethodChannel('com.footprint/amap_\$id');
+        final channel = MethodChannel('com.footprint/amap_$id');
         channel.setMethodCallHandler((call) async {
           if (call.method == 'onMarkerClick') {
             final tag = call.arguments as String?;
@@ -514,10 +507,9 @@ class _AstrolabeLetterState extends State<AstrolabeLetter> with SingleTickerProv
   }
 }
 
-// StarFieldPainter removed as requested.
-
 class _TimeCapsuleGlow extends StatefulWidget {
-  const _TimeCapsuleGlow({Key? key}) : super(key: key);
+  final bool isUnlocked;
+  const _TimeCapsuleGlow({Key? key, this.isUnlocked = false}) : super(key: key);
 
   @override
   State<_TimeCapsuleGlow> createState() => _TimeCapsuleGlowState();
@@ -539,7 +531,7 @@ class _TimeCapsuleGlowState extends State<_TimeCapsuleGlow> with SingleTickerPro
       final program = await ui.FragmentProgram.fromAsset('shaders/time_capsule_core.frag');
       setState(() => _shader = program.fragmentShader());
     } catch (e) {
-      debugPrint("Failed to load time capsule shader: \$e");
+      debugPrint("Failed to load time capsule shader: $e");
     }
   }
 
@@ -555,18 +547,18 @@ class _TimeCapsuleGlowState extends State<_TimeCapsuleGlow> with SingleTickerPro
       return Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.blueAccent.withValues(alpha: 0.5),
-          boxShadow: const [BoxShadow(blurRadius: 10, color: Colors.blueAccent)],
+          color: widget.isUnlocked ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.blueAccent.withValues(alpha: 0.5),
+          boxShadow: [BoxShadow(blurRadius: 10, color: widget.isUnlocked ? Colors.cyanAccent : Colors.blueAccent)],
         ),
       );
     }
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, _) {
-        _shader!.setFloat(0, 80.0); // resolution.x
-        _shader!.setFloat(1, 80.0); // resolution.y
-        _shader!.setFloat(2, _ctrl.value * 4.0); // time
-        _shader!.setFloat(3, 0.4); // progress
+        _shader!.setFloat(0, 80.0);
+        _shader!.setFloat(1, 80.0);
+        _shader!.setFloat(2, _ctrl.value * 4.0);
+        _shader!.setFloat(3, widget.isUnlocked ? 1.0 : 0.4);
         return CustomPaint(
           size: const Size(80, 80),
           painter: _ShaderPainter(_shader!),
@@ -576,33 +568,26 @@ class _TimeCapsuleGlowState extends State<_TimeCapsuleGlow> with SingleTickerPro
   }
 }
 
-
-
 class _ShaderPainter extends CustomPainter {
   final ui.FragmentShader shader;
   _ShaderPainter(this.shader);
-
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
-
   @override
   bool shouldRepaint(_ShaderPainter oldDelegate) => true;
 }
 
-
 class _SpatiotemporalPlaybackCompass extends StatefulWidget {
   final Function(double) onChanged;
   const _SpatiotemporalPlaybackCompass({Key? key, required this.onChanged}) : super(key: key);
-
   @override
   State<_SpatiotemporalPlaybackCompass> createState() => _SpatiotemporalPlaybackCompassState();
 }
 
 class _SpatiotemporalPlaybackCompassState extends State<_SpatiotemporalPlaybackCompass> {
   double progress = 1.0;
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -617,11 +602,7 @@ class _SpatiotemporalPlaybackCompassState extends State<_SpatiotemporalPlaybackC
         alignment: Alignment.center,
         children: [
           const Positioned(
-            top: 15,
-            child: Text(
-              '时空穿梭罗盘 · SPATIOTEMPORAL PLAYBACK',
-              style: TextStyle(color: Colors.white30, fontSize: 8, letterSpacing: 2, fontWeight: FontWeight.bold),
-            ),
+            top: 15, child: Text('时空穿梭罗盘 · SPATIOTEMPORAL PLAYBACK', style: TextStyle(color: Colors.white30, fontSize: 8, letterSpacing: 2, fontWeight: FontWeight.bold)),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -655,6 +636,219 @@ class _SpatiotemporalPlaybackCompassState extends State<_SpatiotemporalPlaybackC
                 Text('2024.09.16', style: TextStyle(color: Colors.white24, fontSize: 10, fontFamily: 'monospace')),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- 量子时空胶囊 核心交互弹窗 ---
+
+class _QuantumTimeCapsuleDialog extends StatefulWidget {
+  const _QuantumTimeCapsuleDialog({Key? key}) : super(key: key);
+  @override
+  State<_QuantumTimeCapsuleDialog> createState() => _QuantumTimeCapsuleDialogState();
+}
+
+class _QuantumTimeCapsuleDialogState extends State<_QuantumTimeCapsuleDialog> {
+  int _currentIndex = 0;
+  final List<Map<String, dynamic>> _tabs = [
+    {'icon': Icons.auto_awesome_motion, 'label': '记忆回溯', 'view': const _MemoryPlaybackView()},
+    {'icon': Icons.inventory_2_outlined, 'label': '永恒档案', 'view': const _EternalArchivesView()},
+    {'icon': Icons.history_edu, 'label': '时空信笺', 'view': const _FutureLetterView()},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      colors: [const Color(0xFF1A1A2E).withValues(alpha: 0.8), const Color(0xFF16213E).withValues(alpha: 0.9)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.cyanAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.blur_on, color: Colors.cyanAccent, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text("量子时空胶囊", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                        const Text("QUANTUM TIME CAPSULE · VER: LUCAS.01", style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+                      ],
+                    ),
+                    const Spacer(),
+                    IconButton(icon: const Icon(Icons.close, color: Colors.white38), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+              ),
+            ),
+            Positioned.fill(top: 90, bottom: 100, child: AnimatedSwitcher(duration: const Duration(milliseconds: 400), child: _tabs[_currentIndex]['view'])),
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: List.generate(_tabs.length, (index) {
+                    final isSel = _currentIndex == index;
+                    return GestureDetector(
+                      onTap: () => setState(() => _currentIndex = index),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(color: isSel ? Colors.cyanAccent.withValues(alpha: 0.1) : Colors.transparent, borderRadius: BorderRadius.circular(20)),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_tabs[index]['icon'], color: isSel ? Colors.cyanAccent : Colors.white24, size: 24),
+                            const SizedBox(height: 6),
+                            Text(_tabs[index]['label'], style: TextStyle(color: isSel ? Colors.cyanAccent : Colors.white24, fontSize: 10, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MemoryPlaybackView extends StatelessWidget {
+  const _MemoryPlaybackView({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    final memories = [
+      {'year': '2023', 'title': '初遇 · 翠湖', 'desc': '海埂大坝的鸥群见证了故事的开始。'},
+      {'year': '2024', 'title': '重逢 · 大理', 'desc': '洱海的风吹动了尘封的往事。'},
+      {'year': '2025', 'title': '约定 · 玉龙', 'desc': '雪山之下，星河永灿。'},
+    ];
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      itemCount: memories.length,
+      itemBuilder: (context, index) {
+        final m = memories[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+          child: Row(
+            children: [
+              Container(
+                width: 50, height: 50,
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Colors.cyanAccent, Colors.blueAccent]), borderRadius: BorderRadius.circular(15)),
+                child: Center(child: Text(m['year']!, style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold))),
+              ),
+              const SizedBox(width: 20),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(m['title']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)), const SizedBox(height: 4), Text(m['desc']!, style: const TextStyle(color: Colors.white54, fontSize: 12))])),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white12, size: 14),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EternalArchivesView extends StatelessWidget {
+  const _EternalArchivesView({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _buildStatRow("共处时光", "2,341 天", Icons.timer_outlined),
+          _buildStatRow("足迹总里程", "12,480 KM", Icons.map_outlined),
+          _buildStatRow("探索城市", "32 座", Icons.location_city_outlined),
+          _buildStatRow("珍藏瞬间", "1,024 张", Icons.photo_library_outlined),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.cyanAccent.withValues(alpha: 0.1), Colors.blueAccent.withValues(alpha: 0.1)]), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.1))),
+            child: const Column(
+              children: [
+                Icon(Icons.verified_user_outlined, color: Colors.cyanAccent, size: 32),
+                SizedBox(height: 12),
+                Text("永恒之境 · 终极协议已生效", style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                Text("本档案由量子纠缠技术加密，跨越所有平行时空，永不毁灭。", textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 10, height: 1.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildStatRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white24, size: 20),
+          const SizedBox(width: 16),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          const Spacer(),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+        ],
+      ),
+    );
+  }
+}
+
+class _FutureLetterView extends StatelessWidget {
+  const _FutureLetterView({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.auto_fix_high, color: Colors.cyanAccent, size: 48),
+          const SizedBox(height: 24),
+          const Text("写给平行时空的信", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          const Text("在这里留下的文字，将通过量子波函数发送至任意时间支流。无论过去还是未来，这份思念都将被接收。", textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.6)),
+          const SizedBox(height: 48),
+          ElevatedButton(
+            onPressed: () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("量子信道繁忙中，思念已预存至云端..."))); },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black, minimumSize: const Size(double.infinity, 54), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0),
+            child: const Text("开启量子书写模式", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
