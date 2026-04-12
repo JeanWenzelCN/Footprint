@@ -2578,6 +2578,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     // 初始化高德隐私合规（不自动开启定位）
     AMapFlutterLocation.updatePrivacyShow(true, true);
     AMapFlutterLocation.updatePrivacyAgree(true);
+    _initApiKey();
 
     _recoverTrackingState();
 
@@ -2626,6 +2627,20 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         debugPrint('Stream Error: $e');
       }
     });
+  }
+
+  Future<void> _initApiKey() async {
+    try {
+      final String jsonStr = await dataChannel.invokeMethod('getAppCredentials');
+      final creds = jsonDecode(jsonStr);
+      final String amapKey = creds['amapKey'] ?? "";
+      if (amapKey.isNotEmpty) {
+        AMapFlutterLocation.setApiKey(amapKey, "");
+        debugPrint("AMap API Key set in Flutter: $amapKey");
+      }
+    } catch (e) {
+      debugPrint("Error initializing API Key: $e");
+    }
   }
 
   Future<void> _recoverTrackingState() async {

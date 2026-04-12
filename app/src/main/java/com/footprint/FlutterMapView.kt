@@ -937,22 +937,21 @@ class FlutterMapView(
                 result.success(true)
             }
             "centerLocation" -> {
-                // 优先使用 Flutter 传入的坐标
                 val args = call.arguments
-                var lat: Double? = null
-                var lng: Double? = null
+                var latArg: Double? = null
+                var lngArg: Double? = null
                 var zoomLevel = 17f
                 if (args is Map<*, *>) {
-                    lat = (args["latitude"] as? Number)?.toDouble()
-                    lng = (args["longitude"] as? Number)?.toDouble()
+                    latArg = (args["latitude"] as? Number)?.toDouble()
+                    lngArg = (args["longitude"] as? Number)?.toDouble()
                     zoomLevel = (args["zoom"] as? Number)?.toFloat() ?: 17f
                 }
 
-                // 1. Flutter 传入的坐标
-                if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
+                // 1. 如果 Flutter 已经明确传入了坐标，直接使用
+                if (latArg != null && lngArg != null && latArg > 1.0 && lngArg > 1.0) {
                     aMap?.animateCamera(
                             com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(lat, lng),
+                                    LatLng(latArg, lngArg),
                                     zoomLevel
                             )
                     )
@@ -960,47 +959,58 @@ class FlutterMapView(
                     return
                 }
 
-                // 2. 使用缓存的位置坐标（来自 OnMyLocationChangeListener）
-                if (cachedLat > 1.0 && cachedLng > 1.0) {
-                    aMap?.animateCamera(
-                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(cachedLat, cachedLng),
-                                    zoomLevel
-                            )
-                    )
-                    result.success(true)
-                    return
-                }
+                // 2. 否则，异步等待原生定位 Fix (最多等待 3s)
+                scope.launch {
+                    var finalLat = 0.0
+                    var finalLng = 0.0
 
-                // 3. AMap 自身的 myLocation 属性
-                val loc = aMap?.myLocation
-                if (loc != null && loc.latitude > 1.0 && loc.longitude > 1.0) {
-                    aMap?.animateCamera(
-                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(loc.latitude, loc.longitude),
-                                    zoomLevel
-                            )
-                    )
-                    result.success(true)
-                    return
-                }
+                    // 如果当前没开定位，尝试开启
+                    if (aMap?.isMyLocationEnabled != true) {
+                        aMap?.isMyLocationEnabled = true
+                    }
 
-                // 3. Kotlin 追踪服务的位置（兼容旧逻辑）
-                val trackingLoc = LocationTrackingService.currentLocation.value
-                if (trackingLoc != null && trackingLoc.latitude > 1.0 && trackingLoc.longitude > 1.0
-                ) {
-                    aMap?.animateCamera(
-                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(trackingLoc.latitude, trackingLoc.longitude),
-                                    zoomLevel
-                            )
-                    )
-                    result.success(true)
-                    return
-                }
+                    // 轮询检查是否有可用坐标
+                    for (i in 0 until 15) { // 15 * 200ms = 3s
+                        // 来源 A: 缓存
+                        if (cachedLat > 1.0 && cachedLng > 1.0) {
+                            finalLat = cachedLat
+                            finalLng = cachedLng
+                        }
+                        // 来源 B: aMap 属性
+                        if (finalLat < 1.0) {
+                            aMap?.myLocation?.let {
+                                if (it.latitude > 1.0) {
+                                    finalLat = it.latitude
+                                    finalLng = it.longitude
+                                }
+                            }
+                        }
+                        // 来源 C: 追踪服务
+                        if (finalLat < 1.0) {
+                            LocationTrackingService.currentLocation.value?.let {
+                                if (it.latitude > 1.0) {
+                                    finalLat = it.latitude
+                                    finalLng = it.longitude
+                                }
+                            }
+                        }
 
-                // 都没有位置信息
-                result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
+                        if (finalLat > 1.0) break
+                        delay(200)
+                    }
+
+                    if (finalLat > 1.0) {
+                        aMap?.animateCamera(
+                                com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
+                                        LatLng(finalLat, finalLng),
+                                        zoomLevel
+                                )
+                        )
+                        result.success(true)
+                    } else {
+                        result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
+                    }
+                }
             }
             "setLocationEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false
