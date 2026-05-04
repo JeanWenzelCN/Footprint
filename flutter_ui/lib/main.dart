@@ -4304,8 +4304,22 @@ class ArtStudioScreen extends StatelessWidget {
 
   Widget _buildMiniInspirationGrid() {
     final items = const [
-      ('适合分享', '海报更适合发朋友圈或打印留存'),
-      ('适合复盘', '热力图更适合看一段时间的活动重心'),
+      (
+        '适合分享',
+        '海报更适合发朋友圈或打印留存',
+        Color(0xFFDB6C4B),
+        Color(0xFFFFD39C),
+        Color(0xFFFFF4E6),
+        Icons.auto_awesome,
+      ),
+      (
+        '适合复盘',
+        '热力图更适合看一段时间的活动重心',
+        Color(0xFF1D5E73),
+        Color(0xFF6FD7D3),
+        Color(0xFFEAFBFA),
+        Icons.insights_outlined,
+      ),
     ];
     return Row(
       children: items
@@ -4315,25 +4329,50 @@ class ArtStudioScreen extends StatelessWidget {
                 margin: EdgeInsets.only(right: item == items.first ? 10 : 0),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.82),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      item.$3,
+                      Color.alphaBlend(Colors.white.withOpacity(0.14), item.$3),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: const Color(0xFFDDD6CB)),
+                  border: Border.all(color: Colors.white.withOpacity(0.14)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: item.$3.withOpacity(0.18),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.16)),
+                      ),
+                      child: Icon(item.$6, color: item.$4, size: 20),
+                    ),
+                    const SizedBox(height: 12),
                     Text(
                       item.$1,
-                      style: const TextStyle(
-                        color: Color(0xFF1B2430),
+                      style: TextStyle(
+                        color: item.$5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       item.$2,
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
+                      style: TextStyle(
+                        color: item.$5.withOpacity(0.82),
                         fontSize: 12,
                         height: 1.4,
                       ),

@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -48,26 +49,127 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.footprint.FootprintViewModel
 import com.footprint.R
 import com.footprint.data.local.TrackPointEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.PI
 import kotlin.random.Random
 
 private data class StarSpec(val xFactor: Float, val yFactor: Float, val radius: Float, val alpha: Float)
 private data class GlobePoint(val lat: Double, val lng: Double)
-private data class ProjectedTrackPoint(val position: Vec3)
+private data class GlobePolyline(val points: List<GlobePoint>, val strokeScale: Float = 1f)
+private data class GlobeBoundaryDataset(
+    val countryLines: List<GlobePolyline>,
+    val chinaProvinceLines: List<GlobePolyline>
+)
+private data class HeatCluster(val lat: Double, val lng: Double, val weight: Int, val recency: Float)
+private data class SurfacePoint(val position: Vec3, val screenX: Float, val screenY: Float, val depth: Float, val perspective: Float)
+
+private object GlobeBoundaryRepository {
+    @Volatile
+    private var cached: GlobeBoundaryDataset? = null
+
+    suspend fun load(context: Context): GlobeBoundaryDataset =
+        cached ?: withContext(Dispatchers.Default) {
+            cached ?: parseBoundaryDataset(context).also { cached = it }
+        }
+
+    @VisibleForTesting
+    fun clear() {
+        cached = null
+    }
+}
 
 private val GlobeLandOutlines = listOf(
-    listOf(GlobePoint(70.0, -10.0), GlobePoint(75.0, 60.0), GlobePoint(60.0, 180.0), GlobePoint(10.0, 110.0), GlobePoint(10.0, 70.0), GlobePoint(20.0, 30.0)),
-    listOf(GlobePoint(35.0, -20.0), GlobePoint(35.0, 50.0), GlobePoint(-35.0, 20.0), GlobePoint(-35.0, 10.0), GlobePoint(5.0, -10.0)),
-    listOf(GlobePoint(75.0, -170.0), GlobePoint(75.0, -50.0), GlobePoint(15.0, -90.0), GlobePoint(15.0, -110.0)),
-    listOf(GlobePoint(15.0, -80.0), GlobePoint(15.0, -40.0), GlobePoint(-55.0, -70.0), GlobePoint(-10.0, -80.0)),
-    listOf(GlobePoint(-10.0, 110.0), GlobePoint(-10.0, 150.0), GlobePoint(-40.0, 150.0), GlobePoint(-40.0, 110.0)),
-    listOf(GlobePoint(85.0, -70.0), GlobePoint(85.0, -10.0), GlobePoint(60.0, -40.0))
+    GlobePolyline(
+        listOf(
+            GlobePoint(72.0, -168.0), GlobePoint(67.0, -145.0), GlobePoint(61.0, -130.0),
+            GlobePoint(56.0, -122.0), GlobePoint(49.0, -125.0), GlobePoint(39.0, -123.0),
+            GlobePoint(33.0, -118.0), GlobePoint(27.0, -111.0), GlobePoint(22.0, -102.0),
+            GlobePoint(18.0, -95.0), GlobePoint(20.0, -86.0), GlobePoint(25.0, -81.0),
+            GlobePoint(31.0, -81.0), GlobePoint(38.0, -75.0), GlobePoint(44.0, -67.0),
+            GlobePoint(51.0, -60.0), GlobePoint(58.0, -72.0), GlobePoint(66.0, -90.0),
+            GlobePoint(72.0, -120.0), GlobePoint(72.0, -168.0)
+        ),
+        strokeScale = 1.2f
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(11.0, -83.0), GlobePoint(8.0, -79.0), GlobePoint(10.0, -75.0),
+            GlobePoint(8.0, -72.0), GlobePoint(6.0, -78.0), GlobePoint(11.0, -83.0)
+        )
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(12.0, -81.0), GlobePoint(5.0, -78.0), GlobePoint(-5.0, -74.0),
+            GlobePoint(-15.0, -71.0), GlobePoint(-23.0, -70.0), GlobePoint(-30.0, -66.0),
+            GlobePoint(-40.0, -71.0), GlobePoint(-51.0, -73.0), GlobePoint(-55.0, -67.0),
+            GlobePoint(-50.0, -56.0), GlobePoint(-40.0, -49.0), GlobePoint(-27.0, -48.0),
+            GlobePoint(-13.0, -40.0), GlobePoint(0.0, -48.0), GlobePoint(8.0, -59.0),
+            GlobePoint(12.0, -70.0), GlobePoint(12.0, -81.0)
+        )
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(71.0, -9.0), GlobePoint(66.0, 15.0), GlobePoint(61.0, 34.0),
+            GlobePoint(58.0, 60.0), GlobePoint(55.0, 87.0), GlobePoint(61.0, 112.0),
+            GlobePoint(58.0, 137.0), GlobePoint(49.0, 150.0), GlobePoint(43.0, 141.0),
+            GlobePoint(39.0, 129.0), GlobePoint(29.0, 122.0), GlobePoint(24.0, 113.0),
+            GlobePoint(18.0, 106.0), GlobePoint(12.0, 101.0), GlobePoint(9.0, 78.0),
+            GlobePoint(24.0, 69.0), GlobePoint(33.0, 52.0), GlobePoint(37.0, 36.0),
+            GlobePoint(44.0, 24.0), GlobePoint(51.0, 15.0), GlobePoint(58.0, 4.0),
+            GlobePoint(64.0, -5.0), GlobePoint(71.0, -9.0)
+        ),
+        strokeScale = 1.25f
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(35.0, -10.0), GlobePoint(31.0, -2.0), GlobePoint(28.0, 8.0),
+            GlobePoint(24.0, 18.0), GlobePoint(17.0, 24.0), GlobePoint(10.0, 35.0),
+            GlobePoint(6.0, 44.0), GlobePoint(-5.0, 40.0), GlobePoint(-17.0, 38.0),
+            GlobePoint(-26.0, 32.0), GlobePoint(-34.0, 19.0), GlobePoint(-35.0, 8.0),
+            GlobePoint(-31.0, -5.0), GlobePoint(-22.0, -14.0), GlobePoint(-7.0, -17.0),
+            GlobePoint(5.0, -10.0), GlobePoint(14.0, -17.0), GlobePoint(24.0, -16.0),
+            GlobePoint(31.0, -11.0), GlobePoint(35.0, -10.0)
+        ),
+        strokeScale = 1.1f
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(36.0, 28.0), GlobePoint(32.0, 36.0), GlobePoint(28.0, 43.0),
+            GlobePoint(23.0, 48.0), GlobePoint(18.0, 54.0), GlobePoint(22.0, 58.0),
+            GlobePoint(28.0, 56.0), GlobePoint(31.0, 48.0), GlobePoint(33.0, 40.0),
+            GlobePoint(36.0, 28.0)
+        )
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(-12.0, 113.0), GlobePoint(-18.0, 120.0), GlobePoint(-21.0, 131.0),
+            GlobePoint(-25.0, 139.0), GlobePoint(-32.0, 146.0), GlobePoint(-39.0, 145.0),
+            GlobePoint(-42.0, 134.0), GlobePoint(-36.0, 122.0), GlobePoint(-28.0, 115.0),
+            GlobePoint(-19.0, 113.0), GlobePoint(-12.0, 113.0)
+        )
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(-33.0, 166.0), GlobePoint(-40.0, 174.0), GlobePoint(-46.0, 170.0)
+        )
+    ),
+    GlobePolyline(
+        listOf(
+            GlobePoint(84.0, -78.0), GlobePoint(84.0, -22.0), GlobePoint(72.0, -42.0),
+            GlobePoint(64.0, -52.0), GlobePoint(60.0, -46.0), GlobePoint(66.0, -34.0),
+            GlobePoint(74.0, -28.0), GlobePoint(84.0, -38.0)
+        )
+    )
 )
 
 private val GlobeCityLights = List(150) {
@@ -91,7 +193,7 @@ enum class ArtStyle(val label: String) {
     HEATMAP("时空格点"),
     TEMPORAL_FLOW("时光幻影"),
     GALAXY_DUST("极星尘埃"),
-    GLOBE_HEATMAP("时空地球")
+    GLOBE_HEATMAP("全息地球")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -178,6 +280,9 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
             letterSpacing = 0.1f
         }
     }
+    val boundaryDataset by produceState<GlobeBoundaryDataset?>(initialValue = null, context) {
+        value = GlobeBoundaryRepository.load(context)
+    }
 
     // 2. Move pointerInput to the outermost Box to ensure it captures all gestures
     Box(
@@ -205,6 +310,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                 density = visualDensity,
                 seed = randomSeed,
                 size = size,
+                boundaryDataset = boundaryDataset,
                 rotateX = globeRotateX,
                 rotateY = currentRotateY,
                 scale = globeScale,
@@ -213,7 +319,8 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
             )
             
             if (artStyle == ArtStyle.GLOBE_HEATMAP) {
-                drawGlobeOverlays(this, size, filteredPoints.size, globeScale, overlayPaint)
+                val heatClusters = buildHeatClusters(filteredPoints)
+                drawGlobeOverlays(this, size, filteredPoints.size, heatClusters.size, globeScale, overlayPaint)
             }
         }
 
@@ -222,7 +329,7 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("足迹工坊 · 时空地球", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("足迹工坊 · 全息时空地球", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
                         Text(displayDateRange, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 },
@@ -263,6 +370,12 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "双指缩放，拖拽旋转。热区会按历史密度贴合到球面前景。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("时空演进", style = MaterialTheme.typography.labelMedium, color = Color.White)
                         Spacer(Modifier.weight(1f))
@@ -342,12 +455,14 @@ private fun drawGlobeOverlays(
     drawScope: DrawScope,
     size: Size,
     pointCount: Int,
+    clusterCount: Int,
     scale: Float,
     overlayPaint: AndroidPaint
 ) {
     with(drawScope) {
         val margin = 60f
-        drawContext.canvas.nativeCanvas.drawText("SYSTEM_STATUS: ACTIVE", margin, size.height - margin - 80f, overlayPaint)
+        drawContext.canvas.nativeCanvas.drawText("HOLO_GLOBE: ONLINE", margin, size.height - margin - 120f, overlayPaint)
+        drawContext.canvas.nativeCanvas.drawText("HEAT_CELLS: ${clusterCount}", margin, size.height - margin - 80f, overlayPaint)
         drawContext.canvas.nativeCanvas.drawText("DATA_POINTS: ${pointCount}", margin, size.height - margin - 40f, overlayPaint)
         drawContext.canvas.nativeCanvas.drawText("ZOOM_LEVEL: ${String.format("%.1f", scale)}x", margin, size.height - margin, overlayPaint)
         
@@ -369,6 +484,7 @@ private fun drawArt(
     density: Float,
     seed: Long,
     size: Size,
+    boundaryDataset: GlobeBoundaryDataset? = null,
     rotateX: Float = 0f,
     rotateY: Float = 0f,
     scale: Float = 1f,
@@ -394,6 +510,13 @@ private fun drawArt(
                 val radius = baseRadius * scale
                 val centerX = width / 2f
                 val centerY = height / 2f
+                val heatClusters = buildHeatClusters(trackPoints)
+                val projectedHeat = heatClusters
+                    .mapNotNull { cluster ->
+                        projectVisibleSurface(cluster.lat, cluster.lng, radius, rotateX, rotateY, centerX, centerY)
+                            ?.let { cluster to it }
+                    }
+                    .sortedBy { it.second.depth }
                 
                 // --- 2. Rich Star Field ---
                 starField.forEach { star ->
@@ -408,116 +531,195 @@ private fun drawArt(
                 // --- 3. Atmosphere / Bloom ---
                 drawCircle(
                     brush = Brush.radialGradient(
-                        0.8f to Color.Transparent,
+                        0.68f to Color.Transparent,
                         1.0f to palette.colors.first().copy(alpha = 0.35f)
                     ),
                     radius = radius * 1.45f,
+                    center = Offset(centerX, centerY)
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0.55f to Color.Transparent,
+                        1f to palette.colors.getOrElse(1) { palette.colors.first() }.copy(alpha = 0.15f)
+                    ),
+                    radius = radius * 1.18f,
                     center = Offset(centerX, centerY)
                 )
 
                 // --- 4. The Core Sphere ---
                 drawCircle(
                     brush = Brush.radialGradient(
-                        0.0f to Color(0xFF20204A), // Distinct blue base
-                        0.8f to Color(0xFF0A0A15),
-                        1.0f to palette.colors.first().copy(alpha = 0.6f)
+                        0.0f to Color(0xFF203D62),
+                        0.45f to Color(0xFF12243E),
+                        0.82f to Color(0xFF08111D),
+                        1.0f to palette.colors.first().copy(alpha = 0.64f)
                     ),
                     radius = radius,
                     center = Offset(centerX, centerY)
                 )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0f to Color.White.copy(alpha = 0.14f),
+                        0.4f to Color.Transparent,
+                        1f to Color.Transparent,
+                        center = Offset(centerX - radius * 0.28f, centerY - radius * 0.35f),
+                        radius = radius * 0.86f
+                    ),
+                    radius = radius,
+                    center = Offset(centerX, centerY),
+                    blendMode = BlendMode.Screen
+                )
 
-                // --- 5. High-Detail Landmasses & Country Outlines ---
-                val landAlpha = 0.4f * scale.coerceIn(0.5f, 2f)
-                val landColor = palette.colors.getOrElse(1) { Color.Cyan }
-                val outlineColor = Color.White.copy(alpha = 0.15f * scale.coerceIn(0.5f, 2f))
-                
-                // Detailed boundary paths (Simplified major landmasses & islands)
-                GlobeLandOutlines.forEach { points ->
-                    val path = Path()
-                    points.forEach { point ->
-                        val pos = projectGlobe(point.lat, point.lng, radius, rotateX, rotateY)
-                        if (pos.z > 0) {
-                            val x = centerX + pos.x; val y = centerY + pos.y
-                            if (path.isEmpty) path.moveTo(x, y) else path.lineTo(x, y)
-                        } else if (!path.isEmpty) {
-                            drawPath(path, landColor, alpha = landAlpha * 0.5f)
-                            drawPath(path, outlineColor, style = Stroke(1f))
-                            path.reset()
-                        }
-                    }
-                    if (!path.isEmpty) {
-                        drawPath(path, landColor, alpha = landAlpha * 0.5f)
-                        drawPath(path, outlineColor, style = Stroke(1.5f))
-                    }
+                // --- 5. Layered line mesh to simulate continent / country / province / city scales ---
+                drawGlobeLineMesh(
+                    centerX = centerX,
+                    centerY = centerY,
+                    radius = radius,
+                    rotateX = rotateX,
+                    rotateY = rotateY,
+                    palette = palette,
+                    coarseAlpha = 0.24f,
+                    mediumAlpha = 0.14f,
+                    fineAlpha = 0.08f
+                )
+
+                // --- 6. Fallback continent outlines ---
+                GlobeLandOutlines.forEach { outline ->
+                    drawPolylineOnGlobe(
+                        polyline = outline,
+                        centerX = centerX,
+                        centerY = centerY,
+                        radius = radius,
+                        rotateX = rotateX,
+                        rotateY = rotateY,
+                        fillColor = palette.colors.getOrElse(1) { Color.Cyan }.copy(alpha = 0.12f),
+                        strokeColor = Color.White.copy(alpha = 0.22f),
+                        strokeWidth = 1.1f * outline.strokeScale
+                    )
                 }
 
-                // --- 5.1 City Lights (Static Decorative Points) ---
+                // --- 6.1 Real country and province boundaries from GeoJSON assets ---
+                boundaryDataset?.countryLines?.forEach { outline ->
+                    drawPolylineOnGlobe(
+                        polyline = outline,
+                        centerX = centerX,
+                        centerY = centerY,
+                        radius = radius,
+                        rotateX = rotateX,
+                        rotateY = rotateY,
+                        fillColor = Color.Transparent,
+                        strokeColor = palette.colors.first().copy(alpha = 0.16f),
+                        strokeWidth = 0.72f * outline.strokeScale
+                    )
+                }
+                boundaryDataset?.chinaProvinceLines?.forEach { outline ->
+                    drawPolylineOnGlobe(
+                        polyline = outline,
+                        centerX = centerX,
+                        centerY = centerY,
+                        radius = radius,
+                        rotateX = rotateX,
+                        rotateY = rotateY,
+                        fillColor = Color.Transparent,
+                        strokeColor = palette.colors.last().copy(alpha = 0.22f),
+                        strokeWidth = 0.9f * outline.strokeScale
+                    )
+                }
+
+                // --- 7. City Lights (Static Decorative Points) ---
                 GlobeCityLights.forEach { city ->
-                    val pos = projectGlobe(city.lat, city.lng, radius, rotateX, rotateY)
-                    if (pos.z > 0) {
-                        val depthScale = (pos.z / radius).coerceIn(0f, 1f)
+                    val projected = projectVisibleSurface(city.lat, city.lng, radius, rotateX, rotateY, centerX, centerY)
+                    if (projected != null) {
+                        val depthScale = projected.depth
                         drawCircle(
                             color = Color.White.copy(alpha = 0.3f * depthScale),
-                            radius = 1.5f * scale,
-                            center = Offset(centerX + pos.x, centerY + pos.y)
+                            radius = 1.2f * projected.perspective,
+                            center = Offset(projected.screenX, projected.screenY)
                         )
                     }
                 }
 
-                // --- 6. Grid Lines ---
-                val gridColor = palette.colors.first().copy(alpha = 0.3f)
-                for (lat in -80..80 step 20) {
-                    val path = Path()
-                    for (lng in -180..180 step 10) {
-                        val pos = projectGlobe(lat.toDouble(), lng.toDouble(), radius, rotateX, rotateY)
-                        if (pos.z > 0) {
-                            val x = centerX + pos.x; val y = centerY + pos.y
-                            if (path.isEmpty) path.moveTo(x, y) else path.lineTo(x, y)
-                        } else if (!path.isEmpty) { drawPath(path, gridColor, style = Stroke(1.2f)); path.reset() }
+                // --- 8. Footprint heatmap bonded to the surface ---
+                if (projectedHeat.isNotEmpty()) {
+                    val maxWeight = projectedHeat.maxOf { it.first.weight }.coerceAtLeast(1)
+                    projectedHeat.forEach { (cluster, projected) ->
+                        val normalizedWeight = cluster.weight / maxWeight.toFloat()
+                        val glowRadius = radius * (0.022f + normalizedWeight * 0.085f) * projected.perspective * (0.7f + density)
+                        val hotColor = when {
+                            normalizedWeight > 0.72f -> palette.colors.last()
+                            normalizedWeight > 0.38f -> palette.colors.getOrElse(1) { palette.colors.first() }
+                            else -> palette.colors.first()
+                        }
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0f to hotColor.copy(alpha = 0.34f + normalizedWeight * 0.28f),
+                                0.52f to hotColor.copy(alpha = 0.12f + normalizedWeight * 0.08f),
+                                1f to Color.Transparent
+                            ),
+                            radius = glowRadius,
+                            center = Offset(projected.screenX, projected.screenY),
+                            blendMode = BlendMode.Plus
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.2f + cluster.recency * 0.25f),
+                            radius = glowRadius * 0.15f,
+                            center = Offset(projected.screenX, projected.screenY),
+                            blendMode = BlendMode.Screen
+                        )
+                        if (normalizedWeight > 0.55f) {
+                            drawCircle(
+                                color = hotColor.copy(alpha = 0.14f),
+                                radius = glowRadius * 1.18f,
+                                center = Offset(projected.screenX, projected.screenY),
+                                style = Stroke(width = glowRadius * 0.08f),
+                                blendMode = BlendMode.Plus
+                            )
+                        }
                     }
-                    drawPath(path, gridColor, style = Stroke(1.2f))
                 }
 
-                // --- 7. Data Points (Pillars) ---
+                // --- 9. Route ribbons between visible points ---
                 if (trackPoints.isNotEmpty()) {
                     val projectedTrackPoints =
                         trackPoints
                             .asSequence()
-                            .map { ProjectedTrackPoint(projectGlobe(it.latitude, it.longitude, radius, rotateX, rotateY)) }
-                            .filter { it.position.z > 0 }
-                            .sortedBy { it.position.z }
+                            .mapNotNull {
+                                projectVisibleSurface(it.latitude, it.longitude, radius, rotateX, rotateY, centerX, centerY)
+                            }
                             .toList()
 
-                    projectedTrackPoints.forEach { projected ->
-                        val pos = projected.position
-                        val x = centerX + pos.x
-                        val y = centerY + pos.y
-                        val depthScale = (pos.z / radius).coerceIn(0f, 1f)
-                        val pillarHeight = (20f + 120f * density) * scale * depthScale
-
+                    for (index in 1 until projectedTrackPoints.size) {
+                        val previous = projectedTrackPoints[index - 1]
+                        val current = projectedTrackPoints[index]
+                        val avgDepth = (previous.depth + current.depth) * 0.5f
                         drawLine(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(palette.colors.last(), Color.Transparent),
-                                startY = y, endY = y - pillarHeight
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    palette.colors.first().copy(alpha = 0.06f + avgDepth * 0.12f),
+                                    palette.colors.last().copy(alpha = 0.08f + avgDepth * 0.18f)
+                                ),
+                                start = Offset(previous.screenX, previous.screenY),
+                                end = Offset(current.screenX, current.screenY)
                             ),
-                            start = Offset(x, y),
-                            end = Offset(x, y - pillarHeight),
-                            strokeWidth = 5f * scale * depthScale,
+                            start = Offset(previous.screenX, previous.screenY),
+                            end = Offset(current.screenX, current.screenY),
+                            strokeWidth = 1.2f + density * 5.5f * avgDepth,
                             cap = StrokeCap.Round,
-                            blendMode = BlendMode.Plus
-                        )
-                        drawCircle(
-                            brush = Brush.radialGradient(0f to palette.colors.last().copy(alpha = 0.8f), 1f to Color.Transparent),
-                            radius = 15f * scale * depthScale * density,
-                            center = Offset(x, y),
+                            alpha = 0.85f,
                             blendMode = BlendMode.Plus
                         )
                     }
                 }
 
-                // --- 8. Tech Scan Line ---
+                // --- 10. Tech scan line and shell rim ---
                 val scanLineY = scanLineProgress * height
                 drawLine(palette.colors.first().copy(alpha = 0.2f), Offset(0f, scanLineY), Offset(width, scanLineY), 4f)
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.16f),
+                    radius = radius,
+                    center = Offset(centerX, centerY),
+                    style = Stroke(width = 2.4f)
+                )
             }
             else -> {
                 if (trackPoints.isEmpty()) return
@@ -535,15 +737,15 @@ private fun drawArt(
                 val displayWidth = width * (1 - padding * 2)
                 val displayHeight = height * (1 - padding * 2)
                 
-                val scale = if (latRange > 0 && lngRange > 0) {
+                val projectionScale = if (latRange > 0 && lngRange > 0) {
                     minOf(displayWidth.toDouble() / lngRange, displayHeight.toDouble() / latRange)
                 } else 1.0
         
-                val offsetX = (width.toDouble() - lngRange * scale) / 2.0
-                val offsetY = (height.toDouble() - latRange * scale) / 2.0
+                val offsetX = (width.toDouble() - lngRange * projectionScale) / 2.0
+                val offsetY = (height.toDouble() - latRange * projectionScale) / 2.0
         
-                fun projectX(lng: Double) = ((lng - minLng) * scale + offsetX).toFloat()
-                fun projectY(lat: Double) = (height.toDouble() - ((lat - minLat) * scale + offsetY)).toFloat()
+                fun projectX(lng: Double) = ((lng - minLng) * projectionScale + offsetX).toFloat()
+                fun projectY(lat: Double) = (height.toDouble() - ((lat - minLat) * projectionScale + offsetY)).toFloat()
 
                 when (artStyle) {
                     ArtStyle.LIQUID_NEON -> {
@@ -640,6 +842,251 @@ private fun drawArt(
     }
 }
 
+private fun buildHeatClusters(trackPoints: List<TrackPointEntity>): List<HeatCluster> {
+    if (trackPoints.isEmpty()) return emptyList()
+    val lastIndex = (trackPoints.size - 1).coerceAtLeast(1)
+    val buckets = linkedMapOf<Pair<Int, Int>, MutableList<Pair<Int, TrackPointEntity>>>()
+    trackPoints.forEachIndexed { index, point ->
+        val latKey = floor(point.latitude * 2.0).toInt()
+        val lngKey = floor(point.longitude * 2.0).toInt()
+        buckets.getOrPut(latKey to lngKey) { mutableListOf() }.add(index to point)
+    }
+    return buckets.values.map { entries ->
+        val averageLat = entries.map { it.second.latitude }.average()
+        val averageLng = entries.map { it.second.longitude }.average()
+        val latestIndex = entries.maxOf { it.first }
+        HeatCluster(
+            lat = averageLat,
+            lng = averageLng,
+            weight = entries.size,
+            recency = latestIndex / lastIndex.toFloat()
+        )
+    }
+}
+
+private fun projectVisibleSurface(
+    lat: Double,
+    lng: Double,
+    radius: Float,
+    rotateX: Float,
+    rotateY: Float,
+    centerX: Float,
+    centerY: Float
+): SurfacePoint? {
+    val position = projectGlobe(lat, lng, radius, rotateX, rotateY)
+    if (position.z <= 0f) return null
+    val depth = (position.z / radius).coerceIn(0f, 1f)
+    val perspective = 0.78f + depth * 0.34f
+    return SurfacePoint(
+        position = position,
+        screenX = centerX + position.x * perspective,
+        screenY = centerY + position.y * perspective,
+        depth = depth,
+        perspective = perspective
+    )
+}
+
+private fun DrawScope.drawPolylineOnGlobe(
+    polyline: GlobePolyline,
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    rotateX: Float,
+    rotateY: Float,
+    fillColor: Color,
+    strokeColor: Color,
+    strokeWidth: Float
+) {
+    val path = Path()
+    var visibleSegment = false
+    polyline.points.forEach { point ->
+        val projected = projectVisibleSurface(point.lat, point.lng, radius, rotateX, rotateY, centerX, centerY)
+        if (projected != null) {
+            if (!visibleSegment) {
+                path.moveTo(projected.screenX, projected.screenY)
+                visibleSegment = true
+            } else {
+                path.lineTo(projected.screenX, projected.screenY)
+            }
+        } else if (visibleSegment) {
+            drawPath(path, color = fillColor, style = Stroke(width = strokeWidth * 2.2f))
+            drawPath(path, color = strokeColor, style = Stroke(width = strokeWidth))
+            path.reset()
+            visibleSegment = false
+        }
+    }
+    if (!path.isEmpty) {
+        drawPath(path, color = fillColor, style = Stroke(width = strokeWidth * 2.2f))
+        drawPath(path, color = strokeColor, style = Stroke(width = strokeWidth))
+    }
+}
+
+private fun DrawScope.drawGlobeLineMesh(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    rotateX: Float,
+    rotateY: Float,
+    palette: ArtPalette,
+    coarseAlpha: Float,
+    mediumAlpha: Float,
+    fineAlpha: Float
+) {
+    val primary = palette.colors.first()
+    val accent = palette.colors.getOrElse(1) { primary }
+    drawLatitudeFamily(centerX, centerY, radius, rotateX, rotateY, 30, primary.copy(alpha = coarseAlpha), 1.25f)
+    drawLongitudeFamily(centerX, centerY, radius, rotateX, rotateY, 30, primary.copy(alpha = coarseAlpha), 1.25f)
+    drawLatitudeFamily(centerX, centerY, radius, rotateX, rotateY, 15, accent.copy(alpha = mediumAlpha), 0.95f)
+    drawLongitudeFamily(centerX, centerY, radius, rotateX, rotateY, 15, accent.copy(alpha = mediumAlpha), 0.95f)
+    drawLatitudeFamily(centerX, centerY, radius, rotateX, rotateY, 7, Color.White.copy(alpha = fineAlpha), 0.7f)
+    drawLongitudeFamily(centerX, centerY, radius, rotateX, rotateY, 7, Color.White.copy(alpha = fineAlpha), 0.7f)
+}
+
+private fun DrawScope.drawLatitudeFamily(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    rotateX: Float,
+    rotateY: Float,
+    step: Int,
+    color: Color,
+    strokeWidth: Float
+) {
+    for (lat in -75..75 step step) {
+        val path = Path()
+        var visible = false
+        for (lng in -180..180 step 4) {
+            val projected = projectVisibleSurface(lat.toDouble(), lng.toDouble(), radius, rotateX, rotateY, centerX, centerY)
+            if (projected != null) {
+                if (!visible) {
+                    path.moveTo(projected.screenX, projected.screenY)
+                    visible = true
+                } else {
+                    path.lineTo(projected.screenX, projected.screenY)
+                }
+            } else if (visible) {
+                drawPath(path, color = color, style = Stroke(width = strokeWidth))
+                path.reset()
+                visible = false
+            }
+        }
+        if (!path.isEmpty) {
+            drawPath(path, color = color, style = Stroke(width = strokeWidth))
+        }
+    }
+}
+
+private fun DrawScope.drawLongitudeFamily(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    rotateX: Float,
+    rotateY: Float,
+    step: Int,
+    color: Color,
+    strokeWidth: Float
+) {
+    for (lng in -180..180 step step) {
+        val path = Path()
+        var visible = false
+        for (lat in -85..85 step 4) {
+            val projected = projectVisibleSurface(lat.toDouble(), lng.toDouble(), radius, rotateX, rotateY, centerX, centerY)
+            if (projected != null) {
+                if (!visible) {
+                    path.moveTo(projected.screenX, projected.screenY)
+                    visible = true
+                } else {
+                    path.lineTo(projected.screenX, projected.screenY)
+                }
+            } else if (visible) {
+                drawPath(path, color = color, style = Stroke(width = strokeWidth))
+                path.reset()
+                visible = false
+            }
+        }
+        if (!path.isEmpty) {
+            drawPath(path, color = color, style = Stroke(width = strokeWidth))
+        }
+    }
+}
+
+private fun parseBoundaryDataset(context: Context): GlobeBoundaryDataset {
+    val countriesJson = context.assets.open("globe_countries.geojson").bufferedReader().use { it.readText() }
+    val chinaJson = context.assets.open("globe_china_provinces.geojson").bufferedReader().use { it.readText() }
+    return GlobeBoundaryDataset(
+        countryLines = parseGeoJsonPolylines(countriesJson, strokeScale = 0.95f),
+        chinaProvinceLines = parseGeoJsonPolylines(chinaJson, strokeScale = 1.1f)
+    )
+}
+
+private fun parseGeoJsonPolylines(
+    json: String,
+    strokeScale: Float
+): List<GlobePolyline> {
+    val root = JSONObject(json)
+    val features = root.optJSONArray("features") ?: return emptyList()
+    val lines = mutableListOf<GlobePolyline>()
+    for (i in 0 until features.length()) {
+        val feature = features.optJSONObject(i) ?: continue
+        val geometry = feature.optJSONObject("geometry") ?: continue
+        when (geometry.optString("type")) {
+            "Polygon" -> {
+                extractPolygonRings(geometry.optJSONArray("coordinates")).forEach { ring ->
+                    ringToPolyline(ring, strokeScale)?.let(lines::add)
+                }
+            }
+            "MultiPolygon" -> {
+                val polygons = geometry.optJSONArray("coordinates") ?: continue
+                for (polygonIndex in 0 until polygons.length()) {
+                    extractPolygonRings(polygons.optJSONArray(polygonIndex)).forEach { ring ->
+                        ringToPolyline(ring, strokeScale)?.let(lines::add)
+                    }
+                }
+            }
+        }
+    }
+    return lines
+}
+
+private fun extractPolygonRings(polygon: JSONArray?): List<JSONArray> {
+    if (polygon == null) return emptyList()
+    val rings = mutableListOf<JSONArray>()
+    for (ringIndex in 0 until polygon.length()) {
+        polygon.optJSONArray(ringIndex)?.let(rings::add)
+    }
+    return rings
+}
+
+private fun ringToPolyline(
+    ring: JSONArray,
+    strokeScale: Float
+): GlobePolyline? {
+    if (ring.length() < 4) return null
+    val step = when {
+        ring.length() > 900 -> 12
+        ring.length() > 450 -> 8
+        ring.length() > 180 -> 4
+        ring.length() > 80 -> 2
+        else -> 1
+    }
+    val points = mutableListOf<GlobePoint>()
+    var index = 0
+    while (index < ring.length()) {
+        val coord = ring.optJSONArray(index)
+        val lng = coord?.optDouble(0, Double.NaN) ?: Double.NaN
+        val lat = coord?.optDouble(1, Double.NaN) ?: Double.NaN
+        if (!lat.isNaN() && !lng.isNaN()) {
+            points.add(GlobePoint(lat = lat, lng = lng))
+        }
+        index += step
+    }
+    if (points.size < 3) return null
+    if (points.first() != points.last()) {
+        points.add(points.first())
+    }
+    return GlobePolyline(points = points, strokeScale = strokeScale)
+}
+
 /** 
  * Data class to hold 3D projection result 
  */
@@ -700,6 +1147,9 @@ private fun captureArtToBitmap(
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(bitmap)
         canvas.drawColor(android.graphics.Color.BLACK) // Same as background
+        val boundaryDataset = runCatching {
+            kotlinx.coroutines.runBlocking { GlobeBoundaryRepository.load(context) }
+        }.getOrNull()
 
         val drawScope = CanvasDrawScope()
         drawScope.draw(
@@ -707,7 +1157,7 @@ private fun captureArtToBitmap(
                 layoutDirection = LayoutDirection.Ltr,
                 canvas = androidx.compose.ui.graphics.Canvas(canvas),
                 size = Size(width.toFloat(), height.toFloat())
-        ) { drawArt(this, points, artStyle, palette, density, seed, size, rotX, rotY, scale) }
+        ) { drawArt(this, points, artStyle, palette, density, seed, size, boundaryDataset, rotX, rotY, scale) }
         return bitmap
 }
 
