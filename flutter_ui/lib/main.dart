@@ -887,6 +887,18 @@ class MainContainer extends StatefulWidget {
 
 class _MainContainerState extends State<MainContainer>
     with TickerProviderStateMixin {
+  static const List<IconData> _selectedTabIcons = <IconData>[
+    Icons.dashboard,
+    Icons.explore,
+    Icons.flag,
+    Icons.palette,
+  ];
+  static const List<IconData> _unselectedTabIcons = <IconData>[
+    Icons.dashboard_outlined,
+    Icons.explore_outlined,
+    Icons.outlined_flag,
+    Icons.palette_outlined,
+  ];
   int _selectedIndex = 0;
   late AnimationController _navController;
   late Animation<double> _elasticAnimation;
@@ -933,9 +945,7 @@ class _MainContainerState extends State<MainContainer>
       if (event != null) {
         try {
           final badgeData = jsonDecode(event.toString());
-          setState(() {
-            _badgeQueue.add(badgeData);
-          });
+          _badgeQueue.add(badgeData);
           _processBadgeQueue();
         } catch (e) {
           debugPrint("Failed to parse badge: $e");
@@ -985,7 +995,7 @@ class _MainContainerState extends State<MainContainer>
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
@@ -1131,8 +1141,6 @@ class _MainContainerState extends State<MainContainer>
                       child: Stack(
                         alignment: Alignment.center,
                         children: List.generate(4, (index) {
-                          final icons = [Icons.dashboard, Icons.explore, Icons.flag, Icons.palette];
-                          final outlines = [Icons.dashboard_outlined, Icons.explore_outlined, Icons.outlined_flag, Icons.palette_outlined];
                           final double step = fullWidth / 4;
                           final double currentX = (index - 1.5) * step * clampedT;
                           final bool isSelected = _selectedIndex == index;
@@ -1147,16 +1155,14 @@ class _MainContainerState extends State<MainContainer>
                                 onTap: () => _onTabTap(index),
                                 child: Transform.scale(
                                   scale: iconScale,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 250),
-                                    curve: Curves.easeOutBack,
+                                  child: Container(
                                     width: 48, height: 48,
                                     decoration: BoxDecoration(
                                       color: isSelected ? cs.primaryContainer : Colors.transparent,
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      isSelected ? icons[index] : outlines[index],
+                                      isSelected ? _selectedTabIcons[index] : _unselectedTabIcons[index],
                                       color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
                                       size: 24,
                                     ),
@@ -1203,12 +1209,25 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+class _TimelineMonth {
+  final int month;
+  final List<dynamic> entries;
+
+  const _TimelineMonth({
+    required this.month,
+    required this.entries,
+  });
+}
+
 class _DashboardScreenState extends State<DashboardScreen> {
   int currentYear = DateTime.now().year;
   List<dynamic> allEntries = [];
   List<dynamic> allTimeEntries = [];
   List<dynamic> onThisDayEntries = [];
   List<dynamic> yearlyGoals = [];
+  List<dynamic> _searchResults = const [];
+  List<_TimelineMonth> _timelineMonths = const [];
+  Map<String, Color> _heatmapDateColors = const {};
   double totalDistance = 0.0;
   int uniquePlacesLength = 0;
   double avgEnergy = 0.0;
@@ -1249,12 +1268,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  @override
-  void didUpdateWidget(covariant DashboardScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _loadEntries();
-  }
-
   String _mapMoodToChinese(String englishMood) {
     if (englishMood.contains(RegExp(r'[\u4e00-\u9fa5]'))) return englishMood;
     switch (englishMood.toUpperCase()) {
@@ -1266,6 +1279,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case "CALM": return "平静";
       default: return englishMood;
     }
+  }
+
+  Color _moodColor(String mood, ColorScheme cs) {
+    switch (_mapMoodToChinese(mood)) {
+      case "激情":
+        return Colors.orange;
+      case "探索":
+        return Colors.teal;
+      case "放松":
+        return Colors.blue;
+      case "思考":
+        return Colors.purple;
+      case "愉快":
+        return Colors.amber;
+      case "平静":
+        return Colors.lightBlue;
+      default:
+        return cs.primary;
+    }
+  }
+
+  List<dynamic> _buildSearchResults(List<dynamic> entries, String query) {
+    if (query.isEmpty) return const [];
+    return entries.where((e) {
+      final loc = (e['location'] as String? ?? '').toLowerCase();
+      final title = (e['title'] as String? ?? '').toLowerCase();
+      final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
+      return loc.contains(query) || title.contains(query) || tags.contains(query);
+    }).toList(growable: false);
   }
 
   Future<void> _loadEntries() async {
@@ -1289,9 +1331,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (jsonStr != null) {
+        if (!mounted) return;
         final List<dynamic> entries = jsonDecode(jsonStr);
         final today = DateTime.now();
         List<dynamic> onThisDay = [];
+        final colorScheme = Theme.of(context).colorScheme;
 
         final yearEntries = entries.where((e) {
           final dateStr = e['happenedOn'] as String?;
@@ -1338,11 +1382,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         });
 
+        final heatmapDateColors = <String, Color>{};
+        for (final entry in yearEntries) {
+          final dateStr = entry['happenedOn'] as String?;
+          final moodStr = entry['mood'] as String?;
+          if (dateStr != null && dateStr.length >= 10 && moodStr != null) {
+            heatmapDateColors[dateStr.substring(0, 10)] = _moodColor(moodStr, colorScheme);
+          }
+        }
+
+        final groupedByMonth = <int, List<dynamic>>{};
+        for (final entry in yearEntries) {
+          final dateStr = entry['happenedOn'] as String?;
+          if (dateStr != null && dateStr.length >= 7) {
+            final month = int.tryParse(dateStr.split('-')[1]) ?? 1;
+            groupedByMonth.putIfAbsent(month, () => []).add(entry);
+          }
+        }
+        final timelineMonths =
+            (groupedByMonth.keys.toList()..sort((a, b) => b.compareTo(a)))
+                .map((month) => _TimelineMonth(month: month, entries: groupedByMonth[month]!))
+                .toList(growable: false);
+
+        final searchResults = _buildSearchResults(entries, _searchQuery);
+
         setState(() {
           allTimeEntries = entries;
           allEntries = yearEntries;
           onThisDayEntries = onThisDay;
           yearlyGoals = yGoals;
+          _heatmapDateColors = heatmapDateColors;
+          _timelineMonths = timelineMonths;
+          _searchResults = searchResults;
           totalDistance = dist;
           uniquePlacesLength = places.length;
           avgEnergy = yearEntries.isNotEmpty ? energySum / yearEntries.length : 0.0;
@@ -1872,12 +1943,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Text("搜索结果", style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 12),
-                    ...allTimeEntries.where((e) {
-                      final loc = (e['location'] as String? ?? '').toLowerCase();
-                      final title = (e['title'] as String? ?? '').toLowerCase();
-                      final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
-                      return loc.contains(_searchQuery) || title.contains(_searchQuery) || tags.contains(_searchQuery);
-                    }).map((e) => Card(
+                    ..._searchResults.map((e) => Card(
                       elevation: 0,
                       margin: const EdgeInsets.only(bottom: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: cs.outlineVariant)),
@@ -1908,12 +1974,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                       ),
                     )),
-                    if (allTimeEntries.where((e) {
-                      final loc = (e['location'] as String? ?? '').toLowerCase();
-                      final title = (e['title'] as String? ?? '').toLowerCase();
-                      final tags = ((e['tags'] as List?)?.join(' ') ?? '').toLowerCase();
-                      return loc.contains(_searchQuery) || title.contains(_searchQuery) || tags.contains(_searchQuery);
-                    }).isEmpty)
+                    if (_searchResults.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 32),
                         child: Center(child: Text("没有找到匹配的足迹", style: TextStyle(color: Colors.grey))),
@@ -1999,28 +2060,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final year = currentYear;
     final firstDay = DateTime(year, 1, 1);
     final daysInYear = DateTime(year + 1, 1, 1).difference(firstDay).inDays;
-    
-    // Map entries to dates and colors
-    final Map<String, Color> dateColors = {};
-    for (var entry in allEntries) {
-      final dateStr = entry['happenedOn'] as String?;
-      final moodStr = entry['mood'] as String?;
-      if (dateStr != null && dateStr.length >= 10 && moodStr != null) {
-        final dateKey = dateStr.substring(0, 10);
-        final chineseMood = _mapMoodToChinese(moodStr);
-        Color c = cs.surfaceContainerHighest;
-        switch (chineseMood) {
-          case '激情': c = Colors.orange; break;
-          case '探索': c = Colors.teal; break;
-          case '放松': c = Colors.blue; break;
-          case '思考': c = Colors.purple; break;
-          case '愉快': c = Colors.amber; break;
-          case '平静': c = Colors.lightBlue; break;
-          default: c = cs.primary;
-        }
-        dateColors[dateKey] = c;
-      }
-    }
 
     // Determine grid dimensions
     final firstWeekday = (firstDay.weekday) % 7; // 0 for Sunday
@@ -2040,42 +2079,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 4),
           // Heatmap grid
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: List.generate(cols, (colIndex) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 2),
-                  child: Column(
-                    children: List.generate(rows, (rowIndex) {
-                      final dayIndex = colIndex * rows + rowIndex - firstWeekday;
-                      if (dayIndex < 0 || dayIndex >= daysInYear) {
-                         // Empty cell for padding
-                         return Container(width: cellSize, height: cellSize, margin: const EdgeInsets.only(bottom: 2));
-                      }
-                      
-                      final date = firstDay.add(Duration(days: dayIndex));
-                      if (date.year > year || (year == now.year && date.isAfter(now))) {
-                         return Container(width: cellSize, height: cellSize, margin: const EdgeInsets.only(bottom: 2));
-                      }
-                      
-                      final dateKey = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-                      final color = dateColors[dateKey] ?? cs.surfaceContainerHighest.withValues(alpha: 0.5);
-                      
-                      return Container(
-                        width: cellSize,
-                        height: cellSize,
-                        margin: const EdgeInsets.only(bottom: 2),
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      );
-                    }),
-                  ),
-                );
-              }),
+          RepaintBoundary(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(cols, (colIndex) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 2),
+                    child: Column(
+                      children: List.generate(rows, (rowIndex) {
+                        final dayIndex = colIndex * rows + rowIndex - firstWeekday;
+                        if (dayIndex < 0 || dayIndex >= daysInYear) {
+                           return Container(width: cellSize, height: cellSize, margin: const EdgeInsets.only(bottom: 2));
+                        }
+                        
+                        final date = firstDay.add(Duration(days: dayIndex));
+                        if (date.year > year || (year == now.year && date.isAfter(now))) {
+                           return Container(width: cellSize, height: cellSize, margin: const EdgeInsets.only(bottom: 2));
+                        }
+                        
+                        final dateKey = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                        final color = _heatmapDateColors[dateKey] ?? cs.surfaceContainerHighest.withValues(alpha: 0.5);
+                        
+                        return Container(
+                          width: cellSize,
+                          height: cellSize,
+                          margin: const EdgeInsets.only(bottom: 2),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        );
+                      }),
+                    ),
+                  );
+                }),
+              ),
             ),
           ),
         ],
@@ -2085,7 +2125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   
   // Custom timeline renderer grouping by month
   List<Widget> _buildTimeline(ColorScheme cs) {
-    if (allEntries.isEmpty) {
+    if (_timelineMonths.isEmpty) {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 32),
@@ -2096,20 +2136,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    final Map<int, List<dynamic>> groupedByMonth = {};
-    for (var entry in allEntries) {
-      final dateStr = entry['happenedOn'] as String?;
-      if (dateStr != null && dateStr.length >= 7) {
-        final m = int.tryParse(dateStr.split('-')[1]) ?? 1;
-        groupedByMonth.putIfAbsent(m, () => []).add(entry);
-      }
-    }
-
-    final sortedMonths = groupedByMonth.keys.toList()..sort((a, b) => b.compareTo(a));
-
-    return sortedMonths.map((m) {
-      final isExpanded = _expandedMonths.contains(m);
-      final monthEntries = groupedByMonth[m]!;
+    return _timelineMonths.map((bucket) {
+      final month = bucket.month;
+      final isExpanded = _expandedMonths.contains(month);
+      final monthEntries = bucket.entries;
       
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2117,8 +2147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           InkWell(
             onTap: () {
               setState(() {
-                if (isExpanded) _expandedMonths.remove(m);
-                else _expandedMonths.add(m);
+                if (isExpanded) _expandedMonths.remove(month);
+                else _expandedMonths.add(month);
               });
             },
             borderRadius: BorderRadius.circular(8),
@@ -2126,7 +2156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Row(
                 children: [
-                  Text("$m 月", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.primary)),
+                  Text("$month 月", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.primary)),
                   const Spacer(),
                   Text("${monthEntries.length} 篇", style: TextStyle(color: cs.outline, fontSize: 12)),
                   Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: cs.outline, size: 20),
@@ -2416,8 +2446,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           TextField(
             controller: _searchController,
             onChanged: (val) {
+              final query = val.trim().toLowerCase();
               setState(() {
-                _searchQuery = val.trim().toLowerCase();
+                _searchQuery = query;
+                _searchResults = _buildSearchResults(allTimeEntries, query);
               });
             },
             decoration: InputDecoration(
@@ -2429,6 +2461,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onPressed: () {
                         setState(() {
                           _searchQuery = "";
+                          _searchResults = const [];
                           _searchController.clear();
                         });
                         FocusScope.of(context).unfocus();
@@ -2529,6 +2562,20 @@ class ExploreMapScreen extends StatefulWidget {
   State<ExploreMapScreen> createState() => _ExploreMapScreenState();
 }
 
+class _TrackingOverlayData {
+  final double totalDistanceMeters;
+  final int pointCount;
+  final double? lat;
+  final double? lng;
+
+  const _TrackingOverlayData({
+    this.totalDistanceMeters = 0.0,
+    this.pointCount = 0,
+    this.lat,
+    this.lng,
+  });
+}
+
 class _ExploreMapScreenState extends State<ExploreMapScreen>
     with WidgetsBindingObserver {
   static const dataChannel = MethodChannel('com.footprint/data');
@@ -2562,7 +2609,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   List<dynamic> _capsules = [];
   double? _lastAltitude;
   Timer? _durationTimer;
-  String _durationStr = '00:00:00';
+  final ValueNotifier<String> _durationNotifier = ValueNotifier<String>('00:00:00');
+  final ValueNotifier<_TrackingOverlayData> _trackingOverlayNotifier =
+      ValueNotifier(const _TrackingOverlayData());
 
   // 匹配原 Kotlin 服务的过滤阈值
   static const double _maxSpeedMs = 50.0;
@@ -2600,7 +2649,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
             _updateNativeLocationState();
             _updateNativeMap();
             if (!_isTracking) {
-              _durationStr = '00:00:00';
+              _durationNotifier.value = '00:00:00';
+              _trackingOverlayNotifier.value = const _TrackingOverlayData();
               _durationTimer?.cancel();
             } else if (_durationTimer == null || !_durationTimer!.isActive) {
                _startDurationTimer();
@@ -2610,18 +2660,26 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
           if (_isTracking && data['data'] != null) {
             final lat = (data['data']['latitude'] as num).toDouble();
             final lng = (data['data']['longitude'] as num).toDouble();
-            
-            setState(() {
-              _lastLat = lat;
-              _lastLng = lng;
-              _trackingPath.add({'latitude': lat, 'longitude': lng});
-            });
+
+            _lastLat = lat;
+            _lastLng = lng;
+            _trackingPath.add({'latitude': lat, 'longitude': lng});
+            _updateTrackingOverlay(
+              totalDistanceMeters: _totalDistance,
+              pointCount: _trackingPath.length,
+              lat: lat,
+              lng: lng,
+            );
             _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
           }
         } else if (data['type'] == 'distance') {
-           setState(() {
-             _totalDistance = (data['distance'] as num).toDouble();
-           });
+           _totalDistance = (data['distance'] as num).toDouble();
+           _updateTrackingOverlay(
+             totalDistanceMeters: _totalDistance,
+             pointCount: _trackingPath.length,
+             lat: _lastLat,
+             lng: _lastLng,
+           );
         }
       } catch (e) {
         debugPrint('Stream Error: $e');
@@ -2659,6 +2717,15 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
             _trackingPath.add({'latitude': p['latitude'], 'longitude': p['longitude']});
           }
         });
+        final lastPoint = _trackingPath.isNotEmpty ? _trackingPath.last : null;
+        _lastLat = lastPoint?['latitude'];
+        _lastLng = lastPoint?['longitude'];
+        _updateTrackingOverlay(
+          totalDistanceMeters: _totalDistance,
+          pointCount: _trackingPath.length,
+          lat: _lastLat,
+          lng: _lastLng,
+        );
         _startDurationTimer();
         _mapChannel?.invokeMethod('setTrackingPath', _trackingPath);
         _updateNativeMap();
@@ -2673,22 +2740,53 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || !_isTracking || _isPaused) return;
       
-      // 安全检查：如果 _sessionStartTime 尚未初始化（为0），或者是异常值，
-      // 避免计算出几百万个小时。
       int now = DateTime.now().millisecondsSinceEpoch;
-      if (_sessionStartTime <= 0 || _sessionStartTime > now) {
-        // 尝试使用最近已知的持续时间
-        _sessionStartTime = now - _lastKnownDurationMs;
-      }
-      
-      int elapsed = now - _sessionStartTime;
-      // 这里的 1000 小时是一个合理的上限检查（约为 41 天），超过此值认为初始化有问题
-      if (elapsed > 3600000 * 1000) {
-        elapsed = _lastKnownDurationMs;
+      late final String nextDuration;
+      // 核心修复：如果 _sessionStartTime 为 0 或异常，直接使用 _lastKnownDurationMs
+      if (_sessionStartTime <= 1000000) { // 甚至没到 1970-01-01 00:16
+        nextDuration = _formatDuration(_lastKnownDurationMs);
+      } else {
+        int elapsed = now - _sessionStartTime;
+        // 这里的 1000 小时是一个合理的上限检查，超过此值认为计算溢出（通常是因为 startTime 错误）
+        if (elapsed > 3600000 * 1000 || elapsed < 0) {
+          elapsed = _lastKnownDurationMs;
+        }
+        nextDuration = _formatDuration(elapsed);
       }
 
-      setState(() => _durationStr = _formatDuration(elapsed));
+      if (_durationNotifier.value != nextDuration) {
+        _durationNotifier.value = nextDuration;
+      }
     });
+  }
+
+  void _updateTrackingOverlay({
+    required double totalDistanceMeters,
+    required int pointCount,
+    double? lat,
+    double? lng,
+  }) {
+    final current = _trackingOverlayNotifier.value;
+    final sameDistance =
+        (current.totalDistanceMeters - totalDistanceMeters).abs() < 0.01;
+    final samePointCount = current.pointCount == pointCount;
+    final sameLat = (current.lat == null && lat == null) ||
+        (current.lat != null &&
+            lat != null &&
+            (current.lat! - lat).abs() < 0.000001);
+    final sameLng = (current.lng == null && lng == null) ||
+        (current.lng != null &&
+            lng != null &&
+            (current.lng! - lng).abs() < 0.000001);
+    if (sameDistance && samePointCount && sameLat && sameLng) {
+      return;
+    }
+    _trackingOverlayNotifier.value = _TrackingOverlayData(
+      totalDistanceMeters: totalDistanceMeters,
+      pointCount: pointCount,
+      lat: lat,
+      lng: lng,
+    );
   }
 
   @override
@@ -2698,6 +2796,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _streamSubscription?.cancel();
     _locationClient.destroy();
     _durationTimer?.cancel();
+    _durationNotifier.dispose();
+    _trackingOverlayNotifier.dispose();
     super.dispose();
   }
 
@@ -2722,7 +2822,6 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   /// Tab 切换离开地图页时调用
   void onTabDeselected() {
     _isMapActive = false;
-    _userRequestedLocation = false; // 重置点击定位状态以确保续航
     _stopLocationIfIdle();
     _updateNativeLocationState();
   }
@@ -2752,7 +2851,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     if (_isTracking) {
       shouldEnable = _isMapActive;
     } else {
-      shouldEnable = _userRequestedLocation && _isMapActive;
+      // 如果用户点击了定位，或者正在定位过程中，且地图处于激活状态，开启原生定位
+      shouldEnable = (_userRequestedLocation || _isLocating) && _isMapActive;
     }
     _mapChannel?.invokeMethod('setLocationEnabled', shouldEnable);
   }
@@ -2862,15 +2962,18 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _mapChannel?.invokeMethod('setMapMode', mapMode);
     _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
     
-    // User request: Hide history in standard mode when not tracking
+    // 用户要求：非追踪状态下且处于标准模式（STANDARD）时，隐藏历史足迹 Marker 和轨迹
     final bool showHistory = mapMode != 'STANDARD' || _isTracking;
-    _mapChannel?.invokeMethod('setEntries', showHistory ? _allEntries : []);
-    _mapChannel?.invokeMethod('setCapsules', showHistory ? _capsules : []);
     
     if (showHistory) {
+      _mapChannel?.invokeMethod('setEntries', _allEntries);
+      _mapChannel?.invokeMethod('setCapsules', _capsules);
       _mapChannel?.invokeMethod('setHistoryPoints', _fogPoints);
     } else {
-      _mapChannel?.invokeMethod('setHistoryPoints', <Map<String, double>>[]);
+      // 显式传入空列表以清除地图上的所有历史元素
+      _mapChannel?.invokeMethod('setEntries', []);
+      _mapChannel?.invokeMethod('setCapsules', []);
+      _mapChannel?.invokeMethod('setHistoryPoints', []);
     }
   }
 
@@ -2889,13 +2992,19 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       }
 
       // === 策略1：直接让原生地图居中到它自己已知的蓝点位置 ===
-      // 原生地图的 isMyLocationEnabled 开启后有独立的定位能力
-      _userRequestedLocation = true;
+      setState(() {
+        _userRequestedLocation = true;
+        _isLocating = true;
+      });
       _updateNativeLocationState();
 
       try {
         final nativeResult = await _mapChannel?.invokeMethod('centerLocation', {'zoom': 17.0});
         if (nativeResult == true) {
+          setState(() {
+            _isLocating = false;
+            _userRequestedLocation = false;
+          });
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位成功"), backgroundColor: Colors.green, duration: Duration(seconds: 1)));
           return;
         }
@@ -2904,7 +3013,6 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       }
 
       // === 策略2：原生没有位置数据时，使用 Flutter AMap 定位 SDK 获取坐标 ===
-      _isLocating = true;
       _locationClient.setLocationOption(AMapLocationOption(onceLocation: true, locationMode: AMapLocationMode.Hight_Accuracy, needAddress: true));
       _locationSubscription?.cancel();
       bool hasResult = false;
@@ -2913,9 +3021,14 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         final double? lat = result['latitude'] as double?;
         final double? lng = result['longitude'] as double?;
         final errorCode = result['errorCode'];
+        
         if (errorCode != null && errorCode != 0) {
           hasResult = true;
-          _isLocating = false;
+          setState(() {
+            _isLocating = false;
+            _userRequestedLocation = false;
+          });
+          _updateNativeLocationState();
           _locationSubscription?.cancel();
           _locationClient.stopLocation();
           if (!mounted) return;
@@ -2936,7 +3049,11 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         }
         if (lat != null && lng != null && lat > 1.0 && lng > 1.0) {
           hasResult = true;
-          _isLocating = false;
+          setState(() {
+            _isLocating = false;
+            _userRequestedLocation = false;
+          });
+          _updateNativeLocationState();
           await _mapChannel?.invokeMethod('centerLocation', {'latitude': lat, 'longitude': lng, 'zoom': 17.0});
           _locationSubscription?.cancel();
           _locationClient.stopLocation();
@@ -2945,15 +3062,23 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       });
       _locationClient.startLocation();
       Future.delayed(const Duration(seconds: 10), () {
-        if (!hasResult) {
-          _isLocating = false;
+        if (!hasResult && mounted) {
+          setState(() {
+            _isLocating = false;
+            _userRequestedLocation = false;
+          });
+          _updateNativeLocationState();
           _locationSubscription?.cancel();
           _locationClient.stopLocation();
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位超时：请检查GPS是否开启及网络状况"), backgroundColor: Colors.orange));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("定位超时：请检查GPS是否开启及网络状况"), backgroundColor: Colors.orange));
         }
       });
     } catch (e) {
-      _isLocating = false;
+      setState(() {
+        _isLocating = false;
+        _userRequestedLocation = false;
+      });
+      _updateNativeLocationState();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("定位异常: $e"), backgroundColor: Colors.redAccent));
     }
   }
@@ -2971,8 +3096,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       _lastLat = null;
       _lastLng = null;
       _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
-      _durationStr = '00:00:00';
     });
+    _durationNotifier.value = '00:00:00';
+    _trackingOverlayNotifier.value = const _TrackingOverlayData();
 
     try {
       await _mapChannel?.invokeMethod('centerLocation', {'zoom': 18.0});
@@ -3038,8 +3164,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       _totalDistance = 0.0;
       _lastLat = null;
       _lastLng = null;
-      _durationStr = '00:00:00';
     });
+    _durationNotifier.value = '00:00:00';
+    _trackingOverlayNotifier.value = const _TrackingOverlayData();
     _mapChannel?.invokeMethod('setTrackingPath', <Map<String, double>>[]);
     
     // 延迟重新加载，给 Kotlin 保存 DB 留一点时间
@@ -3113,42 +3240,54 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
             bottom: 185,
             left: 16,
             right: 90,
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              color: cs.surface.withValues(alpha: 0.95),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _trackingStat(Icons.timer, _durationStr, "时长", cs),
-                        _trackingStat(Icons.straighten, "${(_totalDistance / 1000).toStringAsFixed(3)} km", "距离", cs),
-                        _trackingStat(Icons.scatter_plot, "${_trackingPath.length}", "点位", cs),
-                      ],
-                    ),
-                    if (_lastLat != null && _lastLng != null) ...[
-                      const Divider(height: 24),
+            child: ValueListenableBuilder<_TrackingOverlayData>(
+              valueListenable: _trackingOverlayNotifier,
+              builder: (context, tracking, _) => Card(
+                elevation: 6,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                color: cs.surface.withValues(alpha: 0.95),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          Icon(Icons.location_on, size: 14, color: cs.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            "Lat: ${_lastLat!.toStringAsFixed(3)}  Lng: ${_lastLng!.toStringAsFixed(3)}",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontFamily: "monospace",
-                              color: cs.onSurfaceVariant,
-                            ),
+                          ValueListenableBuilder<String>(
+                            valueListenable: _durationNotifier,
+                            builder: (context, value, _) =>
+                                _trackingStat(Icons.timer, value, "时长", cs),
                           ),
+                          _trackingStat(
+                            Icons.straighten,
+                            "${(tracking.totalDistanceMeters / 1000).toStringAsFixed(3)} km",
+                            "距离",
+                            cs,
+                          ),
+                          _trackingStat(Icons.scatter_plot, "${tracking.pointCount}", "点位", cs),
                         ],
                       ),
+                      if (tracking.lat != null && tracking.lng != null) ...[
+                        const Divider(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.location_on, size: 14, color: cs.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Lat: ${tracking.lat!.toStringAsFixed(3)}  Lng: ${tracking.lng!.toStringAsFixed(3)}",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -3561,7 +3700,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             0, 0, 0, 1, 0,
           ]),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10 * anim.value, sigmaY: 10 * anim.value),
+            filter: ImageFilter.blur(sigmaX: 8 * anim.value, sigmaY: 8 * anim.value),
             child: Container(
               color: const Color(0xFFD9C5B2).withValues(alpha: 0.15 * anim.value),
               child: FadeTransition(opacity: anim, child: child),
@@ -3591,7 +3730,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(32),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                   child: Container(
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(

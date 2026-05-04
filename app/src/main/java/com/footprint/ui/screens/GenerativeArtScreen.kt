@@ -12,18 +12,19 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,6 +57,27 @@ import kotlin.math.sin
 import kotlin.math.PI
 import kotlin.random.Random
 
+private data class StarSpec(val xFactor: Float, val yFactor: Float, val radius: Float, val alpha: Float)
+private data class GlobePoint(val lat: Double, val lng: Double)
+private data class ProjectedTrackPoint(val position: Vec3)
+
+private val GlobeLandOutlines = listOf(
+    listOf(GlobePoint(70.0, -10.0), GlobePoint(75.0, 60.0), GlobePoint(60.0, 180.0), GlobePoint(10.0, 110.0), GlobePoint(10.0, 70.0), GlobePoint(20.0, 30.0)),
+    listOf(GlobePoint(35.0, -20.0), GlobePoint(35.0, 50.0), GlobePoint(-35.0, 20.0), GlobePoint(-35.0, 10.0), GlobePoint(5.0, -10.0)),
+    listOf(GlobePoint(75.0, -170.0), GlobePoint(75.0, -50.0), GlobePoint(15.0, -90.0), GlobePoint(15.0, -110.0)),
+    listOf(GlobePoint(15.0, -80.0), GlobePoint(15.0, -40.0), GlobePoint(-55.0, -70.0), GlobePoint(-10.0, -80.0)),
+    listOf(GlobePoint(-10.0, 110.0), GlobePoint(-10.0, 150.0), GlobePoint(-40.0, 150.0), GlobePoint(-40.0, 110.0)),
+    listOf(GlobePoint(85.0, -70.0), GlobePoint(85.0, -10.0), GlobePoint(60.0, -40.0))
+)
+
+private val GlobeCityLights = List(150) {
+    val rand = Random(42 + it)
+    GlobePoint(
+        lat = ((rand.nextFloat() * 140) - 60).toDouble(),
+        lng = ((rand.nextFloat() * 360) - 180).toDouble()
+    )
+}
+
 enum class ArtPalette(val label: String, val colors: List<androidx.compose.ui.graphics.Color>) {
     CYBERPUNK("赛博朋克", listOf(androidx.compose.ui.graphics.Color(0xFF00E5FF), androidx.compose.ui.graphics.Color(0xFF651FFF), androidx.compose.ui.graphics.Color(0xFFFF4081))),
     AURORA("极光之境", listOf(androidx.compose.ui.graphics.Color(0xFF00FF9F), androidx.compose.ui.graphics.Color(0xFF00B8FF), androidx.compose.ui.graphics.Color(0xFF001AFF))),
@@ -77,17 +99,44 @@ enum class ArtStyle(val label: String) {
 fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var artStyle by remember { mutableStateOf(ArtStyle.LIQUID_NEON) }
-    var timeFilter by remember { mutableFloatStateOf(1f) } // 0.0 to 1.0
+    // 1. Set GLOBE_HEATMAP as default style
+    var artStyle by remember { mutableStateOf(ArtStyle.GLOBE_HEATMAP) }
+    var timeFilter by remember { mutableFloatStateOf(1f) } 
     var selectedPalette by remember { mutableStateOf(ArtPalette.CYBERPUNK) }
-    var visualDensity by remember { mutableFloatStateOf(0.5f) } // 0.1 to 1.0
+    var visualDensity by remember { mutableFloatStateOf(0.5f) } 
     var randomSeed by remember { mutableLongStateOf(42L) }
 
-    // Globe rotation state
+    // Globe rotation and scale state
     var globeRotateX by remember { mutableFloatStateOf(0f) }
     var globeRotateY by remember { mutableFloatStateOf(0f) }
+    var globeScale by remember { mutableFloatStateOf(1.2f) }
+    var isUserInteracting by remember { mutableStateOf(false) }
 
-    // Get all track points (or a sample)
+    // Auto-rotation animation
+    val infiniteTransition = rememberInfiniteTransition(label = "GlobeRotation")
+    val autoRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(25000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "AutoRotation"
+    )
+    val scanLineProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ScanLine"
+    )
+
+    // Combine auto and manual rotation
+    val currentRotateY = if (isUserInteracting || artStyle != ArtStyle.GLOBE_HEATMAP) globeRotateY else globeRotateY + autoRotation
+
+    // Get all track points
     val allTrackPoints by viewModel.getHeatmapPoints().collectAsStateWithLifecycle(initialValue = emptyList())
 
     val filteredPoints = remember(allTrackPoints, timeFilter) {
@@ -109,13 +158,71 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
             "${start.format(formatter)} - ${end.format(formatter)}"
         }
     }
+    val starField = remember(randomSeed) {
+        val rand = Random(randomSeed)
+        List(120) {
+            StarSpec(
+                xFactor = rand.nextFloat(),
+                yFactor = rand.nextFloat(),
+                radius = 0.5f + rand.nextFloat() * 1.5f,
+                alpha = rand.nextFloat() * 0.8f
+            )
+        }
+    }
+    val overlayPaint = remember {
+        AndroidPaint().apply {
+            color = AndroidColor.WHITE
+            textSize = 32f
+            alpha = 100
+            isFakeBoldText = true
+            letterSpacing = 0.1f
+        }
+    }
 
-    Scaffold(
-        topBar = {
+    // 2. Move pointerInput to the outermost Box to ensure it captures all gestures
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(artStyle) {
+                if (artStyle == ArtStyle.GLOBE_HEATMAP) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        isUserInteracting = true
+                        globeScale = (globeScale * zoom).coerceIn(0.5f, 10f)
+                        globeRotateY += pan.x * 0.5f / globeScale
+                        globeRotateX -= pan.y * 0.5f / globeScale
+                    }
+                }
+            }
+    ) {
+        // Full Screen Art Canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawArt(
+                drawScope = this,
+                trackPoints = filteredPoints,
+                artStyle = artStyle,
+                palette = selectedPalette,
+                density = visualDensity,
+                seed = randomSeed,
+                size = size,
+                rotateX = globeRotateX,
+                rotateY = currentRotateY,
+                scale = globeScale,
+                scanLineProgress = scanLineProgress,
+                starField = starField
+            )
+            
+            if (artStyle == ArtStyle.GLOBE_HEATMAP) {
+                drawGlobeOverlays(this, size, filteredPoints.size, globeScale, overlayPaint)
+            }
+        }
+
+        // UI Layer (Controls)
+        Column(modifier = Modifier.fillMaxSize()) {
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("足迹工坊 · 时空热力", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("足迹工坊 · 时空地球", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
                         Text(displayDateRange, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 },
@@ -125,218 +232,132 @@ fun GenerativeArtScreen(viewModel: FootprintViewModel, onBack: () -> Unit) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { randomSeed = System.currentTimeMillis() }) {
-                        Icon(Icons.Default.Refresh, "Randomize", tint = MaterialTheme.colorScheme.primary)
+                    IconButton(onClick = { 
+                        randomSeed = System.currentTimeMillis()
+                        globeScale = 1.2f
+                        globeRotateX = 0f
+                        globeRotateY = 0f
+                        isUserInteracting = false
+                    }) {
+                        Icon(Icons.Default.Refresh, "Reset", tint = MaterialTheme.colorScheme.primary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Black.copy(alpha = 0.9f),
+                    containerColor = Color.Transparent,
                     titleContentColor = Color.White
                 )
             )
-        },
-        containerColor = Color(0xFF0A0A0A) // Darker background for art
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // Art Preview Area with glowing border
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(Color(0xFF1A1A1A), Color.Black),
-                            center = Offset.Infinite
-                        ),
-                        shape = RoundedCornerShape(32.dp)
-                    )
-                    .clip(RoundedCornerShape(32.dp))
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
-                        ),
-                        RoundedCornerShape(32.dp)
-                    )
-                    .pointerInput(artStyle) {
-                        if (artStyle == ArtStyle.GLOBE_HEATMAP) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                globeRotateY += dragAmount.x * 0.5f // L-R drag rotates around vertical axis (Y)
-                                globeRotateX -= dragAmount.y * 0.5f // U-D drag rotates around horizontal axis (X)
-                            }
-                        }
-                    }
-            ) {
-                if (filteredPoints.isNotEmpty()) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawArt(this, filteredPoints, artStyle, selectedPalette, visualDensity, randomSeed, size, globeRotateX, globeRotateY)
-                        
-                        // Overlay decorative text
-                        val paint = android.graphics.Paint().apply {
-                            color = android.graphics.Color.WHITE
-                            textSize = 36f
-                            alpha = 80
-                            isFakeBoldText = true
-                            letterSpacing = 0.2f
-                        }
-                        
-                        drawContext.canvas.nativeCanvas.drawText(
-                            "FOOTPRINT ART // ${artStyle.label} // SEED:${randomSeed.toString().takeLast(4)}",
-                            60f, size.height - 80f, paint
-                        )
 
-                        if (artStyle == ArtStyle.GLOBE_HEATMAP) {
-                            drawContext.canvas.nativeCanvas.drawText(
-                                "DRAG TO ROTATE EARTH",
-                                size.width / 2f - 180f, 100f, paint
-                            )
-                        }
-                    }
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.weight(1f))
 
-            // Controls
+            // Bottom Controls - Floating Glassmorphism
             Card(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1E1E1E).copy(alpha = 0.98f) // Forced dark card for art controls
+                    containerColor = Color.Black.copy(alpha = 0.6f)
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DateRange, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("时空演进", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
+                        Text("时空演进", style = MaterialTheme.typography.labelMedium, color = Color.White)
                         Spacer(Modifier.weight(1f))
-                        Text("${(timeFilter * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                        Text("${(timeFilter * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
                     Slider(
                         value = timeFilter,
                         onValueChange = { timeFilter = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-                        )
+                        colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary)
+                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("视觉浓度", style = MaterialTheme.typography.labelMedium, color = Color.White)
+                        Spacer(Modifier.weight(1f))
+                        Text("${(visualDensity * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                    }
+                    Slider(
+                        value = visualDensity,
+                        onValueChange = { visualDensity = it },
+                        colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.tertiary)
                     )
                     
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text("视觉风格", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
-                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         ArtStyle.entries.forEach { style ->
                             val isSelected = artStyle == style
-                            Surface(
+                            InputChip(
                                 selected = isSelected,
                                 onClick = { artStyle = style },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
-                                modifier = Modifier.width(100.dp)
-                            ) {
-                                Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                                    Text(
-                                        style.label, 
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White.copy(alpha = 0.7f),
-                                        maxLines = 1
-                                    )
-                                }
-                            }
+                                label = { Text(style.label) },
+                                colors = InputChipDefaults.inputChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    labelColor = Color.White
+                                )
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
-                    
-                    Text("艺术配色", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
-                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        ArtPalette.entries.forEach { palette ->
-                            val isSelected = selectedPalette == palette
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.clickable { selectedPalette = palette }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .background(
-                                            Brush.sweepGradient(palette.colors),
-                                            shape = androidx.compose.foundation.shape.CircleShape
-                                        )
-                                        .border(
-                                            if (isSelected) 2.dp else 0.dp,
-                                            Color.White,
-                                            androidx.compose.foundation.shape.CircleShape
-                                        )
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    palette.label, 
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) Color.White else Color.Gray
-                                )
-                            }
+                        ArtPalette.entries.take(4).forEach { palette ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(Brush.sweepGradient(palette.colors), CircleShape)
+                                    .clickable { selectedPalette = palette }
+                                    .border(if(selectedPalette == palette) 2.dp else 0.dp, Color.White, CircleShape)
+                            )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("视觉浓度", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.9f))
-                        Spacer(Modifier.weight(1f))
-                        Text("${(visualDensity * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
-                    }
-                    Slider(
-                        value = visualDensity,
-                        onValueChange = { visualDensity = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.tertiary,
-                            activeTrackColor = MaterialTheme.colorScheme.tertiary
-                        )
-                    )
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val bitmap = captureArtToBitmap(context, filteredPoints, artStyle, selectedPalette, visualDensity, randomSeed, globeRotateX, globeRotateY)
+                        
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val bitmap = captureArtToBitmap(context, filteredPoints, artStyle, selectedPalette, visualDensity, randomSeed, globeRotateX, currentRotateY, globeScale)
                                     saveAndShareArt(context, bitmap)
-                                } catch (e: Exception) {
-                                    android.widget.Toast.makeText(context, "导出失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                                 }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Icon(painterResource(R.drawable.ic_share), null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("保存并分享永恒轨迹", fontWeight = FontWeight.Bold)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp)
+                        ) {
+                            Icon(painterResource(R.drawable.ic_share), null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("导出轨迹", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+private fun drawGlobeOverlays(
+    drawScope: DrawScope,
+    size: Size,
+    pointCount: Int,
+    scale: Float,
+    overlayPaint: AndroidPaint
+) {
+    with(drawScope) {
+        val margin = 60f
+        drawContext.canvas.nativeCanvas.drawText("SYSTEM_STATUS: ACTIVE", margin, size.height - margin - 80f, overlayPaint)
+        drawContext.canvas.nativeCanvas.drawText("DATA_POINTS: ${pointCount}", margin, size.height - margin - 40f, overlayPaint)
+        drawContext.canvas.nativeCanvas.drawText("ZOOM_LEVEL: ${String.format("%.1f", scale)}x", margin, size.height - margin, overlayPaint)
+        
+        // Circular Scanner Effect
+        drawCircle(
+            color = Color.White.copy(alpha = 0.05f),
+            radius = size.width / 2f,
+            center = Offset(size.width / 2f, size.height / 2f),
+            style = Stroke(width = 2f)
+        )
     }
 }
 
@@ -349,118 +370,158 @@ private fun drawArt(
     seed: Long,
     size: Size,
     rotateX: Float = 0f,
-    rotateY: Float = 0f
+    rotateY: Float = 0f,
+    scale: Float = 1f,
+    scanLineProgress: Float = 0f,
+    starField: List<StarSpec> = emptyList()
 ) {
     with(drawScope) {
         val width = size.width
         val height = size.height
-
-        if (trackPoints.isEmpty()) return
+        
+        // --- 1. Space Background Gradient ---
+        drawRect(
+            brush = Brush.radialGradient(
+                0.0f to Color(0xFF0D0D1A),
+                1.0f to Color.Black,
+                center = Offset(width / 2f, height / 2f)
+            )
+        )
 
         when (artStyle) {
             ArtStyle.GLOBE_HEATMAP -> {
-                // --- 3D Globe Implementation ---
-                val radius = minOf(width, height) * 0.4f
+                val baseRadius = minOf(width, height) * 0.45f
+                val radius = baseRadius * scale
                 val centerX = width / 2f
                 val centerY = height / 2f
+                
+                // --- 2. Rich Star Field ---
+                starField.forEach { star ->
+                    drawCircle(
+                        color = Color.White,
+                        radius = star.radius,
+                        center = Offset(star.xFactor * width, star.yFactor * height),
+                        alpha = star.alpha
+                    )
+                }
 
-                // Draw background sphere (subtle glowing base)
+                // --- 3. Atmosphere / Bloom ---
                 drawCircle(
                     brush = Brush.radialGradient(
-                        0.0f to Color(0xFF151515),
-                        0.8f to Color(0xFF0F0F0F),
-                        1.0f to palette.colors.first().copy(alpha = 0.3f)
+                        0.8f to Color.Transparent,
+                        1.0f to palette.colors.first().copy(alpha = 0.35f)
+                    ),
+                    radius = radius * 1.45f,
+                    center = Offset(centerX, centerY)
+                )
+
+                // --- 4. The Core Sphere ---
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0.0f to Color(0xFF20204A), // Distinct blue base
+                        0.8f to Color(0xFF0A0A15),
+                        1.0f to palette.colors.first().copy(alpha = 0.6f)
                     ),
                     radius = radius,
                     center = Offset(centerX, centerY)
                 )
 
-                // Draw Latitude/Longitude grid lines (Holographic effect)
-                val gridAlpha = 0.15f
+                // --- 5. High-Detail Landmasses & Country Outlines ---
+                val landAlpha = 0.4f * scale.coerceIn(0.5f, 2f)
+                val landColor = palette.colors.getOrElse(1) { Color.Cyan }
+                val outlineColor = Color.White.copy(alpha = 0.15f * scale.coerceIn(0.5f, 2f))
+                
+                // Detailed boundary paths (Simplified major landmasses & islands)
+                GlobeLandOutlines.forEach { points ->
+                    val path = Path()
+                    points.forEach { point ->
+                        val pos = projectGlobe(point.lat, point.lng, radius, rotateX, rotateY)
+                        if (pos.z > 0) {
+                            val x = centerX + pos.x; val y = centerY + pos.y
+                            if (path.isEmpty) path.moveTo(x, y) else path.lineTo(x, y)
+                        } else if (!path.isEmpty) {
+                            drawPath(path, landColor, alpha = landAlpha * 0.5f)
+                            drawPath(path, outlineColor, style = Stroke(1f))
+                            path.reset()
+                        }
+                    }
+                    if (!path.isEmpty) {
+                        drawPath(path, landColor, alpha = landAlpha * 0.5f)
+                        drawPath(path, outlineColor, style = Stroke(1.5f))
+                    }
+                }
 
-                // Simplified grid rendering
-                for (lat in -90..90 step 30) {
+                // --- 5.1 City Lights (Static Decorative Points) ---
+                GlobeCityLights.forEach { city ->
+                    val pos = projectGlobe(city.lat, city.lng, radius, rotateX, rotateY)
+                    if (pos.z > 0) {
+                        val depthScale = (pos.z / radius).coerceIn(0f, 1f)
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.3f * depthScale),
+                            radius = 1.5f * scale,
+                            center = Offset(centerX + pos.x, centerY + pos.y)
+                        )
+                    }
+                }
+
+                // --- 6. Grid Lines ---
+                val gridColor = palette.colors.first().copy(alpha = 0.3f)
+                for (lat in -80..80 step 20) {
                     val path = Path()
                     for (lng in -180..180 step 10) {
                         val pos = projectGlobe(lat.toDouble(), lng.toDouble(), radius, rotateX, rotateY)
-                        if (pos.z > 0) { // Only visible side
-                            val x = centerX + pos.x
-                            val y = centerY + pos.y
-                            if (path.isEmpty) path.moveTo(x, y) else path.lineTo(x, y)
-                        } else {
-                            if (!path.isEmpty) {
-                                drawPath(path, palette.colors.first().copy(alpha = gridAlpha), style = Stroke(width = 1f))
-                                path.reset()
-                            }
-                        }
-                    }
-                    drawPath(path, palette.colors.first().copy(alpha = gridAlpha), style = Stroke(width = 1f))
-                }
-                
-                for (lng in -180..180 step 30) {
-                    val path = Path()
-                    for (lat in -90..90 step 5) {
-                        val pos = projectGlobe(lat.toDouble(), lng.toDouble(), radius, rotateX, rotateY)
                         if (pos.z > 0) {
-                            val x = centerX + pos.x
-                            val y = centerY + pos.y
+                            val x = centerX + pos.x; val y = centerY + pos.y
                             if (path.isEmpty) path.moveTo(x, y) else path.lineTo(x, y)
-                        } else {
-                            if (!path.isEmpty) {
-                                drawPath(path, palette.colors.first().copy(alpha = gridAlpha), style = Stroke(width = 1f))
-                                path.reset()
-                            }
-                        }
+                        } else if (!path.isEmpty) { drawPath(path, gridColor, style = Stroke(1.2f)); path.reset() }
                     }
-                    drawPath(path, palette.colors.first().copy(alpha = gridAlpha), style = Stroke(width = 1f))
+                    drawPath(path, gridColor, style = Stroke(1.2f))
                 }
 
-                // Draw Heat Points on Globe
-                // Collect points into buckets for density calculation if needed, but additive blending works well
-                trackPoints.forEach { pt ->
-                    val pos = projectGlobe(pt.latitude, pt.longitude, radius, rotateX, rotateY)
-                    
-                    // Only draw if on the visible hemisphere (z > 0)
-                    if (pos.z > 0) {
+                // --- 7. Data Points (Pillars) ---
+                if (trackPoints.isNotEmpty()) {
+                    val projectedTrackPoints =
+                        trackPoints
+                            .asSequence()
+                            .map { ProjectedTrackPoint(projectGlobe(it.latitude, it.longitude, radius, rotateX, rotateY)) }
+                            .filter { it.position.z > 0 }
+                            .sortedBy { it.position.z }
+                            .toList()
+
+                    projectedTrackPoints.forEach { projected ->
+                        val pos = projected.position
                         val x = centerX + pos.x
                         val y = centerY + pos.y
-                        
-                        // Distance from the "front" of the sphere can affect size/opacity
                         val depthScale = (pos.z / radius).coerceIn(0f, 1f)
-                        val pointSize = (8f + 20f * density) * depthScale
-                        
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                0.0f to palette.colors.last().copy(alpha = 0.8f * density),
-                                0.5f to palette.colors.getOrElse(1) { palette.colors.first() }.copy(alpha = 0.3f),
-                                1.0f to Color.Transparent
+                        val pillarHeight = (20f + 120f * density) * scale * depthScale
+
+                        drawLine(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(palette.colors.last(), Color.Transparent),
+                                startY = y, endY = y - pillarHeight
                             ),
-                            radius = pointSize,
+                            start = Offset(x, y),
+                            end = Offset(x, y - pillarHeight),
+                            strokeWidth = 5f * scale * depthScale,
+                            cap = StrokeCap.Round,
+                            blendMode = BlendMode.Plus
+                        )
+                        drawCircle(
+                            brush = Brush.radialGradient(0f to palette.colors.last().copy(alpha = 0.8f), 1f to Color.Transparent),
+                            radius = 15f * scale * depthScale * density,
                             center = Offset(x, y),
                             blendMode = BlendMode.Plus
                         )
-                        
-                        // Tiny core for "hottest" part
-                        drawCircle(
-                            color = Color.White.copy(alpha = 0.9f * depthScale),
-                            radius = 1f + 2f * density,
-                            center = Offset(x, y)
-                        )
                     }
                 }
 
-                // Draw Glossy overlay
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        0.0f to Color.Transparent,
-                        0.9f to Color.Transparent,
-                        1.0f to Color.White.copy(alpha = 0.1f)
-                    ),
-                    radius = radius + 2f,
-                    center = Offset(centerX, centerY)
-                )
+                // --- 8. Tech Scan Line ---
+                val scanLineY = scanLineProgress * height
+                drawLine(palette.colors.first().copy(alpha = 0.2f), Offset(0f, scanLineY), Offset(width, scanLineY), 4f)
             }
             else -> {
+                if (trackPoints.isEmpty()) return
+                // ... (Keep existing 2D art styles)
                 val minLat = trackPoints.minOf { it.latitude }
                 val maxLat = trackPoints.maxOf { it.latitude }
                 val minLng = trackPoints.minOf { it.longitude }
@@ -631,7 +692,8 @@ private fun captureArtToBitmap(
         density: Float,
         seed: Long,
         rotX: Float = 0f,
-        rotY: Float = 0f
+        rotY: Float = 0f,
+        scale: Float = 1f
 ): Bitmap {
         val width = 1080
         val height = 1920
@@ -645,7 +707,7 @@ private fun captureArtToBitmap(
                 layoutDirection = LayoutDirection.Ltr,
                 canvas = androidx.compose.ui.graphics.Canvas(canvas),
                 size = Size(width.toFloat(), height.toFloat())
-        ) { drawArt(this, points, artStyle, palette, density, seed, size, rotX, rotY) }
+        ) { drawArt(this, points, artStyle, palette, density, seed, size, rotX, rotY, scale) }
         return bitmap
 }
 

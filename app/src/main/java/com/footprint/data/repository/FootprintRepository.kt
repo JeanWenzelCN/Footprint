@@ -61,6 +61,27 @@ class FootprintRepository(
                 trackPointDao.insert(entity)
         }
 
+        suspend fun saveTrackPoints(
+                locations: List<com.amap.api.location.AMapLocation>,
+                sessionId: Long = 0
+        ) {
+                if (locations.isEmpty()) return
+                val entities =
+                        locations.map { location ->
+                                com.footprint.data.local.TrackPointEntity(
+                                        latitude = location.latitude,
+                                        longitude = location.longitude,
+                                        timestamp = location.time,
+                                        speed = location.speed,
+                                        accuracy = location.accuracy,
+                                        altitude = location.altitude,
+                                        adcode = location.adCode,
+                                        sessionId = sessionId
+                                )
+                        }
+                trackPointDao.insertAll(entities)
+        }
+
         suspend fun saveTrackPointRaw(
                 latitude: Double,
                 longitude: Double,

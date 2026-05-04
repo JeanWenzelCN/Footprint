@@ -25,6 +25,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
   StreamSubscription? _gyroSub;
   Offset _pointerOffset = Offset.zero;
   Offset _gyroOffset = Offset.zero;
+  final ValueNotifier<Offset> _lightOffsetNotifier = ValueNotifier(Offset.zero);
   
   late AnimationController _revealController;
   
@@ -37,16 +38,13 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     
     _gyroSub = gyroscopeEvents.listen((GyroscopeEvent event) {
       if (!mounted) return;
-      setState(() {
-        // Integrate gyro data into a fake tilt offset. 
-        // Dampen it so it slowly returns to zero
-        _gyroOffset += Offset(event.y, event.x) * 0.1;
-        // Dampen
-        _gyroOffset = Offset(
-          _gyroOffset.dx * 0.95,
-          _gyroOffset.dy * 0.95,
-        );
-      });
+      // Integrate gyro data into a fake tilt offset and keep updates local to badge shaders.
+      _gyroOffset += Offset(event.y, event.x) * 0.1;
+      _gyroOffset = Offset(
+        _gyroOffset.dx * 0.95,
+        _gyroOffset.dy * 0.95,
+      );
+      _pushLightOffset();
     });
 
     _revealController = AnimationController(
@@ -79,6 +77,13 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     }
   }
 
+  void _pushLightOffset() {
+    final next = _gyroOffset + _pointerOffset;
+    final current = _lightOffsetNotifier.value;
+    if ((next - current).distanceSquared < 0.0004) return;
+    _lightOffsetNotifier.value = next;
+  }
+
   @override
   void dispose() {
     _gyroSub?.cancel();
@@ -86,6 +91,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     for (var controller in _badgeFocusControllers.values) {
         controller.dispose();
     }
+    _lightOffsetNotifier.dispose();
     super.dispose();
   }
 
@@ -238,12 +244,11 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
           
           MouseRegion(
             onHover: (e) {
-              setState(() {
-                _pointerOffset = Offset(
-                  (e.localPosition.dx / MediaQuery.of(context).size.width - 0.5) * 2.0,
-                  (e.localPosition.dy / MediaQuery.of(context).size.height - 0.5) * 2.0,
-                );
-              });
+              _pointerOffset = Offset(
+                (e.localPosition.dx / MediaQuery.of(context).size.width - 0.5) * 2.0,
+                (e.localPosition.dy / MediaQuery.of(context).size.height - 0.5) * 2.0,
+              );
+              _pushLightOffset();
             },
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -391,16 +396,19 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                         padding: const EdgeInsets.only(bottom: 15.0),
                         child: AspectRatio(
                           aspectRatio: 1.0,  // 强制正方形，避免拉伸成椭圆
-                          child: BadgeShaderWidget(
-                            program: _program!,
-                            isUnlocked: isUnlocked,
-                            materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
-                                          (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
-                                          (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
-                            baseColor: _parseColor(badge['visual_meta']?['color']),
-                            lightOffset: _gyroOffset + _pointerOffset,
-                            iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
-                            category: badge['category'] ?? 'General',
+                          child: ValueListenableBuilder<Offset>(
+                            valueListenable: _lightOffsetNotifier,
+                            builder: (context, lightOffset, _) => BadgeShaderWidget(
+                              program: _program!,
+                              isUnlocked: isUnlocked,
+                              materialType: (materialType == 'Cyber' || materialType == 'cyber_neon') ? 1.0 :
+                                            (materialType == 'Liquid' || materialType == 'liquid_glass') ? 2.0 :
+                                            (materialType == 'Gold' || materialType == 'gold') ? 3.0 : 0.0,
+                              baseColor: _parseColor(badge['visual_meta']?['color']),
+                              lightOffset: lightOffset,
+                              iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
+                              category: badge['category'] ?? 'General',
+                            ),
                           ),
                         ),
                       ),
@@ -649,7 +657,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
             child: ClipRRect(
               borderRadius: BorderRadius.circular(40),
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                 child: Material(
                   color: Colors.white.withValues(alpha: 0.1),
                   child: Container(
@@ -679,8 +687,8 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                                 boxShadow: [
                                   BoxShadow(
                                     color: baseColor.withValues(alpha: 0.4),
-                                    blurRadius: 60,
-                                    spreadRadius: 10,
+                                    blurRadius: 36,
+                                    spreadRadius: 6,
                                   ),
                                 ],
                               ),
@@ -856,68 +864,72 @@ class BadgeShaderWidget extends StatelessWidget {
         return Transform(
           transform: depthMatrix,
           alignment: FractionalOffset.center,
-          child: Stack(
-            fit: StackFit.expand,
-            alignment: Alignment.center,
-            children: [
-              // 背景 3D 材质
-              CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: BadgeShaderPainter(
-                  program: program,
-                  materialType: materialType,
-                  isUnlocked: isUnlocked,
-                  baseColor: baseColor,
-                  lightOffset: Offset(-lightOffset.dx, -lightOffset.dy),
-                ),
-              ),
-              
-              // 对应的外部装饰框/边饰
-              _buildCategoryFrame(constraints.maxWidth, displayColor),
-
-              // 中心勋章 Icon
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: ShaderMask(
-                    shaderCallback: (Rect bounds) {
-                      // 恢复较高的曝光度以解决“显示太浅”的问题
-                      final Color iconTopColor = isUnlocked 
-                          ? Colors.white.withAlpha(255) 
-                          : Colors.white.withAlpha(80);
-                      final Color iconBottomColor = isUnlocked 
-                          ? displayColor.withAlpha(100) 
-                          : Colors.transparent;
-                      
-                      return ui.Gradient.linear(
-                        Offset(bounds.width * 0.5 + lightOffset.dx * 10, 0),
-                        Offset(bounds.width * 0.5 - lightOffset.dx * 10, bounds.height),
-                        [iconTopColor, iconBottomColor],
-                      );
-                    },
-                    child: Stack(
-                      children: [
-                        // Subtle drop shadow for icon visibility
-                        Positioned(
-                          top: 1.5,
-                          left: 1.5,
-                          child: Icon(
-                            iconData,
-                            size: constraints.maxWidth * 0.4,
-                            color: Colors.black.withAlpha(120),
-                          ),
-                        ),
-                        Icon(
-                          iconData,
-                          size: constraints.maxWidth * 0.4,
-                          color: Colors.white,
-                        ),
-                      ],
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              alignment: Alignment.center,
+              children: [
+                // 背景 3D 材质
+                RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: BadgeShaderPainter(
+                      program: program,
+                      materialType: materialType,
+                      isUnlocked: isUnlocked,
+                      baseColor: baseColor,
+                      lightOffset: Offset(-lightOffset.dx, -lightOffset.dy),
                     ),
                   ),
                 ),
-              ),
-            ],
+                
+                // 对应的外部装饰框/边饰
+                _buildCategoryFrame(constraints.maxWidth, displayColor),
+
+                // 中心勋章 Icon
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: RepaintBoundary(
+                      child: ShaderMask(
+                        shaderCallback: (Rect bounds) {
+                          final Color iconTopColor = isUnlocked
+                              ? Colors.white.withAlpha(255)
+                              : Colors.white.withAlpha(80);
+                          final Color iconBottomColor = isUnlocked
+                              ? displayColor.withAlpha(100)
+                              : Colors.transparent;
+
+                          return ui.Gradient.linear(
+                            Offset(bounds.width * 0.5 + lightOffset.dx * 10, 0),
+                            Offset(bounds.width * 0.5 - lightOffset.dx * 10, bounds.height),
+                            [iconTopColor, iconBottomColor],
+                          );
+                        },
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 1.5,
+                              left: 1.5,
+                              child: Icon(
+                                iconData,
+                                size: constraints.maxWidth * 0.4,
+                                color: Colors.black.withAlpha(120),
+                              ),
+                            ),
+                            Icon(
+                              iconData,
+                              size: constraints.maxWidth * 0.4,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

@@ -3,6 +3,7 @@ package com.footprint
 import android.content.Context
 import android.graphics.*
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.widget.FrameLayout
 import com.amap.api.maps.AMap
@@ -54,6 +55,8 @@ class FlutterMapView(
     private var rawCapsules: List<Map<*, *>> = emptyList()
     private var rawEntries: List<Map<*, *>> = emptyList()
     private var currentMode: String = "STANDARD"
+    private var lastLivePolylineUpdateMs: Long = 0L
+    private var lastRenderedLivePointCount: Int = 0
 
     // 专属渲染层
     private var yunnanMask: Polygon? = null
@@ -126,7 +129,7 @@ class FlutterMapView(
                 fogOverlay.updateLivePathMercatorCache()
                 updateLivePolyline()
                 if (heatmapOverlay != null) updateHeatmap()
-                fogOverlay.invalidate()
+                fogOverlay.requestRender()
             }
         }
 
@@ -134,36 +137,51 @@ class FlutterMapView(
         aMap?.setOnCameraChangeListener(
                 object : AMap.OnCameraChangeListener {
                     override fun onCameraChange(pos: com.amap.api.maps.model.CameraPosition?) {
-                        fogOverlay.invalidate()
+                        fogOverlay.requestRender()
                     }
                     override fun onCameraChangeFinish(
                             pos: com.amap.api.maps.model.CameraPosition?
                     ) {
-                        fogOverlay.invalidate()
+                        fogOverlay.requestRender()
                     }
                 }
         )
     }
 
-    private fun updateLivePolyline() {
+    private fun updateLivePolyline(force: Boolean = false) {
         val map = aMap ?: return
+        val pointCount = currentPathPoints.size
+        if (pointCount == 0) {
+            livePolyline?.remove()
+            livePolyline = null
+            lastRenderedLivePointCount = 0
+            lastLivePolylineUpdateMs = 0L
+            return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        val pointDelta = pointCount - lastRenderedLivePointCount
+        if (!force && pointDelta in 0..2 && now - lastLivePolylineUpdateMs < 120L) {
+            return
+        }
+
         livePolyline?.remove()
         livePolyline = null
-        if (currentPathPoints.isNotEmpty()) {
-            val smoothedPoints = com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8)
-            val gradientColors = getGradientColorsForSmoothedPoints(smoothedPoints)
-            livePolyline =
-                    map.addPolyline(
-                            PolylineOptions()
-                                    .addAll(smoothedPoints)
-                                    .width(if (currentMode == "CAPSULE") 10f else 12f)
-                                    .useGradient(true)
-                                    .colorValues(gradientColors)
-                                    .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                    .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                    .zIndex(100f)
-                    )
-        }
+        val smoothedPoints = com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8)
+        val gradientColors = getGradientColorsForSmoothedPoints(smoothedPoints)
+        livePolyline =
+                map.addPolyline(
+                        PolylineOptions()
+                                .addAll(smoothedPoints)
+                                .width(if (currentMode == "CAPSULE") 10f else 12f)
+                                .useGradient(true)
+                                .colorValues(gradientColors)
+                                .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                .zIndex(100f)
+                )
+        lastLivePolylineUpdateMs = now
+        lastRenderedLivePointCount = pointCount
     }
 
     private fun getGradientColorsForSmoothedPoints(points: List<LatLng>): List<Int> {
@@ -776,6 +794,7 @@ class FlutterMapView(
             "setFogEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false
                 fogOverlay.visibility = if (enabled) View.VISIBLE else View.GONE
+                fogOverlay.requestRender()
                 result.success(true)
             }
             "setTheme" -> {
@@ -788,7 +807,8 @@ class FlutterMapView(
                 currentMode = mode
                 updateMapStyle(mode)
                 updateMarkers()
-                fogOverlay.visibility = if (mode == "FOG") View.VISIBLE else View.GONE
+                fogOverlay.visibility =
+                    if (mode == "FOG" || mode == "ETERNAL_REALM") View.VISIBLE else View.GONE
                 
                 if (mode == "HEATMAP") {
                     updateHeatmap()
@@ -804,6 +824,7 @@ class FlutterMapView(
                     fogOverlay.setEternalMode(false)
                     clearEternalMarkers()
                 }
+                fogOverlay.requestRender()
                 result.success(true)
             }
             "setEntries" -> {
@@ -821,6 +842,19 @@ class FlutterMapView(
             "setHistoryPoints" -> {
                 val points: List<Any?> = (call.arguments as? List<*>) ?: emptyList()
                 
+                // 彻底清空逻辑：无论什么模式，先移除所有 Polyline 和迷雾缓存
+                historyPolylines.forEach { it.remove() }
+                historyPolylines.clear()
+                historyPoints = emptyList()
+                fogOverlay.updateHistoryMercatorCache()
+                fogOverlay.requestRender()
+
+                if (points.isEmpty()) {
+                    if (heatmapOverlay != null) updateHeatmap()
+                    result.success(true)
+                    return
+                }
+
                 // 1. 解析点位并按 SessionId 分组
                 // 使用 LinkedHashMap 保持 Session 间的顺序，每个 Session 内部是一个或多个分段的列表
                 val sessionSegments = mutableListOf<MutableList<LatLng>>()
@@ -875,12 +909,9 @@ class FlutterMapView(
 
                 historyPoints = allPointsForFog
                 fogOverlay.updateHistoryMercatorCache()
-                fogOverlay.invalidate()
+                fogOverlay.requestRender()
 
                 if (heatmapOverlay != null) updateHeatmap()
-
-                historyPolylines.forEach { it.remove() }
-                historyPolylines.clear()
                 
                 if (currentMode != "HEATMAP") {
                     for (segment in sessionSegments) {
@@ -964,19 +995,15 @@ class FlutterMapView(
                     var finalLat = 0.0
                     var finalLng = 0.0
 
-                    // 如果当前没开定位，尝试开启
-                    if (aMap?.isMyLocationEnabled != true) {
-                        aMap?.isMyLocationEnabled = true
-                    }
+                    // 确保开启定位图层
+                    aMap?.isMyLocationEnabled = true
 
                     // 轮询检查是否有可用坐标
                     for (i in 0 until 15) { // 15 * 200ms = 3s
-                        // 来源 A: 缓存
                         if (cachedLat > 1.0 && cachedLng > 1.0) {
                             finalLat = cachedLat
                             finalLng = cachedLng
                         }
-                        // 来源 B: aMap 属性
                         if (finalLat < 1.0) {
                             aMap?.myLocation?.let {
                                 if (it.latitude > 1.0) {
@@ -985,7 +1012,6 @@ class FlutterMapView(
                                 }
                             }
                         }
-                        // 来源 C: 追踪服务
                         if (finalLat < 1.0) {
                             LocationTrackingService.currentLocation.value?.let {
                                 if (it.latitude > 1.0) {
@@ -1008,7 +1034,43 @@ class FlutterMapView(
                         )
                         result.success(true)
                     } else {
-                        result.error("LOCATION_UNAVAILABLE", "获取位置失败", "目前无法获取定位，请确保 GPS 已开启并位于室外开阔地带")
+                        // 策略 3: 使用一次性的强力定位 Client
+                        try {
+                            val singleClient = com.amap.api.location.AMapLocationClient(context)
+                            val option = com.amap.api.location.AMapLocationClientOption()
+                            option.isOnceLocation = true
+                            option.locationMode = com.amap.api.location.AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                            singleClient.setLocationOption(option)
+                            
+                            var foundByClient = false
+                            singleClient.setLocationListener { loc ->
+                                if (loc != null && loc.errorCode == 0 && loc.latitude > 1.0) {
+                                    aMap?.animateCamera(
+                                            com.amap.api.maps.CameraUpdateFactory.newLatLngZoom(
+                                                    LatLng(loc.latitude, loc.longitude),
+                                                    zoomLevel
+                                            )
+                                    )
+                                    foundByClient = true
+                                }
+                            }
+                            singleClient.startLocation()
+                            
+                            // 等待强力定位结果 (3秒)
+                            for(j in 0 until 10) {
+                                if (foundByClient) break
+                                delay(300)
+                            }
+                            
+                            if (foundByClient) {
+                                result.success(true)
+                            } else {
+                                result.error("LOCATION_UNAVAILABLE", "获取位置失败", "无法获取定位，请确保 GPS 已开启")
+                            }
+                            singleClient.onDestroy()
+                        } catch (e: Exception) {
+                            result.error("LOCATION_ERROR", e.message, null)
+                        }
                     }
                 }
             }
@@ -1087,7 +1149,27 @@ class FlutterMapView(
                     eternalShader = RuntimeShader(ETERNAL_CLOUD_SHADER)
                 }
             }
-            invalidate()
+            updateAnimationState()
+            requestRender()
+        }
+
+        fun requestRender() {
+            if (shouldAnimate()) {
+                postInvalidateOnAnimation()
+            } else {
+                invalidate()
+            }
+        }
+
+        private fun shouldAnimate(): Boolean = visibility == VISIBLE || isEternalMode
+
+        private fun updateAnimationState() {
+            val shouldAnimate = shouldAnimate()
+            if (shouldAnimate == isAnimating) return
+            isAnimating = shouldAnimate
+            if (isAnimating && isAttachedToWindow) {
+                postInvalidateOnAnimation()
+            }
         }
         
         private var lastBlurRadius: Float = -1f
@@ -1199,8 +1281,7 @@ class FlutterMapView(
 
         override fun onAttachedToWindow() {
             super.onAttachedToWindow()
-            isAnimating = true
-            postInvalidateOnAnimation()
+            updateAnimationState()
         }
 
         override fun onDetachedFromWindow() {
@@ -1239,6 +1320,14 @@ class FlutterMapView(
                             Shader.TileMode.CLAMP
                     )
             baseFogPaint.shader = fogGradientShader
+        }
+
+        override fun onVisibilityChanged(changedView: View, visibility: Int) {
+            super.onVisibilityChanged(changedView, visibility)
+            updateAnimationState()
+            if (visibility == VISIBLE) {
+                postInvalidateOnAnimation()
+            }
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -1494,7 +1583,7 @@ class FlutterMapView(
                 canvas.restoreToCount(sc)
             }
 
-            if (isAnimating && visibility == VISIBLE) {
+            if (isAnimating) {
                 postInvalidateOnAnimation()
             }
         }

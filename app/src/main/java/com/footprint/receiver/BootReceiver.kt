@@ -9,8 +9,15 @@ import com.footprint.service.LocationTrackingService
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d("BootReceiver", "Boot completed, starting LocationTrackingService")
-            LocationTrackingService.startTracking(context)
+            val prefs = context.getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+            val shouldResumeTracking = prefs.getBoolean("is_tracking", false)
+            val isPaused = prefs.getBoolean("is_paused", false)
+            if (shouldResumeTracking && !isPaused) {
+                Log.d("BootReceiver", "Boot completed, restoring active tracking service")
+                LocationTrackingService.restoreTracking(context)
+            } else {
+                Log.d("BootReceiver", "Boot completed, no active tracking session to restore")
+            }
         }
     }
 }

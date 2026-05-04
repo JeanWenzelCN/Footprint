@@ -674,7 +674,7 @@ class _QuantumTimeCapsuleDialogState extends State<_QuantumTimeCapsuleDialog> {
           children: [
             Positioned.fill(
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -711,7 +711,16 @@ class _QuantumTimeCapsuleDialogState extends State<_QuantumTimeCapsuleDialog> {
                 ),
               ),
             ),
-            Positioned.fill(top: 90, bottom: 100, child: AnimatedSwitcher(duration: const Duration(milliseconds: 400), child: _tabs[_currentIndex]['view'])),
+            Positioned.fill(
+              top: 90,
+              bottom: 100,
+              child: RepaintBoundary(
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: _tabs.map<Widget>((tab) => tab['view'] as Widget).toList(growable: false),
+                ),
+              ),
+            ),
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: Container(
@@ -723,8 +732,7 @@ class _QuantumTimeCapsuleDialogState extends State<_QuantumTimeCapsuleDialog> {
                     final isSel = _currentIndex == index;
                     return GestureDetector(
                       onTap: () => setState(() => _currentIndex = index),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         decoration: BoxDecoration(color: isSel ? Colors.cyanAccent.withValues(alpha: 0.1) : Colors.transparent, borderRadius: BorderRadius.circular(20)),
                         child: Column(

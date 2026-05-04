@@ -57,15 +57,18 @@ class FootprintApplication : Application() {
         val constraints = androidx.work.Constraints.Builder()
             .setRequiresCharging(true)
             .setRequiresDeviceIdle(true)
+            .setRequiresBatteryNotLow(true)
             .build()
             
         val badgeWorkRequest = androidx.work.PeriodicWorkRequestBuilder<com.footprint.badge.BadgeWorker>(
+            3, java.util.concurrent.TimeUnit.DAYS,
             1, java.util.concurrent.TimeUnit.DAYS
         )
         .setConstraints(constraints)
         .build()
         
         val calibrationRequest = androidx.work.PeriodicWorkRequestBuilder<com.footprint.badge.StatsCalibrationWorker>(
+            3, java.util.concurrent.TimeUnit.DAYS,
             1, java.util.concurrent.TimeUnit.DAYS
         )
         .setConstraints(constraints)

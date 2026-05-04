@@ -7,16 +7,15 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.amap.api.location.AMapLocation
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
 import com.amap.api.location.AMapLocationListener
 import com.footprint.data.model.Mood
-import com.footprint.data.model.TransportType
 import kotlin.math.abs
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,13 +28,16 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private var locationOption: AMapLocationClientOption? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var repository: com.footprint.data.repository.FootprintRepository
-    private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var notificationManager: NotificationManager
     private var _notificationUpdateJob: Job? = null
+    private val trackingPathBuffer = mutableListOf<AMapLocation>()
+    private val pendingTrackPoints = mutableListOf<AMapLocation>()
 
     // Rate limiting for IO / UI updates
     private var _lastSaveTime: Long = 0
     private var _lastNotifyTime: Long = 0
+    private var _lastDistancePersist: Float = 0.0f
+    private var _lastTrackingMode: TrackingMode? = null
 
     companion object {
         const val NOTIFICATION_ID = 1001
@@ -44,12 +46,22 @@ class LocationTrackingService : Service(), AMapLocationListener {
         const val ACTION_STOP_TRACKING = "com.footprint.STOP_TRACKING"
         const val ACTION_PAUSE_TRACKING = "com.footprint.PAUSE_TRACKING"
         const val ACTION_RESUME_TRACKING = "com.footprint.RESUME_TRACKING"
+        const val ACTION_RESTORE_TRACKING = "com.footprint.RESTORE_TRACKING"
 
         // Thresholds
         private const val MAX_SPEED_THRESHOLD_MS =
                 50.0f // 50 m/s = 180 km/h (Limit for driving/train, rejects teleport)
         private const val MIN_DISTANCE_THRESHOLD_M = 0.5f // Capture even very short movements
         private const val MIN_VALID_LATLNG = 0.1 // Reject 0.0 or near 0.0
+        private const val BASE_INTERVAL_MS = 10000L
+        private const val STATIONARY_INTERVAL_MS = 60000L
+        private const val WALKING_INTERVAL_MS = 10000L
+        private const val MOVING_INTERVAL_MS = 5000L
+        private const val FAST_MOVING_INTERVAL_MS = 3000L
+        private const val TRACK_BATCH_WINDOW_MS = 20000L
+        private const val TRACK_BATCH_SIZE = 5
+        private const val NOTIFICATION_UPDATE_INTERVAL_MS = 60000L
+        private const val DISTANCE_PERSIST_STEP_M = 50.0f
 
         private val _sharedIsTracking = MutableStateFlow(false)
         val isTracking: StateFlow<Boolean> = _sharedIsTracking.asStateFlow()
@@ -67,7 +79,11 @@ class LocationTrackingService : Service(), AMapLocationListener {
         private var _lastResumeTime: Long = 0
 
         val totalDurationMs: Long
-            get() = _accumulatedDurationMs + if (_sharedIsPaused.value || !_sharedIsTracking.value) 0L else (System.currentTimeMillis() - _lastResumeTime)
+            get() {
+                if (!_sharedIsTracking.value) return 0L
+                val currentSegment = if (_sharedIsPaused.value) 0L else (System.currentTimeMillis() - _lastResumeTime)
+                return _accumulatedDurationMs + currentSegment
+            }
 
         private var _sessionStartTime: Long = 0 // Keep for legacy if needed, but we use resume logic now
         val sessionStartTime: Long
@@ -90,7 +106,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     Intent(context, LocationTrackingService::class.java).apply {
                         action = ACTION_START_TRACKING
                     }
-            context.startService(intent)
+            ContextCompat.startForegroundService(context, intent)
         }
 
         fun stopTracking(context: Context) {
@@ -98,7 +114,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     Intent(context, LocationTrackingService::class.java).apply {
                         action = ACTION_STOP_TRACKING
                     }
-            context.startService(intent)
+            ContextCompat.startForegroundService(context, intent)
         }
 
         fun pauseTracking(context: Context) {
@@ -106,7 +122,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     Intent(context, LocationTrackingService::class.java).apply {
                         action = ACTION_PAUSE_TRACKING
                     }
-            context.startService(intent)
+            ContextCompat.startForegroundService(context, intent)
         }
 
         fun resumeTracking(context: Context) {
@@ -114,8 +130,38 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     Intent(context, LocationTrackingService::class.java).apply {
                         action = ACTION_RESUME_TRACKING
                     }
-            context.startService(intent)
+            ContextCompat.startForegroundService(context, intent)
         }
+
+        fun restoreTracking(context: Context) {
+            val intent =
+                    Intent(context, LocationTrackingService::class.java).apply {
+                        action = ACTION_RESTORE_TRACKING
+                    }
+            ContextCompat.startForegroundService(context, intent)
+        }
+    }
+
+    private enum class TrackingMode(
+            val intervalMs: Long,
+            val locationMode: AMapLocationClientOption.AMapLocationMode
+    ) {
+        STATIONARY(
+                STATIONARY_INTERVAL_MS,
+                AMapLocationClientOption.AMapLocationMode.Battery_Saving
+        ),
+        WALKING(
+                WALKING_INTERVAL_MS,
+                AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+        ),
+        MOVING(
+                MOVING_INTERVAL_MS,
+                AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+        ),
+        FAST(
+                FAST_MOVING_INTERVAL_MS,
+                AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+        )
     }
 
     override fun onCreate() {
@@ -125,14 +171,11 @@ class LocationTrackingService : Service(), AMapLocationListener {
         notificationManager = getSystemService(NotificationManager::class.java)
         createNotificationChannel()
 
-        // Recover persistent state if needed
-        val prefs = getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("is_tracking", false)) {
-            Log.d("FootprintLoc", "Recovering tracking state from prefs")
-            _sharedIsTracking.value = true
-            _totalDistanceTraveled.value = prefs.getFloat("total_distance", 0.0f)
-            _sessionStartTime = prefs.getLong("session_start", System.currentTimeMillis())
-        }
+        // 禁止在 onCreate 时自动恢复 is_tracking = true，
+        // 只有通过显式的 ACTION_START_TRACKING 或 ACTION_RESUME_TRACKING 才会开启。
+        // 这解决了“一打开地图就自动记录”的问题。
+        _sharedIsTracking.value = false
+        _sharedIsPaused.value = false
     }
 
     private fun createNotificationChannel() {
@@ -159,13 +202,13 @@ class LocationTrackingService : Service(), AMapLocationListener {
             locationOption =
                     AMapLocationClientOption().apply {
                         locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                        interval = 2000L // 2s一次
-                        isNeedAddress = true
+                        interval = BASE_INTERVAL_MS
+                        isNeedAddress = false
                         isMockEnable = false
                         isLocationCacheEnable = true
                         isOnceLocation = false
-                        isSensorEnable = true
-                        isGpsFirst = true
+                        isSensorEnable = false
+                        isGpsFirst = false
                     }
             locationClient?.setLocationOption(locationOption)
         } catch (e: Exception) {
@@ -191,6 +234,12 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 _sessionStartTime = System.currentTimeMillis()
                 _lastResumeTime = _sessionStartTime
                 _accumulatedDurationMs = 0
+                _lastSaveTime = 0L
+                _lastNotifyTime = 0L
+                _lastDistancePersist = 0.0f
+                _lastTrackingMode = null
+                trackingPathBuffer.clear()
+                pendingTrackPoints.clear()
                 _sharedTrackingPath.value = emptyList()
 
                 getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
@@ -204,10 +253,22 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 resumeTrackingFlow()
                 Log.d("FootprintLoc", "定位服务已启动, Session start: $_sessionStartTime")
             }
+            ACTION_RESTORE_TRACKING -> {
+                restoreTrackingStateFromPrefs()
+                if (_sharedIsTracking.value) {
+                    resumeTrackingFlow()
+                    Log.d("FootprintLoc", "定位服务已按持久化状态恢复")
+                } else {
+                    stopSelf()
+                }
+            }
             ACTION_PAUSE_TRACKING -> {
                 if (_sharedIsTracking.value && !_sharedIsPaused.value) {
                     _sharedIsPaused.value = true
                     _accumulatedDurationMs += (System.currentTimeMillis() - _lastResumeTime)
+                    locationClient?.stopLocation()
+                    flushPendingTrackPointsAsync()
+                    persistTrackingSnapshot(forceDistance = true)
                     
                     getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
                         .edit()
@@ -226,6 +287,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 if (_sharedIsTracking.value && _sharedIsPaused.value) {
                     _sharedIsPaused.value = false
                     _lastResumeTime = System.currentTimeMillis()
+                    _lastNotifyTime = 0L
+                    locationClient?.startLocation()
                     
                     getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
                         .edit()
@@ -237,9 +300,17 @@ class LocationTrackingService : Service(), AMapLocationListener {
             }
             // ...
             ACTION_STOP_TRACKING -> {
+                val finalDurationMs =
+                        if (_sharedIsPaused.value) {
+                            _accumulatedDurationMs
+                        } else {
+                            _accumulatedDurationMs +
+                                    (System.currentTimeMillis() - _lastResumeTime)
+                        }
                 locationClient?.stopLocation()
-                _sharedIsTracking.value = false
                 _notificationUpdateJob?.cancel()
+                persistTrackingSnapshot(forceDistance = true)
+                _sharedIsTracking.value = false
 
                 // Clear persistence
                 getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
@@ -247,15 +318,10 @@ class LocationTrackingService : Service(), AMapLocationListener {
                         .putBoolean("is_tracking", false)
                         .apply()
 
-                // Release WakeLock
-                if (wakeLock?.isHeld == true) {
-                    wakeLock?.release()
-                }
-                wakeLock = null
-
                 serviceScope.launch {
                     withContext(NonCancellable) {
-                        saveTrackingSessionAsFootprint()
+                        flushPendingTrackPointsSync()
+                        saveTrackingSessionAsFootprint(finalDurationMs)
                         locationClient?.disableBackgroundLocation(true)
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
@@ -299,18 +365,6 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 } else {
                                     isValidPoint = true
                                     _totalDistanceTraveled.value += distance.toFloat()
-
-                                    // Update persistence every 10 meters to avoid overkill but keep
-                                    // current
-                                    if (_totalDistanceTraveled.value % 10 < 1.0) {
-                                        getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
-                                                .edit()
-                                                .putFloat(
-                                                        "total_distance",
-                                                        _totalDistanceTraveled.value
-                                                )
-                                                .apply()
-                                    }
                                 }
                             }
                         }
@@ -320,31 +374,20 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 }
 
                         if (isValidPoint) {
-                            // Rate limit DB saves to once per 2 seconds
-                            if (now - _lastSaveTime > 2000) {
-                                _lastSaveTime = now
-                                serviceScope.launch {
-                                    try {
-                                        val app =
-                                                applicationContext as
-                                                        com.footprint.FootprintApplication
-                                        app.repository.saveTrackPoint(clonedLocation, _sessionStartTime)
-                                    } catch (e: Exception) {
-                                        Log.e("FootprintLoc", "Failed to save point: ${e.message}")
-                                    }
-                                }
-                            }
+                            queueTrackPoint(clonedLocation, now)
 
                             // Update Real-time Path
-                            _sharedTrackingPath.value = _sharedTrackingPath.value + clonedLocation
+                            trackingPathBuffer.add(clonedLocation)
+                            _sharedTrackingPath.value = trackingPathBuffer.toList()
                             _lastLocation = clonedLocation
 
-                            // Adaptive Interval
-                            updateAdaptiveInterval(location.speed)
+                            // Adaptive Interval and accuracy profile
+                            updateAdaptiveTrackingProfile(location.speed)
 
-                            // Rate limit notification updates to 5s (the background timer also
-                            // handles this)
-                            if (now - _lastNotifyTime > 5000) {
+                            persistTrackingSnapshot()
+
+                            // Rate limit notification updates to reduce background IPC/work.
+                            if (now - _lastNotifyTime > NOTIFICATION_UPDATE_INTERVAL_MS) {
                                 _lastNotifyTime = now
                                 updateNotificationImmediately(
                                         _totalDistanceTraveled.value.toInt(),
@@ -375,6 +418,30 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 }
             }
         }
+    }
+
+    private fun restoreTrackingStateFromPrefs() {
+        val prefs = getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+        val isTracking = prefs.getBoolean("is_tracking", false)
+        val isPaused = prefs.getBoolean("is_paused", false)
+
+        _sharedIsTracking.value = isTracking
+        _sharedIsPaused.value = isPaused
+
+        if (!isTracking) {
+            _totalDistanceTraveled.value = 0.0f
+            _sessionStartTime = 0L
+            _accumulatedDurationMs = 0L
+            _lastResumeTime = 0L
+            return
+        }
+
+        _sessionStartTime = prefs.getLong("session_start", System.currentTimeMillis())
+        _totalDistanceTraveled.value = prefs.getFloat("total_distance", 0.0f)
+        _lastDistancePersist = _totalDistanceTraveled.value
+        val now = System.currentTimeMillis()
+        _accumulatedDurationMs = if (isPaused) 0L else (now - _sessionStartTime).coerceAtLeast(0L)
+        _lastResumeTime = if (isPaused) 0L else now
     }
 
     private fun buildNotification(
@@ -459,17 +526,6 @@ class LocationTrackingService : Service(), AMapLocationListener {
     }
 
     private fun resumeTrackingFlow() {
-        // Acquire WakeLock
-        if (wakeLock == null) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock =
-                    powerManager.newWakeLock(
-                                    PowerManager.PARTIAL_WAKE_LOCK,
-                                    "Footprint:TrackingWakeLock"
-                            )
-                            .apply { acquire() }
-        }
-
         // Start Foreground
         if (ActivityCompat.checkSelfPermission(
                         this,
@@ -489,7 +545,6 @@ class LocationTrackingService : Service(), AMapLocationListener {
         }
 
         initLocationClient()
-        locationClient?.startLocation()
         _sharedIsTracking.value = true
 
         // Recover points from database to restore the trace line
@@ -497,7 +552,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
             try {
                 val points =
                         repository.getTrackPointsOnce(_sessionStartTime, System.currentTimeMillis())
-                _sharedTrackingPath.value =
+                trackingPathBuffer.clear()
+                trackingPathBuffer.addAll(
                         points.map {
                             AMapLocation("").apply {
                                 latitude = it.latitude
@@ -505,35 +561,93 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 time = it.timestamp
                             }
                         }
+                )
+                _sharedTrackingPath.value = trackingPathBuffer.toList()
                 Log.d("FootprintLoc", "Recovered ${_sharedTrackingPath.value.size} points from DB")
             } catch (e: Exception) {
                 Log.e("FootprintLoc", "Failed to recover points: ${e.message}")
             }
         }
 
+        if (!_sharedIsPaused.value) {
+            applyTrackingMode(TrackingMode.WALKING)
+            locationClient?.startLocation()
+        }
         startNotificationUpdates()
     }
 
-    private fun updateAdaptiveInterval(speedMs: Float) {
+    private fun updateAdaptiveTrackingProfile(speedMs: Float) {
         val speedKmh = speedMs * 3.6f
-        val newInterval =
+        val newMode =
                 when {
-                    speedKmh > 30 -> 2000L // 快速移动 (开车/公交): 2s
-                    speedKmh > 5 -> 3000L // 正常跑步/骑行: 3s
-                    speedKmh > 0.5 -> 4000L // 走路: 4s
-                    else -> 10000L // 静止: 10s
+                    speedKmh > 30 -> TrackingMode.FAST
+                    speedKmh > 8 -> TrackingMode.MOVING
+                    speedKmh > 1.5 -> TrackingMode.WALKING
+                    else -> TrackingMode.STATIONARY
                 }
+        applyTrackingMode(newMode)
+    }
 
+    private fun applyTrackingMode(mode: TrackingMode) {
+        if (_lastTrackingMode == mode) return
         locationOption?.let { currentOption ->
-            if (currentOption.interval != newInterval) {
-                currentOption.interval = newInterval
-                locationClient?.setLocationOption(currentOption)
-                Log.d(
-                        "FootprintLoc",
-                        "Adaptive interval updated to: $newInterval ms (Speed: $speedKmh km/h)"
-                )
+            currentOption.interval = mode.intervalMs
+            currentOption.locationMode = mode.locationMode
+            locationClient?.setLocationOption(currentOption)
+            _lastTrackingMode = mode
+            Log.d(
+                    "FootprintLoc",
+                    "Tracking profile updated: ${mode.name}, interval=${mode.intervalMs}ms"
+            )
+        }
+    }
+
+    private fun queueTrackPoint(location: AMapLocation, now: Long) {
+        pendingTrackPoints.add(location)
+        if (pendingTrackPoints.size >= TRACK_BATCH_SIZE ||
+                        now - _lastSaveTime >= TRACK_BATCH_WINDOW_MS
+        ) {
+            flushPendingTrackPointsAsync()
+            _lastSaveTime = now
+        }
+    }
+
+    private fun flushPendingTrackPointsAsync() {
+        if (pendingTrackPoints.isEmpty()) return
+        val snapshot = pendingTrackPoints.toList()
+        pendingTrackPoints.clear()
+        serviceScope.launch {
+            try {
+                repository.saveTrackPoints(snapshot, _sessionStartTime)
+            } catch (e: Exception) {
+                Log.e("FootprintLoc", "Failed to flush points: ${e.message}")
+                pendingTrackPoints.addAll(0, snapshot)
             }
         }
+    }
+
+    private suspend fun flushPendingTrackPointsSync() {
+        if (pendingTrackPoints.isEmpty()) return
+        val snapshot = pendingTrackPoints.toList()
+        pendingTrackPoints.clear()
+        try {
+            repository.saveTrackPoints(snapshot, _sessionStartTime)
+        } catch (e: Exception) {
+            pendingTrackPoints.addAll(0, snapshot)
+            throw e
+        }
+    }
+
+    private fun persistTrackingSnapshot(forceDistance: Boolean = false) {
+        if (!_sharedIsTracking.value) return
+        val distance = _totalDistanceTraveled.value
+        if (!forceDistance && distance - _lastDistancePersist < DISTANCE_PERSIST_STEP_M) return
+        _lastDistancePersist = distance
+        getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putFloat("total_distance", distance)
+                .putLong("session_start", _sessionStartTime)
+                .apply()
     }
 
     private fun startNotificationUpdates() {
@@ -541,7 +655,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         _notificationUpdateJob =
                 serviceScope.launch {
                     while (isActive && _sharedIsTracking.value) {
-                        delay(2000) // 每2秒更新一次时间，降低负载
+                        delay(NOTIFICATION_UPDATE_INTERVAL_MS)
                         updateNotificationImmediately(
                                 _totalDistanceTraveled.value.toInt(),
                                 _sharedCurrentLocation.value?.speed ?: 0f,
@@ -570,7 +684,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         Log.d("FootprintLoc", "Service onTaskRemoved")
     }
 
-    private suspend fun saveTrackingSessionAsFootprint() {
+    private suspend fun saveTrackingSessionAsFootprint(durationMs: Long) {
         val endTime = System.currentTimeMillis()
         val points = repository.getTrackPointsOnce(_sessionStartTime, endTime)
 
@@ -584,7 +698,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             title = "自动追踪",
                             location = lastLocation?.toAddressString() ?: "未知地点",
                             detail =
-                                    "通过自动追踪记录：共 ${points.size} 个点，耗时 ${ totalDurationMs / 60000 } 分钟",
+                                    "通过自动追踪记录：共 ${points.size} 个点，耗时 ${durationMs / 60000} 分钟",
                             mood = Mood.RELAXED,
                             tags = listOf("自动追踪"),
                             distanceKm = totalDistance / 1000.0,
@@ -636,6 +750,10 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onDestroy() {
         locationClient?.stopLocation()
         locationClient?.onDestroy()
+        runBlocking(NonCancellable) {
+            flushPendingTrackPointsSync()
+        }
+        trackingPathBuffer.clear()
         serviceScope.cancel()
         super.onDestroy()
     }
