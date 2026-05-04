@@ -150,4 +150,16 @@ class PreferenceManager(context: Context) {
     var isMaintenanceModeValidated: Boolean
         get() = prefs.getBoolean("is_maintenance_legacy_v2", false)
         set(value) = prefs.edit().putBoolean("is_maintenance_legacy_v2", value).apply()
+
+    var eternalLettersJson: String
+        get() = prefs.getString("eternal_letters_json", "[]") ?: "[]"
+        set(value) = prefs.edit().putString("eternal_letters_json", value).apply()
+
+    var eternalBondProfileJson: String
+        get() = prefs.getString("eternal_bond_profile_json", "{}") ?: "{}"
+        set(value) = prefs.edit().putString("eternal_bond_profile_json", value).apply()
+
+    var eternalInnerGateUnlocked: Boolean
+        get() = prefs.getBoolean("eternal_inner_gate_unlocked", false)
+        set(value) = prefs.edit().putBoolean("eternal_inner_gate_unlocked", value).apply()
 }

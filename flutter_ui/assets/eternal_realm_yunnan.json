@@ -1,0 +1,242 @@
+{
+  "realmTitle": "永恒之境",
+  "introQuote": "山河远阔，人间星河，而你是我愿意反复走回去的云南。",
+  "introSubquote": "把风、湖光、雪山、雨林和想念，藏进只属于她的时空里。",
+  "anniversaries": [
+    {
+      "month": 9,
+      "day": 16,
+      "title": "星图纪念日",
+      "message": "今天的云南心地图会比平日更亮一点。"
+    },
+    {
+      "month": 4,
+      "day": 8,
+      "title": "再遇日",
+      "message": "有些相逢像春雷，一响就是很多年。"
+    }
+  ],
+  "secretQuestion": {
+    "question": "如果云南的风有名字，你最想把它叫做什么？",
+    "answer": "洱海的风",
+    "successTitle": "只对你开放",
+    "successMessage": "这个房间不属于任何人，只属于那个懂得答案的人。"
+  },
+  "seasonalNotes": [
+    {
+      "season": "spring",
+      "title": "春日来信",
+      "message": "昆明的风会先一步抵达你身边，替我把想念说得轻一点。"
+    },
+    {
+      "season": "summer",
+      "title": "夏日来信",
+      "message": "版纳的雨林在生长，像那些我们还没来得及一起完成的愿望。"
+    },
+    {
+      "season": "autumn",
+      "title": "秋日来信",
+      "message": "大理的月色总让人想把心事说慢一点，把路走长一点。"
+    },
+    {
+      "season": "winter",
+      "title": "冬日来信",
+      "message": "玉龙雪山的风很冷，但想起你时，所有白色都会发光。"
+    }
+  ],
+  "futureTemplates": [
+    {
+      "title": "写给生日那天的你",
+      "message": "等你打开这封信的时候，希望你已经被很多温柔围住。但我还是想说，能遇见你，是我很长一段时间里最确定的幸运。"
+    },
+    {
+      "title": "写给情绪低落的你",
+      "message": "如果今天有点累，就先不要着急证明自己。云南的云也不是每一天都很开阔，但天总会慢慢亮起来。"
+    },
+    {
+      "title": "写给未来一起出发的我们",
+      "message": "等下次再去大理、丽江或者版纳的时候，我希望你会想起，这些地方曾经在我们还没到达之前，就已经先住进了我写给你的句子里。"
+    }
+  ],
+  "privatePromises": [
+    "以后再去云南，不赶景点，只陪你慢慢走。",
+    "想和你在洱海边发呆一整天，不做任何必须有意义的事。",
+    "如果某天你情绪不好，我会比风更早一点站到你身边。",
+    "你不用一直发光，累的时候也可以把灯先借给我。"
+  ],
+  "places": [
+    {
+      "tag": "KUNMING",
+      "title": "昆明 · 翠湖",
+      "subtitle": "湖光与海鸥",
+      "lat": 25.0517,
+      "lng": 102.7074,
+      "themeHex": "#75BDE0",
+      "accentHex": "#F5F0C6",
+      "ambient": "海鸥、晨风、湖面碎光",
+      "poem": "风里有湖，湖里有你。",
+      "msg": "在这里，风总是先轻一点，像怕惊动你回头时眼底那点温柔。每次想到翠湖，我都会想到一个很安静的清晨，和你站在湖边时不需要多说的话。",
+      "date": "Spring · Lake Light",
+      "enQuote": "Some places become gentle only because they once held your silhouette.",
+      "cnTrans": "“有些地方之所以温柔，只是因为曾映过你的轮廓。”"
+    },
+    {
+      "tag": "DIANCHI",
+      "title": "昆明 · 滇池",
+      "subtitle": "长风与远水",
+      "lat": 24.9587,
+      "lng": 102.6506,
+      "themeHex": "#5B89C9",
+      "accentHex": "#F4E9C6",
+      "ambient": "长堤、风线、晚霞",
+      "poem": "远水很宽，想念也很宽。",
+      "msg": "滇池像一面慢慢展开的镜子，装得下云层、晚霞，也装得下那些我没有及时说出口的想念。如果能和你一起站在这里，风应该也会变得更偏心一些。",
+      "date": "Summer · Open Water",
+      "enQuote": "Distance softens when the same wind crosses both of us.",
+      "cnTrans": "“当同一阵风吹过我们，距离就会悄悄变轻。”"
+    },
+    {
+      "tag": "DALI",
+      "title": "大理 · 古城",
+      "subtitle": "风花雪月的门口",
+      "lat": 25.6980,
+      "lng": 100.1636,
+      "themeHex": "#7DA5C7",
+      "accentHex": "#E8D8B8",
+      "ambient": "石板路、白墙、夜灯",
+      "poem": "风花雪月，都不如你。",
+      "msg": "大理很适合把话说慢一点。石板路、晚灯和风，都会让人想把喜欢收得很深，又藏不住一点点。要是和你一起走进古城，我大概会觉得每一盏灯都在替我偏爱你。",
+      "date": "Autumn · Moon Over Old Town",
+      "enQuote": "The moon over Dali is beautiful, but your smile still edits the whole night.",
+      "cnTrans": "“大理的月色很好，但你的笑还是改写了整片夜晚。”"
+    },
+    {
+      "tag": "ERHAI",
+      "title": "大理 · 洱海",
+      "subtitle": "月色与回声",
+      "lat": 25.7956,
+      "lng": 100.1777,
+      "themeHex": "#8EC5E8",
+      "accentHex": "#FFF0D2",
+      "ambient": "波纹、白月光、风铃",
+      "poem": "我想把所有温柔都放进水里，等你低头时看见。",
+      "msg": "洱海最动人的不是它有多辽阔，而是它总让人想起一个可以一起安静很久的人。如果我和你坐在岸边，什么都不做，大概也已经算抵达了一天里最好的部分。",
+      "date": "Night · Water Memory",
+      "enQuote": "Love can be as quiet as water and still reach every shore.",
+      "cnTrans": "“喜欢可以像水一样安静，却依然抵达每一处岸。”"
+    },
+    {
+      "tag": "LIJIANG",
+      "title": "丽江 · 古城",
+      "subtitle": "灯影与木纹",
+      "lat": 26.8721,
+      "lng": 100.2380,
+      "themeHex": "#8B6F5E",
+      "accentHex": "#EACDA3",
+      "ambient": "灯影、木窗、夜色",
+      "poem": "夜色很深，想念会发光。",
+      "msg": "丽江的夜总有一种旧木头的温度，像是走得再慢也不会被催促。我喜欢想象和你在古城里并肩走路，灯光一盏一盏亮起来，像替我们把未来的路先照了一遍。",
+      "date": "Winter · Lantern Night",
+      "enQuote": "In old towns, even silence sounds like a promise when you are beside me.",
+      "cnTrans": "“在古城里，只要你在身边，连沉默都像一句承诺。”"
+    },
+    {
+      "tag": "YULONG",
+      "title": "丽江 · 玉龙雪山",
+      "subtitle": "白色誓言",
+      "lat": 27.1096,
+      "lng": 100.2982,
+      "themeHex": "#DDE7F2",
+      "accentHex": "#9BB5C9",
+      "ambient": "雪线、稀薄空气、星光",
+      "poem": "雪很冷，想到你时却会亮起来。",
+      "msg": "雪山会让很多话显得郑重。站在这样高而安静的地方，人会更想把未来说得认真一点。你曾让我相信，路可以很长，但只要想到要走向谁，心里就会一直有光。",
+      "date": "Winter · Eternal White",
+      "enQuote": "Mountains teach us that permanence can still feel tender.",
+      "cnTrans": "“雪山让人明白，坚定也可以是温柔的。”"
+    },
+    {
+      "tag": "SHANGRILA",
+      "title": "香格里拉 · 独克宗",
+      "subtitle": "星图与经幡",
+      "lat": 27.8277,
+      "lng": 99.7073,
+      "themeHex": "#4D6384",
+      "accentHex": "#DABF8A",
+      "ambient": "星夜、经幡、风声",
+      "poem": "愿望被风带高一点，就更接近星星。",
+      "msg": "香格里拉像一个把时间放慢的地方。风吹过经幡的时候，我总会想到，如果有一天我们并肩站在这里，我一定会希望那些没来得及说完的愿望，都能被这阵风替我们送到更高的地方。",
+      "date": "Night · Sky Prayer",
+      "enQuote": "Some wishes are meant to be spoken only under a sky wide enough to keep them.",
+      "cnTrans": "“有些愿望，只适合在足够辽阔的天空下轻声说出。”"
+    },
+    {
+      "tag": "XISHUANGBANNA",
+      "title": "西双版纳 · 星光夜市",
+      "subtitle": "雨林与人间烟火",
+      "lat": 22.0075,
+      "lng": 100.7974,
+      "themeHex": "#3B7E5D",
+      "accentHex": "#F7DA77",
+      "ambient": "雨林、霓虹、夜市热气",
+      "poem": "人间烟火很近，喜欢你也很近。",
+      "msg": "版纳是热闹的，但想念可以在热闹里更清晰。夜市的光、雨林的潮湿、食物的香气，好像都在提醒人，喜欢一个人这件事，本来就该有真实的温度和烟火气。",
+      "date": "Summer · Rainforest Glow",
+      "enQuote": "Even in the loudest market, I can still hear my heart choose you.",
+      "cnTrans": "“就算在人声最热闹的地方，我也还是能听见心里偏向你的声音。”"
+    },
+    {
+      "tag": "TENGCHONG",
+      "title": "腾冲 · 和顺",
+      "subtitle": "慢巷与归意",
+      "lat": 25.0171,
+      "lng": 98.4966,
+      "themeHex": "#997C63",
+      "accentHex": "#F0D8AE",
+      "ambient": "慢巷、旧屋、热泉雾气",
+      "poem": "真正想去的地方，往往也是想一起回去的地方。",
+      "msg": "和顺有一种很难得的安定感，像是人只要走进去，心就会自动慢下来。它让我想到‘归来’这两个字，也让我很自然地想到，如果和你一起，很多地方都会变成想再回去一次的地方。",
+      "date": "Autumn · Returning Lane",
+      "enQuote": "Home is sometimes just the place where I imagine walking slowly with you.",
+      "cnTrans": "“所谓归处，有时只是一个想和你慢慢走过的地方。”"
+    }
+  ],
+  "memories": [
+    {
+      "id": "memory_kunming_first_wind",
+      "year": "2023",
+      "title": "第一次把云南写进想念里",
+      "date": "2023-09-16",
+      "placeTag": "KUNMING",
+      "summary": "那天以后，很多关于风的句子都会自动指向你。",
+      "message": "我开始认真记住云南，不是从地图开始的，是从你开始的。后来每次看到昆明、翠湖、海鸥、滇池这些词，都会像看见你在风里回头。"
+    },
+    {
+      "id": "memory_dali_moon",
+      "year": "2024",
+      "title": "把月色留在大理",
+      "date": "2024-04-08",
+      "placeTag": "ERHAI",
+      "summary": "原来有些月光，真的会让人想把未来说慢一点。",
+      "message": "大理让我第一次觉得，‘以后’这两个字可以很轻，也可以很郑重。像洱海的水面一样，安静，但会反复映出同一个人。"
+    },
+    {
+      "id": "memory_lijiang_lantern",
+      "year": "2024",
+      "title": "灯亮起来的时候",
+      "date": "2024-10-03",
+      "placeTag": "LIJIANG",
+      "summary": "所有夜色都会因为有人同行而变得柔软。",
+      "message": "我总觉得丽江适合并肩走路。不是因为它多热闹，而是因为灯一盏一盏亮起来的时候，会让人更确定，未来应该和某个人一起慢慢走。"
+    },
+    {
+      "id": "memory_shangrila_star",
+      "year": "2025",
+      "title": "想把愿望挂在更高的地方",
+      "date": "2025-01-13",
+      "placeTag": "SHANGRILA",
+      "summary": "在高处想起一个人，喜欢会显得更安静，也更坚定。",
+      "message": "如果有一天真的站在香格里拉的风里，我想对你说的第一句话不是‘好美’，而是‘幸好想到这些地方的时候，想到的人一直是你。’"
+    }
+  ]
+}

@@ -1557,6 +1557,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final todayHint = getEternalTodayBannerText();
     return Scaffold(
       body: Stack(
         children: [
@@ -4025,6 +4026,7 @@ class ArtStudioScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final todayHint = getEternalTodayBannerText();
     
     return Scaffold(
       backgroundColor: cs.surface,
@@ -4098,7 +4100,7 @@ class ArtStudioScreen extends StatelessWidget {
                      _buildStudioCard(
                        context,
                        "Lucas 的时空密室",
-                       "遇见你，是我最美的意外。这里珍藏着属于我们的每一刻。",
+                       todayHint ?? "遇见你，是我最美的意外。这里珍藏着属于我们的每一刻。",
                        Icons.favorite,
                        cs.copyWith(primary: Colors.pinkAccent),
                        () {

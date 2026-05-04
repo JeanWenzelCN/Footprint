@@ -526,22 +526,17 @@ class LocationTrackingService : Service(), AMapLocationListener {
     }
 
     private fun resumeTrackingFlow() {
-        // Start Foreground
+        startForegroundSafely()
+
         if (ActivityCompat.checkSelfPermission(
                         this,
                         android.Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
+                ) != PackageManager.PERMISSION_GRANTED
         ) {
-            val notification = buildNotification(_totalDistanceTraveled.value.toInt(), 0f, "")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                        NOTIFICATION_ID,
-                        notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
+            _locationError.value = "缺少定位权限：请在设置中授予"
+            Log.w("FootprintLoc", "Tracking restore/start skipped because location permission is missing")
+            startNotificationUpdates()
+            return
         }
 
         initLocationClient()
@@ -574,6 +569,23 @@ class LocationTrackingService : Service(), AMapLocationListener {
             locationClient?.startLocation()
         }
         startNotificationUpdates()
+    }
+
+    private fun startForegroundSafely() {
+        try {
+            val notification = buildNotification(_totalDistanceTraveled.value.toInt(), 0f, "")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e("FootprintLoc", "Failed to start foreground service: ${e.message}", e)
+        }
     }
 
     private fun updateAdaptiveTrackingProfile(speedMs: Float) {

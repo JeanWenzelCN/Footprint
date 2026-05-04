@@ -52,6 +52,7 @@ class FlutterMapView(
     private val markerList = mutableListOf<Marker>()
     private val capsuleMarkers = mutableListOf<Marker>()
     private val eternalMarkers = mutableListOf<Marker>()
+    private var eternalBondPolyline: Polyline? = null
     private var rawCapsules: List<Map<*, *>> = emptyList()
     private var rawEntries: List<Map<*, *>> = emptyList()
     private var currentMode: String = "STANDARD"
@@ -833,6 +834,11 @@ class FlutterMapView(
                 updateEntryMarkers()
                 result.success(true)
             }
+            "setEternalBondPath" -> {
+                val rawPoints: List<*> = call.arguments as? List<*> ?: emptyList<Any>()
+                updateEternalBondPath(rawPoints)
+                result.success(true)
+            }
             "setCapsules" -> {
                 @Suppress("UNCHECKED_CAST")
                 rawCapsules = call.arguments as? List<Map<*, *>> ?: emptyList()
@@ -1590,16 +1596,48 @@ class FlutterMapView(
 
         private fun drawEternalClouds(canvas: Canvas) {
             if (android.os.Build.VERSION.SDK_INT >= 33 && eternalShader != null) {
-                val shader = eternalShader!!
-                shader.setFloatUniform("uResolution", width.toFloat(), height.toFloat())
-                shader.setFloatUniform("uTime", (System.currentTimeMillis() % 1000000L).toFloat() / 1000f)
-                shader.setFloatUniform("uTimeOfDay", Calendar.getInstance().get(Calendar.HOUR_OF_DAY) / 24f)
-                
-                val center = aMap?.cameraPosition?.target ?: LatLng(25.0, 102.0)
-                shader.setFloatUniform("uWindOffset", center.longitude.toFloat(), center.latitude.toFloat())
-                shader.setFloatUniform("uMapScale", (20f - (aMap?.cameraPosition?.zoom ?: 10f)).coerceAtLeast(1f) * 2f)
-                
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), Paint().apply { this.shader = shader })
+                try {
+                    val shader = eternalShader!!
+                    shader.setFloatUniform("uResolution", width.toFloat(), height.toFloat())
+                    shader.setFloatUniform(
+                            "uTime",
+                            (System.currentTimeMillis() % 1000000L).toFloat() / 1000f
+                    )
+                    shader.setFloatUniform(
+                            "uTimeOfDay",
+                            Calendar.getInstance().get(Calendar.HOUR_OF_DAY) / 24f
+                    )
+
+                    val center = aMap?.cameraPosition?.target ?: LatLng(25.0, 102.0)
+                    shader.setFloatUniform(
+                            "uWindOffset",
+                            center.longitude.toFloat(),
+                            center.latitude.toFloat()
+                    )
+
+                    val zoom = (aMap?.cameraPosition?.zoom ?: 10f)
+                    val baseScale = (20f - zoom).coerceAtLeast(1f) * 2f
+                    val aspect = if (height > 0) width.toFloat() / height.toFloat() else 1f
+                    shader.setFloatUniform(
+                            "uMapScale",
+                            baseScale,
+                            (baseScale / aspect).coerceAtLeast(0.5f)
+                    )
+
+                    canvas.drawRect(
+                            0f,
+                            0f,
+                            width.toFloat(),
+                            height.toFloat(),
+                            Paint().apply { this.shader = shader }
+                    )
+                } catch (e: IllegalArgumentException) {
+                    android.util.Log.e(
+                            "FlutterMapView",
+                            "Eternal shader uniform mismatch: ${e.message}"
+                    )
+                    canvas.drawColor(Color.parseColor("#1AFFFFFF"))
+                }
             } else {
                 // Fallback: draw a very light tint
                 canvas.drawColor(Color.parseColor("#1AFFFFFF"))
@@ -1612,9 +1650,15 @@ class FlutterMapView(
     private fun updateEternalMarkers() {
         clearEternalMarkers()
         val pois = listOf(
-            Triple(LatLng(25.04, 102.71), "KUNMING", "昆明"),
-            Triple(LatLng(25.69, 100.16), "DALI", "大理"),
-            Triple(LatLng(26.87, 100.22), "LIJIANG", "丽江")
+            Triple(LatLng(25.0517, 102.7074), "KUNMING", "昆明"),
+            Triple(LatLng(24.9587, 102.6506), "DIANCHI", "滇池"),
+            Triple(LatLng(25.6980, 100.1636), "DALI", "大理"),
+            Triple(LatLng(25.7956, 100.1777), "ERHAI", "洱海"),
+            Triple(LatLng(26.8721, 100.2380), "LIJIANG", "丽江"),
+            Triple(LatLng(27.1096, 100.2982), "YULONG", "玉龙雪山"),
+            Triple(LatLng(27.8277, 99.7073), "SHANGRILA", "香格里拉"),
+            Triple(LatLng(22.0075, 100.7974), "XISHUANGBANNA", "西双版纳"),
+            Triple(LatLng(25.0171, 98.4966), "TENGCHONG", "腾冲")
         )
         pois.forEach { (pos, tag, _) ->
             val opt = MarkerOptions().position(pos).title("ETERNAL_POI").snippet(tag)
@@ -1628,6 +1672,38 @@ class FlutterMapView(
     private fun clearEternalMarkers() {
         eternalMarkers.forEach { it.remove() }
         eternalMarkers.clear()
+    }
+
+    private fun updateEternalBondPath(rawPoints: List<*>) {
+        eternalBondPolyline?.remove()
+        eternalBondPolyline = null
+        if (rawPoints.size < 2) return
+
+        val latLngs =
+                rawPoints.mapNotNull { point ->
+                    val map = point as? Map<*, *> ?: return@mapNotNull null
+                    val lat = (map["lat"] as? Number)?.toDouble()
+                    val lng = (map["lng"] as? Number)?.toDouble()
+                    if (lat == null || lng == null) null else LatLng(lat, lng)
+                }
+
+        if (latLngs.size < 2) return
+
+        eternalBondPolyline =
+                aMap?.addPolyline(
+                        PolylineOptions()
+                                .addAll(latLngs)
+                                .width(10f)
+                                .colorValues(
+                                        listOf(
+                                                Color.parseColor("#88F6C5"),
+                                                Color.parseColor("#F5D48A")
+                                        )
+                                )
+                                .useGradient(true)
+                                .setDottedLine(true)
+                                .zIndex(120f)
+                )
     }
 
     private fun createEternalMarkerBitmap(tag: String): Bitmap {
@@ -1651,7 +1727,7 @@ class FlutterMapView(
         c.drawCircle(36f, 36f, 30f, p)
         
         when (tag) {
-            "KUNMING" -> { // Flower 🌺
+            "KUNMING" -> {
                 c.save()
                 c.translate(36f, 36f)
                 for (i in 0..4) {
@@ -1662,7 +1738,11 @@ class FlutterMapView(
                 c.restore()
                 c.drawCircle(36f, 36f, 4f, p)
             }
-            "DALI" -> { // Book 📖
+            "DIANCHI" -> {
+                c.drawArc(RectF(18f, 28f, 54f, 48f), 180f, 180f, false, p)
+                c.drawArc(RectF(24f, 22f, 48f, 40f), 180f, 180f, false, p)
+            }
+            "DALI" -> {
                 val path = Path()
                 path.moveTo(22f, 26f)
                 path.quadTo(28f, 22f, 36f, 26f)
@@ -1674,7 +1754,12 @@ class FlutterMapView(
                 c.drawPath(path, p)
                 c.drawLine(36f, 26f, 36f, 44f, p)
             }
-            "LIJIANG" -> { // Cat 🐈
+            "ERHAI" -> {
+                c.drawArc(RectF(18f, 28f, 54f, 48f), 180f, 180f, false, p)
+                c.drawLine(20f, 40f, 52f, 40f, p)
+                c.drawCircle(32f, 30f, 2f, p)
+            }
+            "LIJIANG" -> {
                 val path = Path()
                 path.moveTo(26f, 28f)
                 path.lineTo(26f, 18f)
@@ -1687,6 +1772,33 @@ class FlutterMapView(
                 c.drawPoint(30f, 34f, p)
                 c.drawPoint(42f, 34f, p)
                 c.drawLine(34f, 38f, 38f, 38f, p)
+            }
+            "YULONG" -> {
+                val path = Path()
+                path.moveTo(18f, 46f)
+                path.lineTo(30f, 24f)
+                path.lineTo(38f, 36f)
+                path.lineTo(46f, 20f)
+                path.lineTo(54f, 46f)
+                c.drawPath(path, p)
+            }
+            "SHANGRILA" -> {
+                c.drawCircle(36f, 34f, 10f, p)
+                c.drawLine(36f, 18f, 36f, 52f, p)
+                c.drawLine(24f, 26f, 48f, 42f, p)
+            }
+            "XISHUANGBANNA" -> {
+                val leaf = Path()
+                leaf.moveTo(36f, 18f)
+                leaf.quadTo(52f, 28f, 36f, 52f)
+                leaf.quadTo(20f, 28f, 36f, 18f)
+                c.drawPath(leaf, p)
+                c.drawLine(36f, 24f, 36f, 46f, p)
+            }
+            "TENGCHONG" -> {
+                c.drawRoundRect(RectF(22f, 24f, 50f, 46f), 6f, 6f, p)
+                c.drawLine(28f, 30f, 44f, 30f, p)
+                c.drawLine(28f, 36f, 44f, 36f, p)
             }
         }
         return b

@@ -234,6 +234,16 @@ class MainActivity : FlutterActivity() {
                                     )
                             result.success(gson.toJson(settings))
                         }
+                        "getEternalRealmState" -> {
+                            val prefs = com.footprint.utils.PreferenceManager(this)
+                            val state =
+                                    mapOf(
+                                            "lettersJson" to prefs.eternalLettersJson,
+                                            "bondProfileJson" to prefs.eternalBondProfileJson,
+                                            "innerGateUnlocked" to prefs.eternalInnerGateUnlocked
+                                    )
+                            result.success(gson.toJson(state))
+                        }
                         "updateNickname" -> {
                             com.footprint.utils.PreferenceManager(this).nickname =
                                     call.arguments as String
@@ -266,6 +276,22 @@ class MainActivity : FlutterActivity() {
                         "syncMaintMode" -> {
                             val active = call.arguments as? Boolean ?: true
                             com.footprint.utils.PreferenceManager(this).isMaintenanceModeValidated = active
+                            result.success(true)
+                        }
+                        "saveEternalLetters" -> {
+                            val prefs = com.footprint.utils.PreferenceManager(this)
+                            prefs.eternalLettersJson = gson.toJson(call.arguments)
+                            result.success(true)
+                        }
+                        "saveEternalBondProfile" -> {
+                            val prefs = com.footprint.utils.PreferenceManager(this)
+                            prefs.eternalBondProfileJson = gson.toJson(call.arguments)
+                            result.success(true)
+                        }
+                        "setEternalInnerGateUnlocked" -> {
+                            val unlocked = call.arguments as? Boolean ?: false
+                            com.footprint.utils.PreferenceManager(this).eternalInnerGateUnlocked =
+                                    unlocked
                             result.success(true)
                         }
                         "getAppCredentials" -> {
