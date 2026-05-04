@@ -58,6 +58,16 @@ String _formatDate(DateTime date) {
   return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
+DateTime _nextOccurrenceForMonthDay(int month, int day, {DateTime? from}) {
+  final now = from ?? DateTime.now();
+  var target = DateTime(now.year, month, day);
+  final today = DateTime(now.year, now.month, now.day);
+  if (target.isBefore(today)) {
+    target = DateTime(now.year + 1, month, day);
+  }
+  return target;
+}
+
 Color _hexColor(String value, {double opacity = 1}) {
   final sanitized = value.replaceAll('#', '');
   final buffer = StringBuffer();
@@ -66,6 +76,16 @@ Color _hexColor(String value, {double opacity = 1}) {
   }
   buffer.write(sanitized);
   return Color(int.parse(buffer.toString(), radix: 16)).withValues(alpha: opacity);
+}
+
+List<Color> _ambientGradientForPlace(EternalPlace? place) {
+  final theme = place?.themeColor ?? const Color(0xFF22314C);
+  final accent = place?.accentColor ?? const Color(0xFFEAD9B0);
+  return [
+    theme.withValues(alpha: 0.42),
+    accent.withValues(alpha: 0.18),
+    Colors.black.withValues(alpha: 0.08),
+  ];
 }
 
 String _seasonForMonth(int month) {
@@ -854,13 +874,23 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
     _refreshLetterUnlocks(visitedPlaceTag: place.tag);
   }
 
-  Future<void> _showCreateLetterSheet({EternalFutureTemplate? template}) async {
+  Future<void> _showCreateLetterSheet({
+    EternalFutureTemplate? template,
+    EternalFutureLetter? existingLetter,
+  }) async {
     if (_config == null) return;
-    final titleController = TextEditingController(text: template?.title ?? '');
-    final messageController = TextEditingController(text: template?.message ?? '');
-    String unlockType = 'date';
-    DateTime unlockDate = DateTime.now().add(const Duration(days: 30));
-    String selectedPlaceTag = _config!.places.first.tag;
+    final titleController = TextEditingController(
+      text: existingLetter?.title ?? template?.title ?? '',
+    );
+    final messageController = TextEditingController(
+      text: existingLetter?.message ?? template?.message ?? '',
+    );
+    String unlockType = existingLetter?.unlockType ?? 'date';
+    DateTime unlockDate = existingLetter?.unlockAt != null
+        ? DateTime.fromMillisecondsSinceEpoch(existingLetter!.unlockAt!)
+        : DateTime.now().add(const Duration(days: 30));
+    String selectedPlaceTag =
+        existingLetter?.placeTag ?? _config!.places.first.tag;
 
     final createdLetter = await showModalBottomSheet<EternalFutureLetter>(
       context: context,
@@ -887,9 +917,9 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '埋一封只给她的未来信',
-                      style: TextStyle(
+                    Text(
+                      existingLetter == null ? '埋一封只给她的未来信' : '修改这封未来信',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -939,6 +969,36 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                       },
                     ),
                     const SizedBox(height: 12),
+                    if (existingLetter == null && _config!.anniversaries.isNotEmpty) ...[
+                      Text(
+                        '快速绑定纪念日',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _config!.anniversaries.map((item) {
+                          final target = _nextOccurrenceForMonthDay(
+                            item['month'] as int? ?? DateTime.now().month,
+                            item['day'] as int? ?? DateTime.now().day,
+                          );
+                          return ActionChip(
+                            label: Text(item['title'] as String? ?? '纪念日'),
+                            onPressed: () {
+                              setSheetState(() {
+                                unlockType = 'date';
+                                unlockDate = target;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     if (unlockType == 'date')
                       ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -997,15 +1057,19 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                             return;
                           }
                           final letter = EternalFutureLetter(
-                            id: 'letter_${DateTime.now().millisecondsSinceEpoch}',
+                            id: existingLetter?.id ??
+                                'letter_${DateTime.now().millisecondsSinceEpoch}',
                             title: titleController.text.trim(),
                             message: messageController.text.trim(),
                             unlockType: unlockType,
-                            createdAt: DateTime.now().millisecondsSinceEpoch,
+                            createdAt: existingLetter?.createdAt ??
+                                DateTime.now().millisecondsSinceEpoch,
                             unlockAt: unlockType == 'date'
                                 ? unlockDate.millisecondsSinceEpoch
                                 : null,
                             placeTag: unlockType == 'place' ? selectedPlaceTag : null,
+                            isUnlocked: existingLetter?.isUnlocked ?? false,
+                            isOpened: existingLetter?.isOpened ?? false,
                           );
                           Navigator.pop(context, letter);
                         },
@@ -1014,7 +1078,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text('埋入未来信箱'),
+                        child: Text(existingLetter == null ? '埋入未来信箱' : '保存这封信'),
                       ),
                     ),
                   ],
@@ -1027,13 +1091,58 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
     );
 
     if (createdLetter != null && mounted) {
-      setState(() => _letters = [createdLetter, ..._letters]);
+      setState(() {
+        if (existingLetter == null) {
+          _letters = [createdLetter, ..._letters];
+        } else {
+          _letters = _letters
+              .map((item) => item.id == existingLetter.id ? createdLetter : item)
+              .toList();
+        }
+      });
       await _saveLetters();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('新的未来信已经藏好了。')),
+          SnackBar(
+            content: Text(existingLetter == null ? '新的未来信已经藏好了。' : '这封未来信已经更新。'),
+          ),
         );
       }
+    }
+  }
+
+  Future<void> _deleteLetter(EternalFutureLetter letter) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        title: const Text('删除这封未来信？', style: TextStyle(color: Colors.white)),
+        content: Text(
+          '《${letter.title}》会从未来信箱里移除。',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.72)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _letters = _letters.where((item) => item.id != letter.id).toList();
+    });
+    await _saveLetters();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这封未来信已经移除。')),
+      );
     }
   }
 
@@ -1092,12 +1201,30 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('收好这封信'),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await _showCreateLetterSheet(existingLetter: letter);
+                    },
+                    child: const Text('编辑'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await _deleteLetter(letter);
+                    },
+                    child: const Text('删除'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('收好这封信'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1279,6 +1406,17 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
 
   int _lettersUnreadCount() =>
       _letters.where((item) => item.isUnlocked && !item.isOpened).length;
+
+  bool _hasLetterForDate(DateTime date) {
+    final target = DateTime(date.year, date.month, date.day);
+    return _letters.any((item) {
+      if (item.unlockType != 'date' || item.unlockAt == null) return false;
+      final unlockDate = DateTime.fromMillisecondsSinceEpoch(item.unlockAt!);
+      return unlockDate.year == target.year &&
+          unlockDate.month == target.month &&
+          unlockDate.day == target.day;
+    });
+  }
 
   List<EternalMemory> _memoriesForPlace(EternalRealmConfig config, String tag) {
     return config.memories.where((item) => item.placeTag == tag).toList();
@@ -1565,14 +1703,20 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
           child: _EternalMapDisplay(onCreated: _onMapCreated),
         ),
         IgnorePointer(
+          child: _AmbientConstellationOverlay(
+            colors: _ambientGradientForPlace(selected),
+            seed: (selected?.tag.hashCode ?? seasonal.title.hashCode).toDouble(),
+          ),
+        ),
+        IgnorePointer(
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
                 colors: [
-                  Colors.black.withValues(alpha: 0.38),
-                  Colors.transparent,
+                  _ambientGradientForPlace(selected)[0],
+                  _ambientGradientForPlace(selected)[1],
                   Colors.black.withValues(alpha: 0.48),
                 ],
               ),
@@ -1664,6 +1808,26 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                               .toList(),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: selected.themeColor.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.wb_twilight, color: selected.accentColor, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '此刻氛围：${selected.ambient}',
+                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 )
@@ -1709,7 +1873,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
         ),
         Positioned(
           right: 20,
-          bottom: 160,
+          bottom: 214,
           child: Column(
             children: [
               GestureDetector(
@@ -1742,7 +1906,7 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
           right: 16,
           bottom: 28,
           child: SizedBox(
-            height: 122,
+            height: 172,
             child: Column(
               children: [
                 Expanded(
@@ -1753,17 +1917,22 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                     itemBuilder: (context, index) {
                       final place = config.places[index];
                       final isSelected = selected?.tag == place.tag;
+                      final relatedMemoryCount = _memoriesForPlace(config, place.tag).length;
+                      final selectedBackground = Color.alphaBlend(
+                        place.themeColor.withValues(alpha: 0.28),
+                        const Color(0xFF0B1220),
+                      );
                       return GestureDetector(
                         onTap: () => _focusPlace(place),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           width: 144,
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(24),
                             color: isSelected
-                                ? place.themeColor.withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.46),
+                                ? selectedBackground
+                                : const Color(0xE6101828),
                             border: Border.all(
                               color: isSelected
                                   ? place.accentColor.withValues(alpha: 0.55)
@@ -1776,20 +1945,33 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                             children: [
                               Text(
                                 place.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 13,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 place.poem,
-                                maxLines: 2,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.78),
-                                  fontSize: 11,
-                                  height: 1.4,
+                                  fontSize: 10.5,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '$relatedMemoryCount 段记忆 · ${place.ambient}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.62),
+                                  fontSize: 9.5,
                                 ),
                               ),
                             ],
@@ -2148,6 +2330,17 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final unlockedCount = _lettersUnlockedCount();
     final unreadCount = _lettersUnreadCount();
+    final upcomingAnniversaries = config.anniversaries
+        .map((item) {
+          final target = _nextOccurrenceForMonthDay(
+            item['month'] as int? ?? DateTime.now().month,
+            item['day'] as int? ?? DateTime.now().day,
+          );
+          return {...item, 'targetDate': target};
+        })
+        .where((item) => !_hasLetterForDate(item['targetDate'] as DateTime))
+        .toList()
+      ..sort((a, b) => (a['targetDate'] as DateTime).compareTo(b['targetDate'] as DateTime));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -2210,6 +2403,85 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
             ],
           ),
         ),
+        if (upcomingAnniversaries.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _glassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '纪念日自动投递建议',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '这些日子还没有为她提前留信，可以先替未来准备好。',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    height: 1.55,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ...upcomingAnniversaries.take(3).map((item) {
+                  final date = item['targetDate'] as DateTime;
+                  final days = date
+                      .difference(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day))
+                      .inDays;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['title'] as String? ?? '纪念日',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${_formatDate(date)} · $days 天后',
+                                  style: TextStyle(
+                                    color: Colors.amberAccent.withValues(alpha: 0.85),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => _showCreateLetterSheet(
+                              template: EternalFutureTemplate(
+                                title: '写给${item['title']}的她',
+                                message: item['message'] as String? ?? '',
+                              ),
+                            ),
+                            child: const Text('写信'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         if (sortedLetters.isEmpty)
           _glassCard(
@@ -2301,11 +2573,31 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                                     fontSize: 11,
                                   ),
                                 ),
-                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right, color: Colors.white24),
+                      PopupMenuButton<String>(
+                        color: const Color(0xFF182235),
+                        icon: const Icon(Icons.more_horiz, color: Colors.white38),
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            await _showCreateLetterSheet(existingLetter: letter);
+                          } else if (value == 'delete') {
+                            await _deleteLetter(letter);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem<String>(
+                            value: 'edit',
+                            child: Text('编辑', style: TextStyle(color: Colors.white)),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Text('删除', style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -2666,7 +2958,13 @@ class _EternalRealmScreenState extends State<EternalRealmScreen>
                         fontWeight: selected ? FontWeight.bold : FontWeight.w500,
                       ),
                       selectedColor: Colors.cyanAccent,
-                      backgroundColor: Colors.white.withValues(alpha: 0.08),
+                      backgroundColor: const Color(0xFF172033),
+                      side: BorderSide(
+                        color: selected
+                            ? Colors.cyanAccent.withValues(alpha: 0.35)
+                            : Colors.white.withValues(alpha: 0.10),
+                      ),
+                      showCheckmark: false,
                       onSelected: (_) => setState(() => _sectionIndex = index),
                     );
                   },
@@ -3003,6 +3301,110 @@ class _SpatiotemporalPlaybackCompassState
         ],
       ),
     );
+  }
+}
+
+class _AmbientConstellationOverlay extends StatefulWidget {
+  final List<Color> colors;
+  final double seed;
+
+  const _AmbientConstellationOverlay({
+    required this.colors,
+    required this.seed,
+  });
+
+  @override
+  State<_AmbientConstellationOverlay> createState() =>
+      _AmbientConstellationOverlayState();
+}
+
+class _AmbientConstellationOverlayState extends State<_AmbientConstellationOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 16),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return CustomPaint(
+          painter: _AmbientConstellationPainter(
+            progress: _controller.value,
+            colors: widget.colors,
+            seed: widget.seed,
+          ),
+          size: Size.infinite,
+        );
+      },
+    );
+  }
+}
+
+class _AmbientConstellationPainter extends CustomPainter {
+  final double progress;
+  final List<Color> colors;
+  final double seed;
+
+  _AmbientConstellationPainter({
+    required this.progress,
+    required this.colors,
+    required this.seed,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final background = Paint()
+      ..shader = ui.Gradient.radial(
+        Offset(size.width * 0.82, size.height * 0.24),
+        size.shortestSide * 0.82,
+        colors,
+        const [0.0, 0.55, 1.0],
+      );
+    canvas.drawRect(rect, background);
+
+    final particlePaint = Paint()..style = PaintingStyle.fill;
+    final linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final points = <Offset>[];
+    for (var i = 0; i < 9; i++) {
+      final wave = progress * math.pi * 2 + i * 0.55 + seed * 0.0003;
+      final x = size.width * (0.15 + (i / 10)) + math.sin(wave) * 18;
+      final y = size.height * (0.22 + ((i % 4) * 0.16)) + math.cos(wave * 0.9) * 22;
+      final point = Offset(x, y);
+      points.add(point);
+      particlePaint.color = colors[i % colors.length].withValues(alpha: 0.22);
+      canvas.drawCircle(point, 2.6 + (i % 3), particlePaint);
+    }
+
+    for (var i = 0; i < points.length - 1; i++) {
+      linePaint.color = colors[(i + 1) % colors.length].withValues(alpha: 0.12);
+      canvas.drawLine(points[i], points[i + 1], linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AmbientConstellationPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.seed != seed ||
+        oldDelegate.colors != colors;
   }
 }
 
