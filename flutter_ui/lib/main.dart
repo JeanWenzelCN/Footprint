@@ -4024,47 +4024,55 @@ class ArtStudioScreen extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final todayHint = getEternalTodayBannerText();
     
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: const Color(0xFFF4EFE7),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 200,
             pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: const Text('足迹工坊', style: TextStyle(fontWeight: FontWeight.bold)),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [cs.primary, cs.tertiary],
-                  ),
-                ),
-                child: Center(
-                  child: Icon(Icons.palette, size: 80, color: Colors.white.withOpacity(0.3)),
-                ),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            backgroundColor: const Color(0xFFF4EFE7),
+            foregroundColor: const Color(0xFF1B2430),
+            title: const Text(
+              '足迹工坊',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+                color: Color(0xFF1B2430),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("艺术创作", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  _buildStudioIntroCard(context, nickname),
+                  const SizedBox(height: 18),
+                  _buildStudioHeroStats(),
+                  const SizedBox(height: 18),
+                  _buildCuratorStrip(todayHint),
+                  const SizedBox(height: 22),
+                  _buildSectionHeader(
+                    context,
+                    "艺术创作",
+                    "把足迹整理成可以分享、打印和反复回看的视觉作品",
+                  ),
                   const SizedBox(height: 16),
                   _buildStudioCard(
                     context,
                     "艺术足迹导出",
                     "将您的轨迹转化为精美的极简主义艺术海报",
                     Icons.auto_awesome,
-                    cs,
+                    const Color(0xFF0D4C78),
+                    const Color(0xFF55B7C4),
+                    const ['极简海报', '打印感', '高完成度'],
                     () {
                       const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'art_studio'});
                     }
@@ -4075,38 +4083,55 @@ class ArtStudioScreen extends StatelessWidget {
                     "时空热力图",
                     "可视化您的活动密集区域",
                     Icons.grid_view,
-                    cs,
+                    const Color(0xFF24514F),
+                    const Color(0xFF9ED3B5),
+                    const ['密度分析', '轨迹纹理', '城市节奏'],
                     () {
                       const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'generative_art'});
                     }
                   ),
+                  const SizedBox(height: 18),
+                  _buildMiniInspirationGrid(),
                   const SizedBox(height: 32),
-                  Text("实验室功能", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  _buildSectionHeader(
+                    context,
+                    "实验室功能",
+                    "更具空间感和沉浸感的足迹回放方式",
+                  ),
                   const SizedBox(height: 16),
                   _buildStudioCard(
                     context,
                     "3D 足迹漫游",
                     "在 3D 地球上回放您的旅行故事",
                     Icons.view_in_ar,
-                    cs,
+                    const Color(0xFF5A3827),
+                    const Color(0xFFF0B071),
+                    const ['空间回放', '地球视角', '故事感'],
                     () {
                       const MethodChannel('com.footprint/data').invokeMethod('openNativeScreen', {'screen_type': 'export_trace'});
                     }
                   ),
                   if (isMaintValid) ...[
                     const SizedBox(height: 32),
-                     Text("永恒之境", style: tt.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
-                     const SizedBox(height: 16),
-                     _buildStudioCard(
-                       context,
-                       "Lucas 的时空密室",
-                       todayHint ?? "遇见你，是我最美的意外。这里珍藏着属于我们的每一刻。",
-                       Icons.favorite,
-                       cs.copyWith(primary: Colors.pinkAccent),
-                       () {
-                         Navigator.push(context, MaterialPageRoute(builder: (_) => const EternalRealmScreen()));
-                       }
-                     ),
+                    _buildSectionHeader(
+                      context,
+                      "永恒之境",
+                      "更私人的入口，只给特定的人和特定的日子",
+                      accent: Colors.pinkAccent,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildStudioCard(
+                      context,
+                      "Lucas 的时空密室",
+                      todayHint ?? "遇见你，是我最美的意外。这里珍藏着属于我们的每一刻。",
+                      Icons.favorite,
+                      const Color(0xFF6F1D4F),
+                      const Color(0xFFFFA7C4),
+                      const ['私密彩蛋', '纪念空间', '只对她开放'],
+                      () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const EternalRealmScreen()));
+                      }
+                    ),
                   ],
                 ],
               ),
@@ -4117,27 +4142,407 @@ class ArtStudioScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStudioCard(BuildContext context, String title, String subtitle, IconData icon, ColorScheme cs, VoidCallback onTap) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: cs.primary),
+  Widget _buildStudioIntroCard(BuildContext context, String nickname) {
+    final tt = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFECE3D3),
+            Color(0xFFF4EFE7),
+            Color(0xFFD7E5E0),
+          ],
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+        border: Border.all(color: const Color(0xFFD9D2C6)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -24,
+            right: -10,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF10355B).withOpacity(0.07),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -18,
+            left: -10,
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFE6A15A).withOpacity(0.09),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10355B).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'FOOTPRINT ATELIER',
+                  style: TextStyle(
+                    color: Color(0xFF10355B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                '$nickname，把轨迹做成值得收藏的作品。',
+                style: tt.titleLarge?.copyWith(
+                  color: const Color(0xFF1B2430),
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '从极简海报到时空热力图，再到 3D 漫游，把日常足迹整理成更有记忆点的表达。',
+                style: tt.bodyMedium?.copyWith(
+                  color: const Color(0xFF5F6C78),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudioHeroStats() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10355B).withOpacity(0.08),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: const Row(
+        children: [
+          Expanded(child: _StudioMetric(value: '3', label: '创作入口', icon: Icons.layers_outlined)),
+          SizedBox(width: 12),
+          Expanded(child: _StudioMetric(value: '∞', label: '回忆延展', icon: Icons.auto_awesome_motion)),
+          SizedBox(width: 12),
+          Expanded(child: _StudioMetric(value: '1', label: '私密空间', icon: Icons.favorite_border)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCuratorStrip(String? todayHint) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF183048),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.tips_and_updates_outlined, color: Color(0xFFFFD18C)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '今日策展建议',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  todayHint ?? '如果想先做一张最容易出效果的作品，优先试试“艺术足迹导出”，它最适合把一段路线收成纪念海报。',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.76),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniInspirationGrid() {
+    final items = const [
+      ('适合分享', '海报更适合发朋友圈或打印留存'),
+      ('适合复盘', '热力图更适合看一段时间的活动重心'),
+    ];
+    return Row(
+      children: items
+          .map(
+            (item) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: item == items.first ? 10 : 0),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.82),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFDDD6CB)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.$1,
+                      style: const TextStyle(
+                        color: Color(0xFF1B2430),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.$2,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    String subtitle, {
+    Color accent = const Color(0xFF10355B),
+  }) {
+    final tt = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              title,
+              style: tt.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF1B2430),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          style: tt.bodyMedium?.copyWith(
+            color: const Color(0xFF6B7280),
+            height: 1.45,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStudioCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color startColor,
+    Color accentColor,
+    List<String> tags,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              startColor,
+              Color.alphaBlend(Colors.white.withOpacity(0.08), startColor),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: startColor.withOpacity(0.22),
+              blurRadius: 22,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
+              ),
+              child: Icon(icon, color: accentColor, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: tags
+                        .map(
+                          (tag) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              tag,
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.78),
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Text(
+                        '进入工坊',
+                        style: TextStyle(
+                          color: accentColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_forward_rounded, color: accentColor, size: 18),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StudioMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+
+  const _StudioMetric({
+    required this.value,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F4EE),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF0F4A67), size: 18),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF1B2430),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
