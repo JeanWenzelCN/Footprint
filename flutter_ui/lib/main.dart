@@ -19,6 +19,138 @@ import 'badge_hall_screen.dart';
 import 'easter_egg.dart';
 import 'package:flutter/foundation.dart';
 
+const Color kAtelierCanvas = Color(0xFFF4EFE7);
+const Color kAtelierSurface = Color(0xFFFFFCF7);
+const Color kAtelierPrimary = Color(0xFF163A59);
+const Color kAtelierAccent = Color(0xFFD47A53);
+const Color kAtelierMint = Color(0xFF5D948E);
+const Color kAtelierInk = Color(0xFF1B2430);
+const Color kAtelierMuted = Color(0xFF66727D);
+const Color kAtelierOutline = Color(0xFFD8D0C3);
+const Color kAtelierSurfaceSoft = Color(0xFFEAE2D6);
+
+ThemeData buildFootprintTheme({
+  required Brightness brightness,
+  Color seedColor = kAtelierPrimary,
+}) {
+  final isDark = brightness == Brightness.dark;
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: Color.alphaBlend(seedColor.withOpacity(0.24), kAtelierPrimary),
+    brightness: brightness,
+  ).copyWith(
+    primary: isDark ? const Color(0xFFA9C4E2) : kAtelierPrimary,
+    onPrimary: Colors.white,
+    primaryContainer: isDark ? const Color(0xFF294866) : const Color(0xFFDCE6F0),
+    onPrimaryContainer: isDark ? Colors.white : kAtelierPrimary,
+    secondary: isDark ? const Color(0xFFFFB794) : kAtelierAccent,
+    onSecondary: Colors.white,
+    secondaryContainer: isDark ? const Color(0xFF75462E) : const Color(0xFFF6D7C6),
+    onSecondaryContainer: isDark ? Colors.white : const Color(0xFF6C371F),
+    tertiary: isDark ? const Color(0xFF9DD9D3) : kAtelierMint,
+    onTertiary: Colors.white,
+    tertiaryContainer: isDark ? const Color(0xFF305A56) : const Color(0xFFD7EEEA),
+    onTertiaryContainer: isDark ? Colors.white : const Color(0xFF24524D),
+    surface: isDark ? const Color(0xFF1A1D22) : kAtelierSurface,
+    onSurface: isDark ? const Color(0xFFF3EEE7) : kAtelierInk,
+    surfaceContainerHighest: isDark ? const Color(0xFF2A2E35) : kAtelierSurfaceSoft,
+    outline: isDark ? const Color(0xFF8C939D) : kAtelierMuted,
+    outlineVariant: isDark ? const Color(0xFF444B56) : kAtelierOutline,
+    error: const Color(0xFFC75050),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: brightness,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: isDark ? const Color(0xFF111417) : kAtelierCanvas,
+    canvasColor: isDark ? const Color(0xFF111417) : kAtelierCanvas,
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: colorScheme.onSurface,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      titleTextStyle: TextStyle(
+        color: colorScheme.onSurface,
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+      ),
+      iconTheme: IconThemeData(color: colorScheme.onSurface),
+      systemOverlayStyle: isDark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
+    ),
+    cardTheme: CardThemeData(
+      color: colorScheme.surface,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: colorScheme.surface,
+      labelStyle: TextStyle(color: colorScheme.outline),
+      hintStyle: TextStyle(color: colorScheme.outline.withOpacity(0.8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.4),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: colorScheme.surface,
+      contentTextStyle: TextStyle(color: colorScheme.onSurface),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      behavior: SnackBarBehavior.floating,
+      elevation: 0,
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      side: BorderSide(color: colorScheme.outlineVariant),
+      backgroundColor: colorScheme.surface,
+      selectedColor: colorScheme.primaryContainer,
+      labelStyle: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700),
+      secondaryLabelStyle: TextStyle(color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.w700),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colorScheme.primary,
+        side: BorderSide(color: colorScheme.outlineVariant),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
+    dividerTheme: DividerThemeData(color: colorScheme.outlineVariant),
+  );
+}
+
 Widget buildAvatar(String avatarId, {double radius = 24, Color? bgColor, Color? fgColor}) {
   if (avatarId.contains('/') || avatarId.contains('\\')) {
     return CircleAvatar(
@@ -216,17 +348,115 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.initialEntry == null ? '记录新的足迹' : '编辑足迹记录', style: const TextStyle(fontWeight: FontWeight.bold)),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: kAtelierCanvas,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      body: ListView(
+      child: Scaffold(
+        backgroundColor: kAtelierCanvas,
+        appBar: AppBar(
+          backgroundColor: kAtelierCanvas,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: kAtelierCanvas,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
+          title: Text(widget.initialEntry == null ? '记录新的足迹' : '编辑足迹记录', style: const TextStyle(fontWeight: FontWeight.w900)),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withOpacity(0.74),
+                      kAtelierCanvas,
+                      const Color(0xFFEFE4D8),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: -80,
+              right: -70,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFDCEAF3).withOpacity(0.54),
+                ),
+              ),
+            ),
+            ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.88),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10355B).withOpacity(0.08),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF163A59), Color(0xFF3C6B8F)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(Icons.edit_location_alt_outlined, color: Colors.white),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.initialEntry == null ? '把这次抵达认真收藏' : '把这段记忆重新润色',
+                        style: tt.titleMedium?.copyWith(
+                          color: kAtelierInk,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '地点、心情、照片和故事会一起沉淀成这次足迹的完整样子。',
+                        style: tt.bodySmall?.copyWith(
+                          color: kAtelierMuted,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
           TextField(
             controller: _titleController,
             decoration: InputDecoration(
@@ -524,6 +754,9 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
             child: Text(widget.initialEntry == null ? "记录足迹" : "保存修改", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -598,17 +831,115 @@ class _AddGoalPageState extends State<AddGoalPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.initialGoal == null ? '新增旅行目标' : '编辑旅行目标', style: const TextStyle(fontWeight: FontWeight.bold)),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: kAtelierCanvas,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      body: ListView(
+      child: Scaffold(
+        backgroundColor: kAtelierCanvas,
+        appBar: AppBar(
+          backgroundColor: kAtelierCanvas,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: kAtelierCanvas,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
+          title: Text(widget.initialGoal == null ? '新增旅行目标' : '编辑旅行目标', style: const TextStyle(fontWeight: FontWeight.w900)),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withOpacity(0.74),
+                      kAtelierCanvas,
+                      const Color(0xFFEFE4D8),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: -70,
+              left: -50,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF5D6BF).withOpacity(0.4),
+                ),
+              ),
+            ),
+            ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10355B).withOpacity(0.08),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD47A53), Color(0xFFE7A27E)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(Icons.flag_outlined, color: Colors.white),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.initialGoal == null ? '给下一次远行一个方向' : '继续打磨这段计划',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: kAtelierInk,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '把想去的地方、时间和注记写清楚，之后回看会更像一份真正的旅程提案。',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: kAtelierMuted,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
           TextField(
             controller: _titleController,
             decoration: InputDecoration(
@@ -751,6 +1082,9 @@ class _AddGoalPageState extends State<AddGoalPage> {
             child: Text(widget.initialGoal == null ? "保存目标" : "保存修改", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -836,19 +1170,13 @@ class _MyAppState extends State<MyApp> {
         Locale('en', 'US'),
       ],
       locale: const Locale('zh', 'CN'),
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _getSeedColor(),
-          brightness: Brightness.light,
-        ),
+      theme: buildFootprintTheme(
+        brightness: Brightness.light,
+        seedColor: _getSeedColor(),
       ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _getSeedColor(),
-          brightness: Brightness.dark,
-        ),
+      darkTheme: buildFootprintTheme(
+        brightness: Brightness.dark,
+        seedColor: _getSeedColor(),
       ),
       home: MainContainer(
         nickname: nickname,
@@ -887,6 +1215,12 @@ class MainContainer extends StatefulWidget {
 
 class _MainContainerState extends State<MainContainer>
     with TickerProviderStateMixin {
+  static const List<String> _tabLabels = <String>[
+    '总览',
+    '探索',
+    '计划',
+    '工坊',
+  ];
   static const List<IconData> _selectedTabIcons = <IconData>[
     Icons.dashboard,
     Icons.explore,
@@ -1104,10 +1438,54 @@ class _MainContainerState extends State<MainContainer>
     ];
 
     return Scaffold(
+      backgroundColor: kAtelierCanvas,
       extendBody: true,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) { _handleScroll(notification); return false; },
-        child: IndexedStack(index: _selectedIndex, children: pages),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withOpacity(0.72),
+                    kAtelierCanvas,
+                    const Color(0xFFF0E6DA),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -110,
+            left: -70,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFF8D8BE).withOpacity(0.42),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 110,
+            right: -90,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFDCEBF3).withOpacity(0.58),
+              ),
+            ),
+          ),
+          NotificationListener<ScrollNotification>(
+            onNotification: (notification) { _handleScroll(notification); return false; },
+            child: IndexedStack(index: _selectedIndex, children: pages),
+          ),
+        ],
       ),
       bottomNavigationBar: AnimatedBuilder(
         animation: Listenable.merge([_elasticAnimation, _tabBounceAnimation]),
@@ -1129,10 +1507,31 @@ class _MainContainerState extends State<MainContainer>
                 child: Container(
                   width: currentWidth, height: dropSize,
                   decoration: BoxDecoration(
-                    color: cs.surface.withValues(alpha: 0.95),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        cs.surface.withValues(alpha: 0.98),
+                        Color.alphaBlend(
+                          const Color(0xFFE9F0F6).withOpacity(0.46),
+                          cs.surface,
+                        ),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(dropSize / 2),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15 * clampedT), blurRadius: 20 * clampedT, offset: Offset(0, 10 * clampedT))],
-                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4 * clampedT)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8DA3B8).withValues(alpha: 0.12 * clampedT),
+                        blurRadius: 26 * clampedT,
+                        offset: Offset(0, 14 * clampedT),
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.65 * clampedT),
+                        blurRadius: 16 * clampedT,
+                        offset: Offset(0, -4 * clampedT),
+                      ),
+                    ],
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.65 * clampedT)),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(dropSize / 2),
@@ -1156,15 +1555,44 @@ class _MainContainerState extends State<MainContainer>
                                 child: Transform.scale(
                                   scale: iconScale,
                                   child: Container(
-                                    width: 48, height: 48,
+                                    width: 58,
+                                    height: 58,
                                     decoration: BoxDecoration(
-                                      color: isSelected ? cs.primaryContainer : Colors.transparent,
-                                      shape: BoxShape.circle,
+                                      borderRadius: BorderRadius.circular(24),
+                                      gradient: isSelected
+                                          ? LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                cs.primary,
+                                                Color.alphaBlend(
+                                                  const Color(0xFF3D688C).withOpacity(0.3),
+                                                  cs.primary,
+                                                ),
+                                              ],
+                                            )
+                                          : null,
+                                      color: isSelected ? null : Colors.transparent,
                                     ),
-                                    child: Icon(
-                                      isSelected ? _selectedTabIcons[index] : _unselectedTabIcons[index],
-                                      color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                                      size: 24,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          isSelected ? _selectedTabIcons[index] : _unselectedTabIcons[index],
+                                          color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _tabLabels[index],
+                                          style: TextStyle(
+                                            color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -1559,8 +1987,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final tt = Theme.of(context).textTheme;
     final todayHint = getEternalTodayBannerText();
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withOpacity(0.7),
+                    kAtelierCanvas,
+                    const Color(0xFFF0E6DA),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -90,
+            left: -60,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFF6D9C4).withOpacity(0.38),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 120,
+            right: -80,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFD8E8F1).withOpacity(0.5),
+              ),
+            ),
+          ),
           ListView(
             padding: const EdgeInsets.only(
               top: 190,

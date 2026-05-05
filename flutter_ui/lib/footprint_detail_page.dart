@@ -151,15 +151,42 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withOpacity(0.68),
+                    kAtelierCanvas,
+                    const Color(0xFFEDE2D7),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -110,
+            right: -90,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: moodColor.withOpacity(0.14),
+              ),
+            ),
+          ),
           CustomScrollView(
             slivers: [
               SliverAppBar(
                 expandedHeight: 300,
                 pinned: true,
-                backgroundColor: cs.surface.withOpacity(0.8),
+                backgroundColor: Colors.transparent,
                 iconTheme: IconThemeData(color: cs.onSurface),
                 actions: [
                   IconButton(
@@ -188,9 +215,12 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              moodColor.withOpacity(0.6),
-                              moodColor.withOpacity(0.2),
+                              Color.alphaBlend(Colors.white.withOpacity(0.18), moodColor.withOpacity(0.72)),
+                              moodColor.withOpacity(0.24),
                             ],
+                          ),
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(36),
                           ),
                         ),
                       ),
@@ -202,7 +232,7 @@ class _FootprintDetailPageState extends State<FootprintDetailPage> {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              cs.surface,
+                              kAtelierCanvas,
                             ],
                           ),
                         ),
