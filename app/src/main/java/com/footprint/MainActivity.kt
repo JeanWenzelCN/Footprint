@@ -2,7 +2,11 @@ package com.footprint
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.GsonBuilder
@@ -195,6 +199,35 @@ class MainActivity : FlutterActivity() {
                             com.footprint.service.LocationTrackingService.resumeTracking(
                                     this@MainActivity
                             )
+                            result.success(true)
+                        }
+                        "isIgnoringBatteryOptimizations" -> {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                val powerManager = getSystemService(PowerManager::class.java)
+                                result.success(
+                                        powerManager.isIgnoringBatteryOptimizations(packageName)
+                                )
+                            } else {
+                                result.success(true)
+                            }
+                        }
+                        "requestBatteryOptimizationExemption" -> {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                try {
+                                    startActivity(
+                                            Intent(
+                                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                                    Uri.parse("package:$packageName")
+                                            )
+                                    )
+                                } catch (_: Exception) {
+                                    startActivity(
+                                            Intent(
+                                                    Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+                                            )
+                                    )
+                                }
+                            }
                             result.success(true)
                         }
                         "openUrl" -> {

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -38,6 +39,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
     private var _lastNotifyTime: Long = 0
     private var _lastDistancePersist: Float = 0.0f
     private var _lastTrackingMode: TrackingMode? = null
+    private var _lastMovementElapsedTime: Long = 0L
 
     companion object {
         const val NOTIFICATION_ID = 1001
@@ -62,6 +64,11 @@ class LocationTrackingService : Service(), AMapLocationListener {
         private const val TRACK_BATCH_SIZE = 5
         private const val NOTIFICATION_UPDATE_INTERVAL_MS = 60000L
         private const val DISTANCE_PERSIST_STEP_M = 50.0f
+        private const val STATIONARY_GRACE_MS = 120000L
+        private const val STATIONARY_JITTER_DISTANCE_M = 8.0f
+        private const val LOCATION_HTTP_TIMEOUT_MS = 10000L
+        private const val RESTART_REQUEST_CODE = 2201
+        private const val RESTART_DELAY_MS = 5000L
 
         private val _sharedIsTracking = MutableStateFlow(false)
         val isTracking: StateFlow<Boolean> = _sharedIsTracking.asStateFlow()
@@ -209,6 +216,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                         isOnceLocation = false
                         isSensorEnable = false
                         isGpsFirst = false
+                        httpTimeOut = LOCATION_HTTP_TIMEOUT_MS
                     }
             locationClient?.setLocationOption(locationOption)
         } catch (e: Exception) {
@@ -219,15 +227,19 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null || intent.action == null) {
             // System restart (START_STICKY)
+            restoreTrackingStateFromPrefs()
             if (_sharedIsTracking.value) {
                 Log.d("FootprintLoc", "Restoring tracking after system kill")
                 resumeTrackingFlow()
+            } else {
+                stopSelf(startId)
             }
             return START_STICKY
         }
 
         when (intent.action) {
             ACTION_START_TRACKING -> {
+                cancelRestartAlarm()
                 _sharedIsPaused.value = false
                 _totalDistanceTraveled.value = 0.0f
                 _lastLocation = null
@@ -238,6 +250,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 _lastNotifyTime = 0L
                 _lastDistancePersist = 0.0f
                 _lastTrackingMode = null
+                _lastMovementElapsedTime = SystemClock.elapsedRealtime()
                 trackingPathBuffer.clear()
                 pendingTrackPoints.clear()
                 _sharedTrackingPath.value = emptyList()
@@ -288,6 +301,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                     _sharedIsPaused.value = false
                     _lastResumeTime = System.currentTimeMillis()
                     _lastNotifyTime = 0L
+                    enableAmapBackgroundLocation()
                     locationClient?.startLocation()
                     
                     getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
@@ -300,6 +314,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
             }
             // ...
             ACTION_STOP_TRACKING -> {
+                cancelRestartAlarm()
                 val finalDurationMs =
                         if (_sharedIsPaused.value) {
                             _accumulatedDurationMs
@@ -346,6 +361,8 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
                     if (_sharedIsTracking.value && !_sharedIsPaused.value) {
                         var isValidPoint = false
+                        var meaningfulMovement = false
+                        var inferredSpeedMs = location.speed.coerceAtLeast(0f)
                         val now = System.currentTimeMillis()
 
                         _lastLocation?.let { lastLoc ->
@@ -355,15 +372,20 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
                             if (timeDeltaSec > 0) {
                                 val speed = distance / timeDeltaSec
+                                inferredSpeedMs =
+                                        if (location.speed > 0f) location.speed else speed.toFloat()
                                 if (speed > MAX_SPEED_THRESHOLD_MS) {
                                     Log.w(
                                             "FootprintLoc",
                                             "Ignored glitch: $distance m in $timeDeltaSec s ($speed m/s)"
                                     )
                                 } else if (distance < MIN_DISTANCE_THRESHOLD_M) {
-                                    // Too close
+                                    updateAdaptiveTrackingProfile(0f, now, false)
                                 } else {
                                     isValidPoint = true
+                                    meaningfulMovement =
+                                            distance >= STATIONARY_JITTER_DISTANCE_M ||
+                                                    inferredSpeedMs >= 0.8f
                                     _totalDistanceTraveled.value += distance.toFloat()
                                 }
                             }
@@ -371,6 +393,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                                 ?: run {
                                     // First point
                                     isValidPoint = true
+                                    meaningfulMovement = true
                                 }
 
                         if (isValidPoint) {
@@ -382,7 +405,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
                             _lastLocation = clonedLocation
 
                             // Adaptive Interval and accuracy profile
-                            updateAdaptiveTrackingProfile(location.speed)
+                            updateAdaptiveTrackingProfile(inferredSpeedMs, now, meaningfulMovement)
 
                             persistTrackingSnapshot()
 
@@ -439,6 +462,7 @@ class LocationTrackingService : Service(), AMapLocationListener {
         _sessionStartTime = prefs.getLong("session_start", System.currentTimeMillis())
         _totalDistanceTraveled.value = prefs.getFloat("total_distance", 0.0f)
         _lastDistancePersist = _totalDistanceTraveled.value
+        _lastMovementElapsedTime = SystemClock.elapsedRealtime()
         val now = System.currentTimeMillis()
         _accumulatedDurationMs = if (isPaused) 0L else (now - _sessionStartTime).coerceAtLeast(0L)
         _lastResumeTime = if (isPaused) 0L else now
@@ -503,7 +527,13 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 .setContentIntent(mainPendingIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止记录", stopPendingIntent)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        }
 
         if (_sharedIsPaused.value) {
             val resumeIntent = Intent(this, LocationTrackingService::class.java).apply { action = ACTION_RESUME_TRACKING }
@@ -566,9 +596,19 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
         if (!_sharedIsPaused.value) {
             applyTrackingMode(TrackingMode.WALKING)
+            enableAmapBackgroundLocation()
             locationClient?.startLocation()
         }
         startNotificationUpdates()
+    }
+
+    private fun enableAmapBackgroundLocation() {
+        try {
+            val notification = buildNotification(_totalDistanceTraveled.value.toInt(), 0f, "")
+            locationClient?.enableBackgroundLocation(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.w("FootprintLoc", "Failed to enable AMap background location: ${e.message}")
+        }
     }
 
     private fun startForegroundSafely() {
@@ -588,14 +628,25 @@ class LocationTrackingService : Service(), AMapLocationListener {
         }
     }
 
-    private fun updateAdaptiveTrackingProfile(speedMs: Float) {
+    private fun updateAdaptiveTrackingProfile(
+            speedMs: Float,
+            @Suppress("UNUSED_PARAMETER") nowWallTimeMs: Long,
+            meaningfulMovement: Boolean
+    ) {
+        if (meaningfulMovement) {
+            _lastMovementElapsedTime = SystemClock.elapsedRealtime()
+        }
         val speedKmh = speedMs * 3.6f
+        val hasBeenStationary =
+                _lastMovementElapsedTime > 0L &&
+                        SystemClock.elapsedRealtime() - _lastMovementElapsedTime >= STATIONARY_GRACE_MS
         val newMode =
                 when {
                     speedKmh > 30 -> TrackingMode.FAST
                     speedKmh > 8 -> TrackingMode.MOVING
                     speedKmh > 1.5 -> TrackingMode.WALKING
-                    else -> TrackingMode.STATIONARY
+                    hasBeenStationary -> TrackingMode.STATIONARY
+                    else -> TrackingMode.WALKING
                 }
         applyTrackingMode(newMode)
     }
@@ -689,10 +740,59 @@ class LocationTrackingService : Service(), AMapLocationListener {
         }
     }
 
+    private fun buildRestorePendingIntent(): PendingIntent {
+        val intent =
+                Intent(this, LocationTrackingService::class.java).apply {
+                    action = ACTION_RESTORE_TRACKING
+                    setPackage(packageName)
+                }
+        return PendingIntent.getService(
+                this,
+                RESTART_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun scheduleRestartAlarm() {
+        if (!getSharedPreferences("tracking_prefs", Context.MODE_PRIVATE)
+                        .getBoolean("is_tracking", false)
+        ) {
+            return
+        }
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        val triggerAt = SystemClock.elapsedRealtime() + RESTART_DELAY_MS
+        val pendingIntent = buildRestorePendingIntent()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerAt,
+                        pendingIntent
+                )
+            } else {
+                alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent)
+            }
+            Log.d("FootprintLoc", "Scheduled tracking service restore alarm")
+        } catch (e: Exception) {
+            Log.w("FootprintLoc", "Failed to schedule restore alarm: ${e.message}")
+        }
+    }
+
+    private fun cancelRestartAlarm() {
+        try {
+            getSystemService(AlarmManager::class.java).cancel(buildRestorePendingIntent())
+        } catch (_: Exception) {}
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        // 当应用被从最近任务栏划掉时，如果是正在记录，可以发送一个广播或通知，或者尝试自启动
-        // 对于 START_STICKY 服务，系统会自动重启，但我们可以通过 startForeground 增加优先级
+        if (_sharedIsTracking.value && !_sharedIsPaused.value) {
+            persistTrackingSnapshot(forceDistance = true)
+            flushPendingTrackPointsAsync()
+            scheduleRestartAlarm()
+            startForegroundSafely()
+        }
         Log.d("FootprintLoc", "Service onTaskRemoved")
     }
 
@@ -760,6 +860,10 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        if (_sharedIsTracking.value && !_sharedIsPaused.value) {
+            persistTrackingSnapshot(forceDistance = true)
+            scheduleRestartAlarm()
+        }
         locationClient?.stopLocation()
         locationClient?.onDestroy()
         runBlocking(NonCancellable) {

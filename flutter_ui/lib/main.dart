@@ -3227,6 +3227,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   String _lastAddress = '';
   List<dynamic> _capsules = [];
   double? _lastAltitude;
+  bool _batteryOptimizationPromptShown = false;
   Timer? _durationTimer;
   final ValueNotifier<String> _durationNotifier = ValueNotifier<String>('00:00:00');
   final ValueNotifier<_TrackingOverlayData> _trackingOverlayNotifier =
@@ -3759,6 +3760,31 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("需要位置权限才能记录足迹"), backgroundColor: Colors.orange));
       return;
     }
+    final alwaysStatus = await Permission.locationAlways.status;
+    if (!alwaysStatus.isGranted) {
+      final requestedAlways = await Permission.locationAlways.request();
+      if (!requestedAlways.isGranted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("建议授予“始终允许”位置权限，后台记录会更稳定"),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(label: "去设置", textColor: Colors.white, onPressed: () => openAppSettings()),
+          ),
+        );
+      }
+    }
+    try {
+      final ignoringBattery = await dataChannel.invokeMethod('isIgnoringBatteryOptimizations') == true;
+      if (!ignoringBattery && !_batteryOptimizationPromptShown) {
+        _batteryOptimizationPromptShown = true;
+        await dataChannel.invokeMethod('requestBatteryOptimizationExemption');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("建议允许后台电池保护例外，长时间记录不易中断"), duration: Duration(seconds: 3)),
+          );
+        }
+      }
+    } catch (_) {}
     setState(() {
       _trackingPath.clear();
       _totalDistance = 0.0;
