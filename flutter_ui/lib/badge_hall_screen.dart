@@ -715,32 +715,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildBadgeRibbon(spec, isUnlocked),
-              _buildSuspensionRing(spec, isUnlocked),
-              Container(
-                width: 18,
-                height: 12,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: spec.connectorColors,
-                  ),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(isUnlocked ? 0.18 : 0.06),
-                    width: 0.7,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 1),
+              const SizedBox(height: 14),
               _buildMedalBody(
                 badge: badge,
                 spec: spec,
@@ -764,62 +739,56 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     required bool isUnlocked,
     required double size,
   }) {
-    return Container(
+    final medalBaseColor = isUnlocked ? baseColor : const Color(0xFF777C82);
+    final medalMaterialType = isUnlocked ? _materialShaderValue(materialType) : 0.0;
+    final category = (badge['category'] ?? 'General').toString();
+    return SizedBox(
       width: size,
       height: size,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: spec.outerRingColors,
-        ),
-        border: Border.all(
-          color: Colors.white.withOpacity(isUnlocked ? 0.48 : 0.14),
-          width: 1.4,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: spec.glowColor.withOpacity(isUnlocked ? 0.3 : 0.08),
-            blurRadius: 24,
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.26),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
       child: Stack(
         alignment: Alignment.center,
         children: [
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: SweepGradient(
-                  colors: [
-                    Colors.white.withOpacity(isUnlocked ? 0.44 : 0.08),
-                    spec.edgeStroke.withOpacity(isUnlocked ? 0.18 : 0.04),
-                    Colors.black.withOpacity(isUnlocked ? 0.16 : 0.08),
-                    Colors.white.withOpacity(isUnlocked ? 0.36 : 0.07),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
             child: CustomPaint(
-              painter: _MedalHardwarePainter(
+              painter: _ShieldMedalPainter(
                 spec: spec,
-                materialType: _materialShaderValue(materialType),
+                baseColor: medalBaseColor,
+                category: category,
                 isUnlocked: isUnlocked,
               ),
             ),
           ),
-          ...List.generate(12, (index) {
+          Padding(
+            padding: EdgeInsets.all(size * 0.155),
+            child: ClipPath(
+              clipper: const _ShieldMedalClipper(),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _RealWorldMedalFinishPainter(
+                        category: category,
+                        baseColor: medalBaseColor,
+                        edgeColor: spec.edgeStroke,
+                        isUnlocked: isUnlocked,
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _MedalHardwarePainter(
+                        spec: spec,
+                        materialType: medalMaterialType,
+                        isUnlocked: isUnlocked,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ...List.generate(6, (index) {
             final angle = index * math.pi / 6;
             final gemColor = Color.lerp(
               spec.edgeStroke,
@@ -855,7 +824,9 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
             );
           }),
           Container(
-            padding: const EdgeInsets.all(6),
+            width: size * 0.48,
+            height: size * 0.48,
+            padding: EdgeInsets.all(size * 0.045),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -873,19 +844,20 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
               builder: (context, lightOffset, _) => BadgeShaderWidget(
                 program: _program!,
                 isUnlocked: isUnlocked,
-                materialType: _materialShaderValue(materialType),
-                baseColor: baseColor,
+                materialType: medalMaterialType,
+                baseColor: medalBaseColor,
                 lightOffset: lightOffset,
                 iconData: _getBadgeIcon(badge['visual_meta']?['icon']),
-                category: badge['category'] ?? 'General',
+                category: category,
               ),
             ),
           ),
           if (!isUnlocked)
             Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+              child: ClipPath(
+                clipper: const _ShieldMedalClipper(),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -894,6 +866,7 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
                       Colors.black.withOpacity(0.42),
                     ],
                   ),
+                ),
                 ),
               ),
             ),
@@ -1238,6 +1211,51 @@ class _BadgeHallScreenState extends State<BadgeHallScreen> with TickerProviderSt
     required String category,
     required bool unlocked,
   }) {
+    if (!unlocked) {
+      return _BadgeVisualSpec(
+        ribbonColors: const [
+          Color(0xFF5C6065),
+          Color(0xFF8A8F96),
+          Color(0xFF4B4F55),
+        ],
+        outerRingColors: const [
+          Color(0xFFD2D5D8),
+          Color(0xFF8A8F96),
+          Color(0xFF4E5359),
+          Color(0xFFAEB2B7),
+        ],
+        innerRingColors: const [
+          Color(0xFF9CA1A8),
+          Color(0xFF6B7077),
+          Color(0xFF484D53),
+        ],
+        connectorColors: const [
+          Color(0xFFC1C5CA),
+          Color(0xFF676C73),
+          Color(0xFF3E4349),
+        ],
+        plinthColors: const [
+          Color(0xFF8F949A),
+          Color(0xFF5A5F66),
+          Color(0xFF3C4147),
+        ],
+        standColors: const [
+          Color(0xFF444950),
+          Color(0xFF92979E),
+          Color(0xFF3A3F45),
+        ],
+        nameplateColors: const [
+          Color(0xFF3F444A),
+          Color(0xFF282C31),
+        ],
+        glowColor: const Color(0xFF8D939A),
+        edgeStroke: const Color(0xFFBFC4CA),
+        titleColor: const Color(0xFF9EA4AB),
+        materialLabel: 'UNLIT PEWTER',
+        seriesLabel: _seriesLabelForCategory(category),
+      );
+    }
+
     final String normalized = materialType.toLowerCase();
     if (normalized.contains('gold')) {
       return _BadgeVisualSpec(
@@ -1655,7 +1673,7 @@ class _RibbonPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final opacity = isUnlocked ? 1.0 : 0.42;
+    final opacity = isUnlocked ? 1.0 : 0.68;
     final body = Path()
       ..moveTo(size.width * 0.12, 0)
       ..quadraticBezierTo(size.width * 0.5, size.height * 0.08, size.width * 0.88, 0)
@@ -1892,6 +1910,187 @@ class _BadgeReliefPainter extends CustomPainter {
   }
 }
 
+class _ShieldMedalGeometry {
+  static Path pathFor(Size size, {double inset = 0}) {
+    final w = size.width;
+    final h = size.height;
+    return Path()
+      ..moveTo(w * 0.50, inset + h * 0.035)
+      ..quadraticBezierTo(w * 0.69, h * 0.02, w * 0.86, h * 0.17)
+      ..lineTo(w - inset - w * 0.045, h * 0.35)
+      ..lineTo(w - inset - w * 0.055, h * 0.72)
+      ..quadraticBezierTo(w * 0.74, h * 0.88, w * 0.50, h - inset - h * 0.045)
+      ..quadraticBezierTo(w * 0.26, h * 0.88, inset + w * 0.055, h * 0.72)
+      ..lineTo(inset + w * 0.045, h * 0.35)
+      ..lineTo(inset + w * 0.14, h * 0.17)
+      ..quadraticBezierTo(w * 0.31, h * 0.02, w * 0.50, inset + h * 0.035)
+      ..close();
+  }
+}
+
+class _ShieldMedalClipper extends CustomClipper<Path> {
+  const _ShieldMedalClipper();
+
+  @override
+  Path getClip(Size size) => _ShieldMedalGeometry.pathFor(size);
+
+  @override
+  bool shouldReclip(covariant _ShieldMedalClipper oldClipper) => false;
+}
+
+class _ShieldMedalPainter extends CustomPainter {
+  final _BadgeVisualSpec spec;
+  final Color baseColor;
+  final String category;
+  final bool isUnlocked;
+
+  const _ShieldMedalPainter({
+    required this.spec,
+    required this.baseColor,
+    required this.category,
+    required this.isUnlocked,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shield = _ShieldMedalGeometry.pathFor(size, inset: size.width * 0.012);
+    final inner = _ShieldMedalGeometry.pathFor(size, inset: size.width * 0.075);
+    final center = Offset(size.width / 2, size.height / 2);
+    final opacity = isUnlocked ? 1.0 : 0.82;
+
+    final castShadow = Paint()
+      ..color = Colors.black.withOpacity(isUnlocked ? 0.24 : 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawPath(shield.shift(Offset(0, size.height * 0.055)), castShadow);
+
+    final rimPaint = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(size.width * 0.16, 0),
+        Offset(size.width * 0.92, size.height),
+        [
+          Colors.white.withOpacity(0.86 * opacity),
+          spec.edgeStroke.withOpacity(0.95 * opacity),
+          Color.alphaBlend(Colors.black.withOpacity(0.36), spec.edgeStroke)
+              .withOpacity(0.96 * opacity),
+          Colors.white.withOpacity(0.64 * opacity),
+        ],
+        [0.0, 0.28, 0.70, 1.0],
+      );
+    canvas.drawPath(shield, rimPaint);
+
+    final bevelPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.025
+      ..shader = ui.Gradient.linear(
+        Offset.zero,
+        Offset(size.width, size.height),
+        [
+          Colors.white.withOpacity(0.82 * opacity),
+          Colors.black.withOpacity(0.18 * opacity),
+        ],
+      );
+    canvas.drawPath(shield, bevelPaint);
+
+    final enamelPaint = Paint()
+      ..shader = ui.Gradient.radial(
+        Offset(size.width * 0.35, size.height * 0.22),
+        size.width * 0.86,
+        [
+          Color.alphaBlend(Colors.white.withOpacity(isUnlocked ? 0.20 : 0.06), baseColor),
+          Color.alphaBlend(Colors.black.withOpacity(isUnlocked ? 0.22 : 0.32), baseColor),
+          Color.alphaBlend(Colors.black.withOpacity(isUnlocked ? 0.42 : 0.46), baseColor),
+        ],
+        [0.0, 0.62, 1.0],
+      );
+    canvas.drawPath(inner, enamelPaint);
+
+    final seamPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.024
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..shader = ui.Gradient.linear(
+        Offset.zero,
+        Offset(size.width, size.height),
+        [
+          Colors.white.withOpacity(isUnlocked ? 0.78 : 0.28),
+          spec.edgeStroke.withOpacity(isUnlocked ? 0.82 : 0.42),
+          Colors.black.withOpacity(isUnlocked ? 0.20 : 0.18),
+        ],
+      );
+
+    void drawSeam(Path path) {
+      canvas.drawPath(path.shift(const Offset(1.0, 1.2)), Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = seamPaint.strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = Colors.black.withOpacity(isUnlocked ? 0.20 : 0.16));
+      canvas.drawPath(path, seamPaint);
+    }
+
+    final arcRect = Rect.fromCenter(
+      center: Offset(size.width * 0.54, size.height * 0.36),
+      width: size.width * 0.58,
+      height: size.height * 0.46,
+    );
+    drawSeam(Path()..addArc(arcRect, math.pi * 0.86, math.pi * 1.18));
+    drawSeam(Path()
+      ..moveTo(size.width * 0.10, size.height * 0.66)
+      ..quadraticBezierTo(size.width * 0.28, size.height * 0.42, size.width * 0.48, size.height * 0.58)
+      ..quadraticBezierTo(size.width * 0.68, size.height * 0.74, size.width * 0.92, size.height * 0.58));
+    drawSeam(Path()
+      ..moveTo(size.width * 0.22, size.height * 0.22)
+      ..quadraticBezierTo(size.width * 0.35, size.height * 0.42, size.width * 0.30, size.height * 0.72));
+    drawSeam(Path()
+      ..moveTo(size.width * 0.78, size.height * 0.20)
+      ..quadraticBezierTo(size.width * 0.68, size.height * 0.43, size.width * 0.76, size.height * 0.74));
+
+    final glintPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.018
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withOpacity(isUnlocked ? 0.62 : 0.18)
+      ..blendMode = BlendMode.screen;
+    canvas.drawLine(
+      Offset(size.width * 0.62, size.height * 0.15),
+      Offset(size.width * 0.86, size.height * 0.35),
+      glintPaint,
+    );
+    if (isUnlocked) {
+      canvas.drawCircle(
+        Offset(size.width * 0.42, size.height * 0.46),
+        size.width * 0.014,
+        Paint()..color = Colors.white.withOpacity(0.72),
+      );
+      canvas.drawCircle(
+        Offset(size.width * 0.57, size.height * 0.38),
+        size.width * 0.009,
+        Paint()..color = Colors.white.withOpacity(0.62),
+      );
+    }
+
+    final bottomShade = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(center.dx, size.height * 0.58),
+        Offset(center.dx, size.height),
+        [
+          Colors.transparent,
+          Colors.black.withOpacity(isUnlocked ? 0.28 : 0.34),
+        ],
+      );
+    canvas.drawPath(inner, bottomShade);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShieldMedalPainter oldDelegate) {
+    return oldDelegate.spec != spec ||
+        oldDelegate.baseColor != baseColor ||
+        oldDelegate.category != category ||
+        oldDelegate.isUnlocked != isUnlocked;
+  }
+}
+
 class _MedalHardwarePainter extends CustomPainter {
   final _BadgeVisualSpec spec;
   final double materialType;
@@ -2045,6 +2244,156 @@ class _MedalHardwarePainter extends CustomPainter {
   }
 }
 
+class _RealWorldMedalFinishPainter extends CustomPainter {
+  final String category;
+  final Color baseColor;
+  final Color edgeColor;
+  final bool isUnlocked;
+
+  const _RealWorldMedalFinishPainter({
+    required this.category,
+    required this.baseColor,
+    required this.edgeColor,
+    required this.isUnlocked,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2;
+    final medalRect = Rect.fromCircle(center: center, radius: radius * 0.96);
+    final clip = _ShieldMedalGeometry.pathFor(size);
+
+    canvas.save();
+    canvas.clipPath(clip);
+
+    final metalWash = Paint()
+      ..shader = ui.Gradient.radial(
+        Offset(center.dx - radius * 0.28, center.dy - radius * 0.34),
+        radius * 1.18,
+        [
+          Colors.white.withOpacity(isUnlocked ? 0.34 : 0.12),
+          baseColor.withOpacity(isUnlocked ? 0.10 : 0.08),
+          Colors.black.withOpacity(isUnlocked ? 0.20 : 0.30),
+        ],
+        [0.0, 0.48, 1.0],
+      )
+      ..blendMode = BlendMode.softLight;
+    canvas.drawOval(medalRect, metalWash);
+
+    final enamelPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..blendMode = isUnlocked ? BlendMode.overlay : BlendMode.srcOver;
+    final enamelOpacity = isUnlocked ? 0.20 : 0.055;
+    for (int i = 0; i < 8; i++) {
+      final start = -math.pi / 2 + i * math.pi / 4;
+      enamelPaint.shader = ui.Gradient.radial(
+        center,
+        radius * 0.74,
+        [
+          Color.alphaBlend(Colors.white.withOpacity(0.12), baseColor)
+              .withOpacity(enamelOpacity),
+          Color.alphaBlend(Colors.black.withOpacity(0.18), baseColor)
+              .withOpacity(enamelOpacity * 0.62),
+        ],
+      );
+      final wedge = Path()
+        ..moveTo(center.dx, center.dy)
+        ..arcTo(
+          Rect.fromCircle(center: center, radius: radius * 0.62),
+          start,
+          math.pi / 4 - 0.026,
+          false,
+        )
+        ..close();
+      canvas.drawPath(wedge, enamelPaint);
+    }
+
+    final engravingPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.55
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withOpacity(isUnlocked ? 0.13 : 0.045);
+    final shadowEngraving = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.black.withOpacity(isUnlocked ? 0.11 : 0.13);
+
+    for (int i = 0; i < 28; i++) {
+      final t = (i + 1) / 30.0;
+      final y = center.dy - radius * 0.68 + t * radius * 1.36;
+      final half = math.sqrt(math.max(0, math.pow(radius * 0.72, 2) - math.pow(y - center.dy, 2)));
+      final startX = center.dx - half * (0.82 + (i % 4) * 0.025);
+      final endX = center.dx + half * (0.82 - (i % 3) * 0.02);
+      final path = Path()
+        ..moveTo(startX, y + 0.8)
+        ..quadraticBezierTo(center.dx, y - radius * 0.022 * math.sin(i), endX, y - 0.6);
+      canvas.drawPath(path.shift(const Offset(0.6, 0.8)), shadowEngraving);
+      canvas.drawPath(path, engravingPaint);
+    }
+
+    final sparklePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = isUnlocked ? 1.2 : 0.7
+      ..color = Colors.white.withOpacity(isUnlocked ? 0.42 : 0.10)
+      ..blendMode = BlendMode.screen;
+    if (isUnlocked) {
+      for (final p in <Offset>[
+        center + Offset(-radius * 0.28, -radius * 0.42),
+        center + Offset(radius * 0.34, -radius * 0.18),
+        center + Offset(-radius * 0.42, radius * 0.18),
+      ]) {
+        canvas.drawLine(p.translate(-3, 0), p.translate(3, 0), sparklePaint);
+        canvas.drawLine(p.translate(0, -3), p.translate(0, 3), sparklePaint);
+      }
+    }
+
+    final edgeShade = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.075
+      ..shader = ui.Gradient.sweep(
+        center,
+        [
+          Colors.white.withOpacity(isUnlocked ? 0.60 : 0.18),
+          edgeColor.withOpacity(isUnlocked ? 0.42 : 0.16),
+          Colors.black.withOpacity(isUnlocked ? 0.30 : 0.28),
+          edgeColor.withOpacity(isUnlocked ? 0.50 : 0.18),
+          Colors.white.withOpacity(isUnlocked ? 0.56 : 0.16),
+        ],
+      );
+    canvas.drawCircle(center, radius * 0.86, edgeShade);
+
+    final glassHighlight = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(center.dx - radius * 0.58, center.dy - radius * 0.72),
+        Offset(center.dx + radius * 0.34, center.dy + radius * 0.26),
+        [
+          Colors.white.withOpacity(isUnlocked ? 0.34 : 0.08),
+          Colors.white.withOpacity(0.0),
+        ],
+      )
+      ..blendMode = BlendMode.screen;
+    final highlightPath = Path()
+      ..moveTo(center.dx - radius * 0.72, center.dy - radius * 0.42)
+      ..quadraticBezierTo(center.dx - radius * 0.18, center.dy - radius * 0.72, center.dx + radius * 0.52, center.dy - radius * 0.38)
+      ..quadraticBezierTo(center.dx + radius * 0.18, center.dy - radius * 0.18, center.dx - radius * 0.58, center.dy - radius * 0.10)
+      ..close();
+    canvas.drawPath(highlightPath, glassHighlight);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _RealWorldMedalFinishPainter oldDelegate) {
+    return oldDelegate.category != category ||
+        oldDelegate.baseColor != baseColor ||
+        oldDelegate.edgeColor != edgeColor ||
+        oldDelegate.isUnlocked != isUnlocked;
+  }
+}
+
 class BadgeShaderWidget extends StatelessWidget {
   final ui.FragmentProgram program;
   final bool isUnlocked;
@@ -2073,8 +2422,8 @@ class BadgeShaderWidget extends StatelessWidget {
       ..rotateX(-lightOffset.dy * 0.5) // 绑定陀螺仪俯仰 (Pitch)
       ..rotateY(lightOffset.dx * 0.5); // 绑定陀螺仪横滚 (Roll)
 
-    // 装饰色：未解锁则为暗灰色
-    final Color displayColor = isUnlocked ? baseColor : Colors.white.withAlpha(20);
+    // 装饰色：未解锁统一为冷灰金属，不保留原彩色点亮效果。
+    final Color displayColor = isUnlocked ? baseColor : const Color(0xFF777C82);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2122,8 +2471,8 @@ class BadgeShaderWidget extends StatelessWidget {
                       gradient: RadialGradient(
                         colors: [
                           Colors.white.withAlpha(isUnlocked ? 210 : 72),
-                          displayColor.withAlpha(isUnlocked ? 150 : 36),
-                          Colors.black.withAlpha(isUnlocked ? 34 : 74),
+                          displayColor.withAlpha(isUnlocked ? 150 : 82),
+                          Colors.black.withAlpha(isUnlocked ? 34 : 92),
                         ],
                       ),
                       border: Border.all(
@@ -2137,7 +2486,7 @@ class BadgeShaderWidget extends StatelessWidget {
                           offset: const Offset(0, 3),
                         ),
                         BoxShadow(
-                          color: displayColor.withAlpha(isUnlocked ? 70 : 18),
+                        color: displayColor.withAlpha(isUnlocked ? 70 : 10),
                           blurRadius: 10,
                         ),
                       ],
@@ -2160,9 +2509,9 @@ class BadgeShaderWidget extends StatelessWidget {
                                 Offset(bounds.width * 0.3 + lightOffset.dx * 6, 0),
                                 Offset(bounds.width * 0.75 - lightOffset.dx * 5, bounds.height),
                                 [
-                                  Colors.white.withAlpha(isUnlocked ? 255 : 96),
-                                  displayColor.withAlpha(isUnlocked ? 190 : 64),
-                                  Colors.black.withAlpha(isUnlocked ? 70 : 96),
+                                  Colors.white.withAlpha(isUnlocked ? 255 : 118),
+                                  displayColor.withAlpha(isUnlocked ? 190 : 112),
+                                  Colors.black.withAlpha(isUnlocked ? 70 : 128),
                                 ],
                               );
                             },

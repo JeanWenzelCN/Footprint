@@ -52,3 +52,21 @@ val SaharaColors = lightColorScheme(
     secondary = Color(0xFFE2725B),
     background = Color(0xFFF4A460)
 )
+
+val EmberLightColors = lightColorScheme(
+    primary = Color(0xFF8F2C2C),
+    secondary = Color(0xFFA3632C),
+    tertiary = Color(0xFF6F5552),
+    background = Color(0xFFF6ECE8),
+    surface = Color(0xFFFFFBF8),
+    onSurface = Color(0xFF2E1D1D)
+)
+
+val EmberDarkColors = darkColorScheme(
+    primary = Color(0xFFE98F86),
+    secondary = Color(0xFFD6A15B),
+    tertiary = Color(0xFFC7A3A0),
+    background = Color(0xFF1A0F10),
+    surface = Color(0xFF241617),
+    onSurface = Color(0xFFFBEFED)
+)

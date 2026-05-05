@@ -229,6 +229,7 @@ class MainActivity : FlutterActivity() {
                                             "nickname" to prefs.nickname,
                                             "avatarId" to prefs.avatarId,
                                             "themeMode" to prefs.themeMode.name,
+                                            "themeStyle" to prefs.themeStyle.name,
                                             "hapticEnabled" to prefs.hapticFeedbackEnabled,
                                             "isMaintValid" to prefs.isMaintenanceModeValidated
                                     )

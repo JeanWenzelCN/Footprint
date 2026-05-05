@@ -29,32 +29,153 @@ const Color kAtelierMuted = Color(0xFF66727D);
 const Color kAtelierOutline = Color(0xFFD8D0C3);
 const Color kAtelierSurfaceSoft = Color(0xFFEAE2D6);
 
+class _FootprintPalette {
+  final Color seed;
+  final Color canvas;
+  final Color surface;
+  final Color surfaceHigh;
+  final Color primary;
+  final Color secondary;
+  final Color tertiary;
+  final Color ink;
+  final Color muted;
+  final Color outline;
+  final Color shadow;
+  final double radius;
+  final double cardElevation;
+
+  const _FootprintPalette({
+    required this.seed,
+    required this.canvas,
+    required this.surface,
+    required this.surfaceHigh,
+    required this.primary,
+    required this.secondary,
+    required this.tertiary,
+    required this.ink,
+    required this.muted,
+    required this.outline,
+    required this.shadow,
+    required this.radius,
+    required this.cardElevation,
+  });
+}
+
+_FootprintPalette _paletteForStyle(String style, bool isDark) {
+  switch (style) {
+    case 'CYBERPUNK':
+      return _FootprintPalette(
+        seed: const Color(0xFF00B8C8),
+        canvas: isDark ? const Color(0xFF091012) : const Color(0xFFEAF6F5),
+        surface: isDark ? const Color(0xFF111A1D) : const Color(0xFFF8FFFE),
+        surfaceHigh: isDark ? const Color(0xFF1A292D) : const Color(0xFFDDEDEC),
+        primary: isDark ? const Color(0xFF54DCE8) : const Color(0xFF0B6D78),
+        secondary: isDark ? const Color(0xFFFF8FB5) : const Color(0xFFB73562),
+        tertiary: isDark ? const Color(0xFFA6E887) : const Color(0xFF4A7C35),
+        ink: isDark ? const Color(0xFFE9FBFA) : const Color(0xFF102226),
+        muted: isDark ? const Color(0xFF8BA3A8) : const Color(0xFF587075),
+        outline: isDark ? const Color(0xFF31474D) : const Color(0xFFB7D1D0),
+        shadow: isDark ? Colors.black : const Color(0xFF437A83),
+        radius: 14,
+        cardElevation: 0,
+      );
+    case 'FOREST':
+      return _FootprintPalette(
+        seed: const Color(0xFF426B45),
+        canvas: isDark ? const Color(0xFF101811) : const Color(0xFFEFF4EC),
+        surface: isDark ? const Color(0xFF172218) : const Color(0xFFFBFFF8),
+        surfaceHigh: isDark ? const Color(0xFF243224) : const Color(0xFFDDE8D7),
+        primary: isDark ? const Color(0xFFA8D5A2) : const Color(0xFF2F5E35),
+        secondary: isDark ? const Color(0xFFD8BD80) : const Color(0xFF8A6B2F),
+        tertiary: isDark ? const Color(0xFF95C8BA) : const Color(0xFF3D7469),
+        ink: isDark ? const Color(0xFFF0F7EC) : const Color(0xFF1E2B1F),
+        muted: isDark ? const Color(0xFF9AA995) : const Color(0xFF65745F),
+        outline: isDark ? const Color(0xFF3A4937) : const Color(0xFFC9D7C3),
+        shadow: isDark ? Colors.black : const Color(0xFF8AA27E),
+        radius: 20,
+        cardElevation: 0,
+      );
+    case 'SAHARA':
+      return _FootprintPalette(
+        seed: const Color(0xFFB8763E),
+        canvas: isDark ? const Color(0xFF1A130E) : const Color(0xFFF5EDE0),
+        surface: isDark ? const Color(0xFF241A13) : const Color(0xFFFFFBF4),
+        surfaceHigh: isDark ? const Color(0xFF35261B) : const Color(0xFFEAD8BE),
+        primary: isDark ? const Color(0xFFE3B77C) : const Color(0xFF8B5428),
+        secondary: isDark ? const Color(0xFFE39573) : const Color(0xFFB35D45),
+        tertiary: isDark ? const Color(0xFFDCCB92) : const Color(0xFF796C36),
+        ink: isDark ? const Color(0xFFF9EFE3) : const Color(0xFF33251B),
+        muted: isDark ? const Color(0xFFB19B83) : const Color(0xFF806E5A),
+        outline: isDark ? const Color(0xFF4E3A2B) : const Color(0xFFD9C4A6),
+        shadow: isDark ? Colors.black : const Color(0xFFB98D61),
+        radius: 18,
+        cardElevation: 0,
+      );
+    case 'EMBER':
+      return _FootprintPalette(
+        seed: const Color(0xFF9E2F2E),
+        canvas: isDark ? const Color(0xFF1A0F10) : const Color(0xFFF6ECE8),
+        surface: isDark ? const Color(0xFF241617) : const Color(0xFFFFFBF8),
+        surfaceHigh: isDark ? const Color(0xFF372121) : const Color(0xFFF0DCD5),
+        primary: isDark ? const Color(0xFFE98F86) : const Color(0xFF8F2C2C),
+        secondary: isDark ? const Color(0xFFD6A15B) : const Color(0xFFA3632C),
+        tertiary: isDark ? const Color(0xFFC7A3A0) : const Color(0xFF6F5552),
+        ink: isDark ? const Color(0xFFFBEFED) : const Color(0xFF2E1D1D),
+        muted: isDark ? const Color(0xFFB69A97) : const Color(0xFF7B6562),
+        outline: isDark ? const Color(0xFF4D3131) : const Color(0xFFD8BFB8),
+        shadow: isDark ? Colors.black : const Color(0xFFB27C73),
+        radius: 16,
+        cardElevation: 0,
+      );
+    case 'AUTO':
+      return _paletteForStyle(isDark ? 'CYBERPUNK' : 'CLASSIC', isDark);
+    case 'CLASSIC':
+    default:
+      return _FootprintPalette(
+        seed: kAtelierPrimary,
+        canvas: isDark ? const Color(0xFF111417) : kAtelierCanvas,
+        surface: isDark ? const Color(0xFF1A1D22) : kAtelierSurface,
+        surfaceHigh: isDark ? const Color(0xFF2A2E35) : kAtelierSurfaceSoft,
+        primary: isDark ? const Color(0xFFA9C4E2) : kAtelierPrimary,
+        secondary: isDark ? const Color(0xFFFFB794) : kAtelierAccent,
+        tertiary: isDark ? const Color(0xFF9DD9D3) : kAtelierMint,
+        ink: isDark ? const Color(0xFFF3EEE7) : kAtelierInk,
+        muted: isDark ? const Color(0xFF8C939D) : kAtelierMuted,
+        outline: isDark ? const Color(0xFF444B56) : kAtelierOutline,
+        shadow: isDark ? Colors.black : const Color(0xFF8DA3B8),
+        radius: 24,
+        cardElevation: 0,
+      );
+  }
+}
+
 ThemeData buildFootprintTheme({
   required Brightness brightness,
-  Color seedColor = kAtelierPrimary,
+  String style = 'CLASSIC',
 }) {
   final isDark = brightness == Brightness.dark;
+  final palette = _paletteForStyle(style, isDark);
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: Color.alphaBlend(seedColor.withOpacity(0.24), kAtelierPrimary),
+    seedColor: palette.seed,
     brightness: brightness,
   ).copyWith(
-    primary: isDark ? const Color(0xFFA9C4E2) : kAtelierPrimary,
+    primary: palette.primary,
     onPrimary: Colors.white,
-    primaryContainer: isDark ? const Color(0xFF294866) : const Color(0xFFDCE6F0),
-    onPrimaryContainer: isDark ? Colors.white : kAtelierPrimary,
-    secondary: isDark ? const Color(0xFFFFB794) : kAtelierAccent,
+    primaryContainer: Color.alphaBlend(palette.primary.withOpacity(isDark ? 0.26 : 0.14), palette.surface),
+    onPrimaryContainer: isDark ? Colors.white : palette.primary,
+    secondary: palette.secondary,
     onSecondary: Colors.white,
-    secondaryContainer: isDark ? const Color(0xFF75462E) : const Color(0xFFF6D7C6),
-    onSecondaryContainer: isDark ? Colors.white : const Color(0xFF6C371F),
-    tertiary: isDark ? const Color(0xFF9DD9D3) : kAtelierMint,
+    secondaryContainer: Color.alphaBlend(palette.secondary.withOpacity(isDark ? 0.24 : 0.16), palette.surface),
+    onSecondaryContainer: isDark ? Colors.white : palette.secondary,
+    tertiary: palette.tertiary,
     onTertiary: Colors.white,
-    tertiaryContainer: isDark ? const Color(0xFF305A56) : const Color(0xFFD7EEEA),
-    onTertiaryContainer: isDark ? Colors.white : const Color(0xFF24524D),
-    surface: isDark ? const Color(0xFF1A1D22) : kAtelierSurface,
-    onSurface: isDark ? const Color(0xFFF3EEE7) : kAtelierInk,
-    surfaceContainerHighest: isDark ? const Color(0xFF2A2E35) : kAtelierSurfaceSoft,
-    outline: isDark ? const Color(0xFF8C939D) : kAtelierMuted,
-    outlineVariant: isDark ? const Color(0xFF444B56) : kAtelierOutline,
+    tertiaryContainer: Color.alphaBlend(palette.tertiary.withOpacity(isDark ? 0.22 : 0.16), palette.surface),
+    onTertiaryContainer: isDark ? Colors.white : palette.tertiary,
+    surface: palette.surface,
+    onSurface: palette.ink,
+    surfaceContainerHighest: palette.surfaceHigh,
+    outline: palette.muted,
+    outlineVariant: palette.outline,
     error: const Color(0xFFC75050),
   );
 
@@ -62,8 +183,8 @@ ThemeData buildFootprintTheme({
     useMaterial3: true,
     brightness: brightness,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: isDark ? const Color(0xFF111417) : kAtelierCanvas,
-    canvasColor: isDark ? const Color(0xFF111417) : kAtelierCanvas,
+    scaffoldBackgroundColor: palette.canvas,
+    canvasColor: palette.canvas,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       foregroundColor: colorScheme.onSurface,
@@ -82,10 +203,11 @@ ThemeData buildFootprintTheme({
     ),
     cardTheme: CardThemeData(
       color: colorScheme.surface,
-      elevation: 0,
+      elevation: palette.cardElevation,
+      shadowColor: palette.shadow.withOpacity(isDark ? 0.35 : 0.16),
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(palette.radius),
         side: BorderSide(color: colorScheme.outlineVariant),
       ),
     ),
@@ -96,15 +218,15 @@ ThemeData buildFootprintTheme({
       hintStyle: TextStyle(color: colorScheme.outline.withOpacity(0.8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular((palette.radius - 6).clamp(10, 18).toDouble()),
         borderSide: BorderSide(color: colorScheme.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular((palette.radius - 6).clamp(10, 18).toDouble()),
         borderSide: BorderSide(color: colorScheme.outlineVariant),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular((palette.radius - 6).clamp(10, 18).toDouble()),
         borderSide: BorderSide(color: colorScheme.primary, width: 1.4),
       ),
     ),
@@ -129,7 +251,7 @@ ThemeData buildFootprintTheme({
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular((palette.radius - 4).clamp(10, 18).toDouble())),
         textStyle: const TextStyle(fontWeight: FontWeight.w800),
       ),
     ),
@@ -138,16 +260,25 @@ ThemeData buildFootprintTheme({
         foregroundColor: colorScheme.primary,
         side: BorderSide(color: colorScheme.outlineVariant),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular((palette.radius - 4).clamp(10, 18).toDouble())),
         textStyle: const TextStyle(fontWeight: FontWeight.w800),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: colorScheme.primary,
       foregroundColor: colorScheme.onPrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular((palette.radius - 2).clamp(12, 22).toDouble())),
     ),
     dividerTheme: DividerThemeData(color: colorScheme.outlineVariant),
+    popupMenuTheme: PopupMenuThemeData(
+      color: colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      textStyle: TextStyle(color: colorScheme.onSurface),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+    ),
   );
 }
 
@@ -348,24 +479,19 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final overlayStyle = (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+        .copyWith(statusBarColor: Theme.of(context).scaffoldBackgroundColor);
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: kAtelierCanvas,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
+      value: overlayStyle,
       child: Scaffold(
-        backgroundColor: kAtelierCanvas,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: kAtelierCanvas,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: kAtelierCanvas,
-            statusBarIconBrightness: Brightness.dark,
-            statusBarBrightness: Brightness.light,
-          ),
+          systemOverlayStyle: overlayStyle,
           title: Text(widget.initialEntry == null ? '记录新的足迹' : '编辑足迹记录', style: const TextStyle(fontWeight: FontWeight.w900)),
           leading: IconButton(
             icon: const Icon(Icons.close),
@@ -381,9 +507,11 @@ class _AddFootprintPageState extends State<AddFootprintPage> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withOpacity(0.74),
-                      kAtelierCanvas,
-                      const Color(0xFFEFE4D8),
+                      isDark
+                          ? Color.alphaBlend(cs.primary.withOpacity(0.06), Theme.of(context).scaffoldBackgroundColor)
+                          : Color.alphaBlend(cs.primary.withOpacity(0.04), Colors.white),
+                      Theme.of(context).scaffoldBackgroundColor,
+                      Color.alphaBlend(cs.secondary.withOpacity(isDark ? 0.05 : 0.08), Theme.of(context).scaffoldBackgroundColor),
                     ],
                   ),
                 ),
@@ -831,24 +959,19 @@ class _AddGoalPageState extends State<AddGoalPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final overlayStyle = (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+        .copyWith(statusBarColor: Theme.of(context).scaffoldBackgroundColor);
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: kAtelierCanvas,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
+      value: overlayStyle,
       child: Scaffold(
-        backgroundColor: kAtelierCanvas,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: kAtelierCanvas,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: kAtelierCanvas,
-            statusBarIconBrightness: Brightness.dark,
-            statusBarBrightness: Brightness.light,
-          ),
+          systemOverlayStyle: overlayStyle,
           title: Text(widget.initialGoal == null ? '新增旅行目标' : '编辑旅行目标', style: const TextStyle(fontWeight: FontWeight.w900)),
           leading: IconButton(
             icon: const Icon(Icons.close),
@@ -864,9 +987,11 @@ class _AddGoalPageState extends State<AddGoalPage> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withOpacity(0.74),
-                      kAtelierCanvas,
-                      const Color(0xFFEFE4D8),
+                      isDark
+                          ? Color.alphaBlend(cs.primary.withOpacity(0.06), Theme.of(context).scaffoldBackgroundColor)
+                          : Color.alphaBlend(cs.primary.withOpacity(0.04), Colors.white),
+                      Theme.of(context).scaffoldBackgroundColor,
+                      Color.alphaBlend(cs.secondary.withOpacity(isDark ? 0.05 : 0.08), Theme.of(context).scaffoldBackgroundColor),
                     ],
                   ),
                 ),
@@ -1140,21 +1265,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Color _getSeedColor() {
-    switch (themeStyleStr) {
-      case "CYBERPUNK":
-        return Colors.cyanAccent;
-      case "FOREST":
-        return Colors.green;
-      case "SAHARA":
-        return Colors.orange;
-      case "AUTO":
-        return Colors.deepPurpleAccent;
-      default:
-        return const Color(0xFF1A73E8);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -1172,12 +1282,26 @@ class _MyAppState extends State<MyApp> {
       locale: const Locale('zh', 'CN'),
       theme: buildFootprintTheme(
         brightness: Brightness.light,
-        seedColor: _getSeedColor(),
+        style: themeStyleStr,
       ),
       darkTheme: buildFootprintTheme(
         brightness: Brightness.dark,
-        seedColor: _getSeedColor(),
+        style: themeStyleStr,
       ),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final overlayStyle = (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+            .copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+        );
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: MainContainer(
         nickname: nickname,
         avatarId: avatarId,
@@ -1429,7 +1553,7 @@ class _MainContainerState extends State<MainContainer>
         isMaintValid: widget.isMaintValid,
         onSettingsChanged: widget.onSettingsChanged,
       ),
-      ExploreMapScreen(key: _mapKey),
+      ExploreMapScreen(key: _mapKey, themeMode: widget.themeMode),
       const GoalPlannerPage(),
       ArtStudioScreen(
         nickname: widget.nickname,
@@ -1437,8 +1561,11 @@ class _MainContainerState extends State<MainContainer>
       ),
     ];
 
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: kAtelierCanvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       extendBody: true,
       body: Stack(
         children: [
@@ -1449,9 +1576,11 @@ class _MainContainerState extends State<MainContainer>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withOpacity(0.72),
-                    kAtelierCanvas,
-                    const Color(0xFFF0E6DA),
+                    isDark
+                        ? Color.alphaBlend(cs.primary.withOpacity(0.06), Theme.of(context).scaffoldBackgroundColor)
+                        : Color.alphaBlend(cs.primary.withOpacity(0.04), Colors.white),
+                    Theme.of(context).scaffoldBackgroundColor,
+                    Color.alphaBlend(cs.secondary.withOpacity(isDark ? 0.05 : 0.08), Theme.of(context).scaffoldBackgroundColor),
                   ],
                 ),
               ),
@@ -1465,7 +1594,8 @@ class _MainContainerState extends State<MainContainer>
               height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFF8D8BE).withOpacity(0.42),
+                color: (isDark ? cs.secondaryContainer : const Color(0xFFF8D8BE))
+                    .withOpacity(isDark ? 0.12 : 0.42),
               ),
             ),
           ),
@@ -1477,7 +1607,8 @@ class _MainContainerState extends State<MainContainer>
               height: 240,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFDCEBF3).withOpacity(0.58),
+                color: (isDark ? cs.primaryContainer : const Color(0xFFDCEBF3))
+                    .withOpacity(isDark ? 0.16 : 0.58),
               ),
             ),
           ),
@@ -1513,7 +1644,8 @@ class _MainContainerState extends State<MainContainer>
                       colors: [
                         cs.surface.withValues(alpha: 0.98),
                         Color.alphaBlend(
-                          const Color(0xFFE9F0F6).withOpacity(0.46),
+                          (isDark ? cs.surfaceContainerHighest : cs.surfaceContainerHighest)
+                              .withOpacity(0.46),
                           cs.surface,
                         ),
                       ],
@@ -1521,17 +1653,19 @@ class _MainContainerState extends State<MainContainer>
                     borderRadius: BorderRadius.circular(dropSize / 2),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF8DA3B8).withValues(alpha: 0.12 * clampedT),
+                        color: (isDark ? Colors.black : const Color(0xFF8DA3B8))
+                            .withValues(alpha: (isDark ? 0.28 : 0.12) * clampedT),
                         blurRadius: 26 * clampedT,
                         offset: Offset(0, 14 * clampedT),
                       ),
                       BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.65 * clampedT),
+                        color: (isDark ? Colors.white : Colors.white)
+                            .withValues(alpha: (isDark ? 0.08 : 0.65) * clampedT),
                         blurRadius: 16 * clampedT,
                         offset: Offset(0, -4 * clampedT),
                       ),
                     ],
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.65 * clampedT)),
+                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.65 * clampedT)),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(dropSize / 2),
@@ -1566,7 +1700,8 @@ class _MainContainerState extends State<MainContainer>
                                               colors: [
                                                 cs.primary,
                                                 Color.alphaBlend(
-                                                  const Color(0xFF3D688C).withOpacity(0.3),
+                                                  cs.secondary
+                                                      .withOpacity(0.3),
                                                   cs.primary,
                                                 ),
                                               ],
@@ -1985,6 +2120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final todayHint = getEternalTodayBannerText();
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1997,9 +2133,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withOpacity(0.7),
-                    kAtelierCanvas,
-                    const Color(0xFFF0E6DA),
+                    isDark
+                        ? Color.alphaBlend(cs.primary.withOpacity(0.06), Theme.of(context).scaffoldBackgroundColor)
+                        : Color.alphaBlend(cs.primary.withOpacity(0.04), Colors.white),
+                    Theme.of(context).scaffoldBackgroundColor,
+                    Color.alphaBlend(cs.secondary.withOpacity(isDark ? 0.05 : 0.08), Theme.of(context).scaffoldBackgroundColor),
                   ],
                 ),
               ),
@@ -2013,7 +2151,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFF6D9C4).withOpacity(0.38),
+                color: (isDark ? cs.secondaryContainer : cs.secondaryContainer)
+                    .withOpacity(isDark ? 0.12 : 0.38),
               ),
             ),
           ),
@@ -2025,7 +2164,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFD8E8F1).withOpacity(0.5),
+                color: (isDark ? cs.primaryContainer : cs.primaryContainer)
+                    .withOpacity(isDark ? 0.16 : 0.5),
               ),
             ),
           ),
@@ -2886,24 +3026,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _showAboutDialog(context);
                   }
                 },
+                color: cs.surface,
+                surfaceTintColor: Colors.transparent,
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'settings',
                     child: Row(
                       children: [
-                        Icon(Icons.settings, size: 20),
-                        SizedBox(width: 12),
-                        Text("设置"),
+                        Icon(Icons.settings, size: 20, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 12),
+                        Text("设置", style: TextStyle(color: cs.onSurface)),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'about',
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 20),
-                        SizedBox(width: 12),
-                        Text("关于"),
+                        Icon(Icons.info_outline, size: 20, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 12),
+                        Text("关于", style: TextStyle(color: cs.onSurface)),
                       ],
                     ),
                   ),
@@ -3026,7 +3168,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 // --- 探索地图页 (ExploreMapScreen) - 1:1 复刻原生功能 ---
 class ExploreMapScreen extends StatefulWidget {
-  ExploreMapScreen({super.key});
+  final String themeMode;
+  const ExploreMapScreen({super.key, required this.themeMode});
   @override
   State<ExploreMapScreen> createState() => _ExploreMapScreenState();
 }
@@ -3052,6 +3195,13 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
   String mapMode = 'STANDARD';
   MethodChannel? _mapChannel;
   List<dynamic> _allEntries = [];
+  bool? _lastNativeShowHistory;
+  String? _lastNativeMode;
+  bool? _lastNativeThemeIsDark;
+  bool? _lastNativeFogEnabled;
+  int? _lastNativeEntriesHash;
+  int? _lastNativeCapsulesHash;
+  int? _lastNativeFogHash;
 
   // Flutter 高德定位客户端 (仅供单击定位使用)
   final AMapFlutterLocation _locationClient = AMapFlutterLocation();
@@ -3332,6 +3482,15 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
     _updateNativeMap();
   }
 
+  @override
+  void didUpdateWidget(covariant ExploreMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.themeMode != widget.themeMode) {
+      _lastNativeThemeIsDark = null;
+      _updateNativeMap();
+    }
+  }
+
   List<dynamic> _fogPoints = [];
 
   Future<void> _loadEntries() async {
@@ -3344,6 +3503,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
         _fogPoints = jsonDecode(fogPointsJson);
         _capsules = jsonDecode(capsulesJson);
       });
+      _lastNativeEntriesHash = null;
+      _lastNativeCapsulesHash = null;
+      _lastNativeFogHash = null;
       _updateNativeMap();
     } catch (e) {
       debugPrint("Failed to load map entries: $e");
@@ -3352,6 +3514,13 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
 
   void _onMapCreated(int id) {
     _mapChannel = MethodChannel('com.footprint/amap_$id');
+    _lastNativeShowHistory = null;
+    _lastNativeMode = null;
+    _lastNativeThemeIsDark = null;
+    _lastNativeFogEnabled = null;
+    _lastNativeEntriesHash = null;
+    _lastNativeCapsulesHash = null;
+    _lastNativeFogHash = null;
     _mapChannel?.setMethodCallHandler((call) async {
       if (call.method == 'onMarkerClick') {
         int entryId = call.arguments;
@@ -3427,23 +3596,54 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
 
   void _updateNativeMap() {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    _mapChannel?.invokeMethod('setTheme', isDark);
-    _mapChannel?.invokeMethod('setMapMode', mapMode);
-    _mapChannel?.invokeMethod('setFogEnabled', mapMode == 'FOG');
+    final bool fogEnabled = mapMode == 'FOG' || mapMode == 'ETERNAL_REALM';
+    if (_lastNativeThemeIsDark != isDark) {
+      _mapChannel?.invokeMethod('setTheme', isDark);
+      _lastNativeThemeIsDark = isDark;
+    }
+    if (_lastNativeMode != mapMode) {
+      _mapChannel?.invokeMethod('setMapMode', mapMode);
+      _lastNativeMode = mapMode;
+    }
+    if (_lastNativeFogEnabled != fogEnabled) {
+      _mapChannel?.invokeMethod('setFogEnabled', fogEnabled);
+      _lastNativeFogEnabled = fogEnabled;
+    }
     
     // 用户要求：非追踪状态下且处于标准模式（STANDARD）时，隐藏历史足迹 Marker 和轨迹
     final bool showHistory = mapMode != 'STANDARD' || _isTracking;
+    final entriesHash = Object.hash(_allEntries.length, _allEntries.isNotEmpty ? _allEntries.last['id'] : null);
+    final capsulesHash = Object.hash(_capsules.length, _capsules.isNotEmpty ? _capsules.last['id'] : null);
+    final fogHash = Object.hash(
+      _fogPoints.length,
+      _fogPoints.isNotEmpty ? _fogPoints.first['timestamp'] : null,
+      _fogPoints.isNotEmpty ? _fogPoints.last['timestamp'] : null,
+    );
     
     if (showHistory) {
-      _mapChannel?.invokeMethod('setEntries', _allEntries);
-      _mapChannel?.invokeMethod('setCapsules', _capsules);
-      _mapChannel?.invokeMethod('setHistoryPoints', _fogPoints);
+      if (_lastNativeShowHistory != true || _lastNativeEntriesHash != entriesHash) {
+        _mapChannel?.invokeMethod('setEntries', _allEntries);
+        _lastNativeEntriesHash = entriesHash;
+      }
+      if (_lastNativeShowHistory != true || _lastNativeCapsulesHash != capsulesHash) {
+        _mapChannel?.invokeMethod('setCapsules', _capsules);
+        _lastNativeCapsulesHash = capsulesHash;
+      }
+      if (_lastNativeShowHistory != true || _lastNativeFogHash != fogHash) {
+        _mapChannel?.invokeMethod('setHistoryPoints', _fogPoints);
+        _lastNativeFogHash = fogHash;
+      }
     } else {
-      // 显式传入空列表以清除地图上的所有历史元素
-      _mapChannel?.invokeMethod('setEntries', []);
-      _mapChannel?.invokeMethod('setCapsules', []);
-      _mapChannel?.invokeMethod('setHistoryPoints', []);
+      if (_lastNativeShowHistory != false) {
+        _mapChannel?.invokeMethod('setEntries', []);
+        _mapChannel?.invokeMethod('setCapsules', []);
+        _mapChannel?.invokeMethod('setHistoryPoints', []);
+        _lastNativeEntriesHash = null;
+        _lastNativeCapsulesHash = null;
+        _lastNativeFogHash = null;
+      }
     }
+    _lastNativeShowHistory = showHistory;
   }
 
   // === 定位按钮：直接使用原生地图的位置居中 ===
@@ -3700,6 +3900,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen>
           child: FloatingActionButton.small(
             onPressed: () => _showApiKeyDialog(),
             backgroundColor: cs.surface,
+            foregroundColor: cs.onSurface,
             child: const Icon(Icons.settings_outlined),
           ),
         ),
@@ -4055,12 +4256,20 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   static const channel = MethodChannel('com.footprint/data');
   late TextEditingController _nicknameController;
+  late String _avatarId;
+  late String _themeMode;
+  late String _themeStyle;
+  late bool _hapticEnabled;
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
     _nicknameController = TextEditingController(text: widget.nickname);
+    _avatarId = widget.avatarId;
+    _themeMode = widget.themeMode;
+    _themeStyle = widget.themeStyle;
+    _hapticEnabled = widget.hapticEnabled;
   }
 
   @override
@@ -4070,6 +4279,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _nicknameController.text != widget.nickname) {
       _nicknameController.text = widget.nickname;
     }
+    if (oldWidget.avatarId != widget.avatarId) _avatarId = widget.avatarId;
+    if (oldWidget.themeMode != widget.themeMode) _themeMode = widget.themeMode;
+    if (oldWidget.themeStyle != widget.themeStyle) _themeStyle = widget.themeStyle;
+    if (oldWidget.hapticEnabled != widget.hapticEnabled) _hapticEnabled = widget.hapticEnabled;
   }
 
   @override
@@ -4080,6 +4293,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _up(String m, dynamic v) async {
+    setState(() {
+      switch (m) {
+        case 'updateAvatar':
+          _avatarId = v as String;
+          break;
+        case 'updateThemeMode':
+          _themeMode = v as String;
+          break;
+        case 'updateThemeStyle':
+          _themeStyle = v as String;
+          break;
+        case 'updateHaptic':
+          _hapticEnabled = v as bool;
+          break;
+      }
+    });
     await channel.invokeMethod(m, v);
     widget.onUpdate();
   }
@@ -4268,6 +4497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('设置', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
@@ -4302,12 +4532,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onTap: () => _up('updateAvatar', id),
                           child: CircleAvatar(
                             radius: 26,
-                            backgroundColor: widget.avatarId == id
+                            backgroundColor: _avatarId == id
                                 ? cs.primary
                                 : cs.surfaceContainerHighest,
                             child: Icon(
                               _getAv(id),
-                              color: widget.avatarId == id
+                              color: _avatarId == id
                                   ? Colors.white
                                   : cs.onSurfaceVariant,
                             ),
@@ -4317,10 +4547,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       .toList(),
                 ),
                 const SizedBox(height: 16),
-                if (widget.avatarId.contains('/') || widget.avatarId.contains('\\'))
+                if (_avatarId.contains('/') || _avatarId.contains('\\'))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: buildAvatar(widget.avatarId, radius: 40),
+                    child: buildAvatar(_avatarId, radius: 40),
                   ),
                 OutlinedButton.icon(
                   onPressed: () async {
@@ -4362,19 +4592,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 RadioListTile(
                   title: const Text("跟随系统"),
                   value: "SYSTEM",
-                  groupValue: widget.themeMode,
+                  groupValue: _themeMode,
                   onChanged: (v) => _up('updateThemeMode', v),
                 ),
                 RadioListTile(
                   title: const Text("日间模式"),
                   value: "LIGHT",
-                  groupValue: widget.themeMode,
+                  groupValue: _themeMode,
                   onChanged: (v) => _up('updateThemeMode', v),
                 ),
                 RadioListTile(
                   title: const Text("夜间模式"),
                   value: "DARK",
-                  groupValue: widget.themeMode,
+                  groupValue: _themeMode,
                   onChanged: (v) => _up('updateThemeMode', v),
                 ),
               ],
@@ -4391,6 +4621,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _sTile("赛博朋克", Icons.electric_bolt, "CYBERPUNK", cs),
                 _sTile("森林氧吧", Icons.forest, "FOREST", cs),
                 _sTile("撒哈拉之光", Icons.wb_sunny, "SAHARA", cs),
+                _sTile("赤陶朱砂", Icons.local_fire_department, "EMBER", cs),
               ],
             ),
           ),
@@ -4401,7 +4632,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SwitchListTile(
               secondary: const Icon(Icons.vibration),
               title: const Text("开启触感反馈"),
-              value: widget.hapticEnabled,
+              value: _hapticEnabled,
               onChanged: (v) => _up('updateHaptic', v),
             ),
           ),
@@ -4450,15 +4681,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     child: child,
   );
   Widget _sTile(String t, IconData i, String v, ColorScheme cs) => ListTile(
-    leading: Icon(i, color: widget.themeStyle == v ? cs.primary : cs.outline),
+    leading: Icon(i, color: _themeStyle == v ? cs.primary : cs.outline),
     title: Text(
       t,
       style: TextStyle(
-        color: widget.themeStyle == v ? cs.primary : null,
-        fontWeight: widget.themeStyle == v ? FontWeight.bold : null,
+        color: _themeStyle == v ? cs.primary : null,
+        fontWeight: _themeStyle == v ? FontWeight.bold : null,
       ),
     ),
-    trailing: widget.themeStyle == v
+    trailing: _themeStyle == v
         ? Icon(Icons.check, color: cs.primary)
         : null,
     onTap: () => _up('updateThemeStyle', v),
@@ -4493,10 +4724,11 @@ class ArtStudioScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     final todayHint = getEternalTodayBannerText();
     
     return Scaffold(
-      backgroundColor: const Color(0xFFF4EFE7),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -4504,14 +4736,14 @@ class ArtStudioScreen extends StatelessWidget {
             elevation: 0,
             scrolledUnderElevation: 0,
             surfaceTintColor: Colors.transparent,
-            backgroundColor: const Color(0xFFF4EFE7),
-            foregroundColor: const Color(0xFF1B2430),
-            title: const Text(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            foregroundColor: cs.onSurface,
+            title: Text(
               '足迹工坊',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.2,
-                color: Color(0xFF1B2430),
+                color: cs.onSurface,
               ),
             ),
           ),
@@ -4523,7 +4755,7 @@ class ArtStudioScreen extends StatelessWidget {
                 children: [
                   _buildStudioIntroCard(context, nickname),
                   const SizedBox(height: 18),
-                  _buildStudioHeroStats(),
+                  _buildStudioHeroStats(context),
                   const SizedBox(height: 18),
                   _buildCuratorStrip(todayHint),
                   const SizedBox(height: 22),
@@ -4612,20 +4844,22 @@ class ArtStudioScreen extends StatelessWidget {
 
   Widget _buildStudioIntroCard(BuildContext context, String nickname) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFECE3D3),
-            Color(0xFFF4EFE7),
-            Color(0xFFD7E5E0),
+            isDark ? cs.surfaceContainerHighest : const Color(0xFFECE3D3),
+            cs.surface,
+            isDark ? const Color(0xFF182523) : const Color(0xFFD7E5E0),
           ],
         ),
-        border: Border.all(color: const Color(0xFFD9D2C6)),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Stack(
         children: [
@@ -4637,7 +4871,7 @@ class ArtStudioScreen extends StatelessWidget {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF10355B).withOpacity(0.07),
+                color: cs.primary.withOpacity(isDark ? 0.12 : 0.07),
               ),
             ),
           ),
@@ -4649,7 +4883,7 @@ class ArtStudioScreen extends StatelessWidget {
               height: 88,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFE6A15A).withOpacity(0.09),
+                color: cs.secondary.withOpacity(isDark ? 0.12 : 0.09),
               ),
             ),
           ),
@@ -4659,13 +4893,13 @@ class ArtStudioScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10355B).withOpacity(0.08),
+                  color: cs.primary.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
+                child: Text(
                   'FOOTPRINT ATELIER',
                   style: TextStyle(
-                    color: Color(0xFF10355B),
+                    color: cs.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.6,
@@ -4676,7 +4910,7 @@ class ArtStudioScreen extends StatelessWidget {
               Text(
                 '$nickname，把轨迹做成值得收藏的作品。',
                 style: tt.titleLarge?.copyWith(
-                  color: const Color(0xFF1B2430),
+                  color: cs.onSurface,
                   fontWeight: FontWeight.w900,
                   height: 1.2,
                 ),
@@ -4685,7 +4919,7 @@ class ArtStudioScreen extends StatelessWidget {
               Text(
                 '从极简海报到时空热力图，再到 3D 漫游，把日常足迹整理成更有记忆点的表达。',
                 style: tt.bodyMedium?.copyWith(
-                  color: const Color(0xFF5F6C78),
+                  color: cs.onSurfaceVariant,
                   height: 1.5,
                 ),
               ),
@@ -4696,19 +4930,21 @@ class ArtStudioScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStudioHeroStats() {
+  Widget _buildStudioHeroStats(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF10355B).withOpacity(0.08),
+            color: cs.shadow.withOpacity(0.08),
             blurRadius: 22,
             offset: const Offset(0, 12),
           ),
         ],
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: const Row(
         children: [
@@ -4861,6 +5097,8 @@ class ArtStudioScreen extends StatelessWidget {
     Color accent = const Color(0xFF10355B),
   }) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final effectiveAccent = accent == const Color(0xFF10355B) ? cs.primary : accent;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4869,14 +5107,14 @@ class ArtStudioScreen extends StatelessWidget {
             Container(
               width: 10,
               height: 10,
-              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: effectiveAccent, shape: BoxShape.circle),
             ),
             const SizedBox(width: 10),
             Text(
               title,
               style: tt.titleLarge?.copyWith(
                 fontWeight: FontWeight.w900,
-                color: const Color(0xFF1B2430),
+                color: cs.onSurface,
               ),
             ),
           ],
@@ -4885,7 +5123,7 @@ class ArtStudioScreen extends StatelessWidget {
         Text(
           subtitle,
           style: tt.bodyMedium?.copyWith(
-            color: const Color(0xFF6B7280),
+            color: cs.onSurfaceVariant,
             height: 1.45,
           ),
         ),
@@ -5022,21 +5260,22 @@ class _StudioMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F4EE),
+        color: cs.surfaceContainerHighest.withOpacity(0.56),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF0F4A67), size: 18),
+          Icon(icon, color: cs.primary, size: 18),
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFF1B2430),
+            style: TextStyle(
+              color: cs.onSurface,
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
@@ -5044,8 +5283,8 @@ class _StudioMetric extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF6B7280),
+            style: TextStyle(
+              color: cs.onSurfaceVariant,
               fontSize: 12,
             ),
           ),

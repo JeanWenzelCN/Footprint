@@ -26,6 +26,11 @@ class FlutterMapView(
         id: Int,
         messenger: BinaryMessenger
 ) : PlatformView, MethodChannel.MethodCallHandler {
+    companion object {
+        private const val MAX_FOG_RENDER_POINTS = 2800
+        private const val MAX_HISTORY_RENDER_POINTS = 3600
+        private const val MAX_SEGMENT_RENDER_POINTS = 220
+    }
 
     private val container = FrameLayout(context)
     private val mapView = MapView(context)
@@ -45,6 +50,7 @@ class FlutterMapView(
     // 数据引用
     private var currentPathPoints: List<LatLng> = emptyList()
     private var historyPoints: List<LatLng> = emptyList()
+    private var historySegments: List<List<LatLng>> = emptyList()
 
     private var livePolyline: Polyline? = null
     private val historyPolylines = mutableListOf<Polyline>()
@@ -58,6 +64,7 @@ class FlutterMapView(
     private var currentMode: String = "STANDARD"
     private var lastLivePolylineUpdateMs: Long = 0L
     private var lastRenderedLivePointCount: Int = 0
+    private var lastHistoryPolylineMode: String? = null
 
     // 专属渲染层
     private var yunnanMask: Polygon? = null
@@ -138,11 +145,13 @@ class FlutterMapView(
         aMap?.setOnCameraChangeListener(
                 object : AMap.OnCameraChangeListener {
                     override fun onCameraChange(pos: com.amap.api.maps.model.CameraPosition?) {
+                        fogOverlay.setCameraMoving(true)
                         fogOverlay.requestRender()
                     }
                     override fun onCameraChangeFinish(
                             pos: com.amap.api.maps.model.CameraPosition?
                     ) {
+                        fogOverlay.setCameraMoving(false)
                         fogOverlay.requestRender()
                     }
                 }
@@ -183,6 +192,79 @@ class FlutterMapView(
                 )
         lastLivePolylineUpdateMs = now
         lastRenderedLivePointCount = pointCount
+    }
+
+    private fun clearHistoryPolylines() {
+        historyPolylines.forEach { it.remove() }
+        historyPolylines.clear()
+        lastHistoryPolylineMode = null
+    }
+
+    private fun updateHistoryPolylinesForMode(force: Boolean = false) {
+        val map = aMap ?: return
+        if (currentMode == "HEATMAP" || currentMode == "FOG" || currentMode == "STANDARD" || currentMode == "ETERNAL_REALM") {
+            clearHistoryPolylines()
+            return
+        }
+        if (!force && lastHistoryPolylineMode == currentMode && historyPolylines.isNotEmpty()) {
+            return
+        }
+
+        clearHistoryPolylines()
+        historySegments.forEach { segment ->
+            if (segment.size < 2) return@forEach
+            val renderSegment =
+                    if (segment.size > 450) {
+                        val step = (segment.size / 450).coerceAtLeast(1)
+                        segment.filterIndexed { index, _ -> index % step == 0 || index == segment.lastIndex }
+                    } else {
+                        segment
+                    }
+            val smoothedSegment = com.footprint.utils.PathInterpolator.interpolate(renderSegment, 4)
+            val gradientColors = getGradientColorsForSmoothedPoints(smoothedSegment)
+            val polyline =
+                    map.addPolyline(
+                            PolylineOptions()
+                                    .addAll(smoothedSegment)
+                                    .width(if (currentMode == "CAPSULE") 10f else 12f)
+                                    .useGradient(true)
+                                    .colorValues(gradientColors)
+                                    .lineCapType(PolylineOptions.LineCapType.LineCapRound)
+                                    .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
+                                    .zIndex(90f)
+                    )
+            historyPolylines.add(polyline)
+        }
+        lastHistoryPolylineMode = currentMode
+    }
+
+    private fun thinLatLngList(points: List<LatLng>, maxPoints: Int): List<LatLng> {
+        if (points.size <= maxPoints) return points
+        val step = Math.ceil(points.size.toDouble() / maxPoints.toDouble()).toInt().coerceAtLeast(1)
+        return points.filterIndexed { index, _ -> index % step == 0 || index == points.lastIndex }
+    }
+
+    private fun thinSegments(segments: List<List<LatLng>>, maxTotalPoints: Int): List<List<LatLng>> {
+        if (segments.isEmpty()) return emptyList()
+        val totalPoints = segments.sumOf { it.size }
+        if (totalPoints <= maxTotalPoints) {
+            return segments.map { thinLatLngList(it, MAX_SEGMENT_RENDER_POINTS) }.filter { it.size >= 2 }
+        }
+        val globalStep = Math.ceil(totalPoints.toDouble() / maxTotalPoints.toDouble()).toInt().coerceAtLeast(1)
+        return segments.mapNotNull { segment ->
+            val segmentStep =
+                    Math.max(
+                            globalStep,
+                            Math.ceil(segment.size.toDouble() / MAX_SEGMENT_RENDER_POINTS.toDouble())
+                                    .toInt()
+                                    .coerceAtLeast(1)
+                    )
+            val thinned =
+                    segment.filterIndexed { index, _ ->
+                        index % segmentStep == 0 || index == segment.lastIndex
+                    }
+            if (thinned.size >= 2) thinned else null
+        }
     }
 
     private fun getGradientColorsForSmoothedPoints(points: List<LatLng>): List<Int> {
@@ -764,10 +846,17 @@ class FlutterMapView(
         allPoints.addAll(com.footprint.utils.PathInterpolator.interpolate(currentPathPoints, 8))
 
         if (allPoints.isEmpty()) return
+        val heatPoints =
+                if (allPoints.size > 2500) {
+                    val step = (allPoints.size / 2500).coerceAtLeast(1)
+                    allPoints.filterIndexed { index, _ -> index % step == 0 || index == allPoints.lastIndex }
+                } else {
+                    allPoints
+                }
 
         try {
             val builder = HeatmapTileProvider.Builder()
-            builder.data(allPoints)
+            builder.data(heatPoints)
             // 自定义渐变色，使其更具设计感（深蓝->青->绿->黄->橙红）
             val gradient = Gradient(
                 intArrayOf(
@@ -794,17 +883,27 @@ class FlutterMapView(
         when (call.method) {
             "setFogEnabled" -> {
                 val enabled = call.arguments as? Boolean ?: false
-                fogOverlay.visibility = if (enabled) View.VISIBLE else View.GONE
-                fogOverlay.requestRender()
+                val nextVisibility = if (enabled) View.VISIBLE else View.GONE
+                if (fogOverlay.visibility != nextVisibility) {
+                    fogOverlay.visibility = nextVisibility
+                    fogOverlay.requestRender()
+                }
                 result.success(true)
             }
             "setTheme" -> {
-                isDark = call.arguments as? Boolean ?: false
-                updateMapStyle()
+                val nextIsDark = call.arguments as? Boolean ?: false
+                if (isDark != nextIsDark) {
+                    isDark = nextIsDark
+                    updateMapStyle()
+                }
                 result.success(true)
             }
             "setMapMode" -> {
                 val mode = call.arguments as? String ?: "STANDARD"
+                if (mode == currentMode) {
+                    result.success(true)
+                    return
+                }
                 currentMode = mode
                 updateMapStyle(mode)
                 updateMarkers()
@@ -817,6 +916,7 @@ class FlutterMapView(
                     heatmapOverlay?.remove()
                     heatmapOverlay = null
                 }
+                updateHistoryPolylinesForMode()
                 
                 if (mode == "ETERNAL_REALM") {
                     fogOverlay.setEternalMode(true)
@@ -849,10 +949,11 @@ class FlutterMapView(
                 val points: List<Any?> = (call.arguments as? List<*>) ?: emptyList()
                 
                 // 彻底清空逻辑：无论什么模式，先移除所有 Polyline 和迷雾缓存
-                historyPolylines.forEach { it.remove() }
-                historyPolylines.clear()
+                clearHistoryPolylines()
                 historyPoints = emptyList()
+                historySegments = emptyList()
                 fogOverlay.updateHistoryMercatorCache()
+                fogOverlay.updateHistorySegmentMercatorCache(emptyList())
                 fogOverlay.requestRender()
 
                 if (points.isEmpty()) {
@@ -913,31 +1014,14 @@ class FlutterMapView(
                     }
                 }
 
-                historyPoints = allPointsForFog
+                historyPoints = thinLatLngList(allPointsForFog, MAX_FOG_RENDER_POINTS)
+                historySegments = thinSegments(sessionSegments, MAX_HISTORY_RENDER_POINTS)
                 fogOverlay.updateHistoryMercatorCache()
+                fogOverlay.updateHistorySegmentMercatorCache(historySegments)
                 fogOverlay.requestRender()
 
                 if (heatmapOverlay != null) updateHeatmap()
-                
-                if (currentMode != "HEATMAP") {
-                    for (segment in sessionSegments) {
-                        if (segment.size >= 2) {
-                            val smoothedSegment = com.footprint.utils.PathInterpolator.interpolate(segment, 8)
-                            val gradientColors = getGradientColorsForSmoothedPoints(smoothedSegment)
-                            val polyline = aMap?.addPolyline(
-                                PolylineOptions()
-                                    .addAll(smoothedSegment)
-                                    .width(if (currentMode == "CAPSULE") 10f else 12f)
-                                    .useGradient(true)
-                                    .colorValues(gradientColors)
-                                    .lineCapType(PolylineOptions.LineCapType.LineCapRound)
-                                    .lineJoinType(PolylineOptions.LineJoinType.LineJoinRound)
-                                    .zIndex(90f)
-                            )
-                            polyline?.let { historyPolylines.add(it) }
-                        }
-                    }
-                }
+                updateHistoryPolylinesForMode(force = true)
                 result.success(true)
             }
             "setTrackingPath" -> {
@@ -1098,6 +1182,8 @@ class FlutterMapView(
     // --- 基于程序化纹理的体积云迷雾系统 (Procedural Volumetric Fog) ---
     inner class FogOverlayView(context: Context) : View(context) {
         private var isAnimating = false
+        private var isCameraMoving = false
+        private var lastRenderRequestMs = 0L
         private val cloudMatrix1 = Matrix()
         private val cloudMatrix2 = Matrix()
         private var fogGradientShader: LinearGradient? = null
@@ -1160,11 +1246,27 @@ class FlutterMapView(
         }
 
         fun requestRender() {
+            if (!isAttachedToWindow) return
             if (shouldAnimate()) {
-                postInvalidateOnAnimation()
+                val now = SystemClock.elapsedRealtime()
+                val minInterval = if (isCameraMoving) 48L else 66L
+                val elapsed = now - lastRenderRequestMs
+                val delay = if (elapsed >= minInterval) 0L else minInterval - elapsed
+                lastRenderRequestMs = now + delay
+                if (delay == 0L) {
+                    invalidate()
+                } else {
+                    postInvalidateDelayed(delay)
+                }
             } else {
                 invalidate()
             }
+        }
+
+        fun setCameraMoving(moving: Boolean) {
+            if (isCameraMoving == moving) return
+            isCameraMoving = moving
+            requestRender()
         }
 
         private fun shouldAnimate(): Boolean = visibility == VISIBLE || isEternalMode
@@ -1174,7 +1276,7 @@ class FlutterMapView(
             if (shouldAnimate == isAnimating) return
             isAnimating = shouldAnimate
             if (isAnimating && isAttachedToWindow) {
-                postInvalidateOnAnimation()
+                requestRender()
             }
         }
         
@@ -1183,7 +1285,9 @@ class FlutterMapView(
         
         // --- 高性能 C++ 矩阵映射缓存机制 ---
         private val mercatorLivePath = Path()
+        private val mercatorHistoryPaths = mutableListOf<Path>()
         private val scratchingScreenPath = Path()
+        private val scratchingHistoryPath = Path()
         private var historyMercatorCoords = FloatArray(0)
         private var screenHistoryScratch = FloatArray(0)
         private val mercatorToScreenMatrix = Matrix()
@@ -1220,6 +1324,24 @@ class FlutterMapView(
             historyPoints.forEach { pt ->
                 historyMercatorCoords[i++] = latLngToMercatorX(pt.longitude)
                 historyMercatorCoords[i++] = latLngToMercatorY(pt.latitude)
+            }
+        }
+
+        fun updateHistorySegmentMercatorCache(segments: List<List<LatLng>>) {
+            mercatorHistoryPaths.clear()
+            segments.forEach { segment ->
+                if (segment.size < 2) return@forEach
+                val path = Path()
+                segment.forEachIndexed { index, pt ->
+                    val mx = latLngToMercatorX(pt.longitude)
+                    val my = latLngToMercatorY(pt.latitude)
+                    if (index == 0) {
+                        path.moveTo(mx, my)
+                    } else {
+                        path.lineTo(mx, my)
+                    }
+                }
+                mercatorHistoryPaths.add(path)
             }
         }
 
@@ -1319,8 +1441,8 @@ class FlutterMapView(
                             0f,
                             h.toFloat(),
                             intArrayOf(
-                                    Color.parseColor("#E60F172A"),
-                                    Color.parseColor("#F21E293B")
+                                    Color.parseColor("#BFE4E8EF"),
+                                    Color.parseColor("#D4B9C3D1")
                             ),
                             null,
                             Shader.TileMode.CLAMP
@@ -1332,12 +1454,13 @@ class FlutterMapView(
             super.onVisibilityChanged(changedView, visibility)
             updateAnimationState()
             if (visibility == VISIBLE) {
-                postInvalidateOnAnimation()
+                requestRender()
             }
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            if (visibility != VISIBLE && !isEternalMode) return
             if (isEternalMode) {
                 drawEternalClouds(canvas)
                 return
@@ -1383,6 +1506,7 @@ class FlutterMapView(
                 val zoom = map.cameraPosition.zoom
                 val baseRadius = (zoom * 3.5).coerceIn(50.0, 250.0).toFloat()
                 val dynamicRadius = baseRadius * 4.5f
+                val historyStride = if (isCameraMoving) 5 else 1
 
                 val requiredBlur = baseRadius * 1.8f
                 if (Math.abs(lastBlurRadius - requiredBlur) > 2f) {
@@ -1391,13 +1515,24 @@ class FlutterMapView(
                 }
 
                 // Draw Path into Mask
-                if (!mercatorLivePath.isEmpty) {
+                if (!isCameraMoving && !mercatorLivePath.isEmpty) {
                     tempEraser.maskFilter = cachedBlurFilter
                     tempEraser.strokeWidth = baseRadius * 1.8f
                     scratchingScreenPath.reset()
                     scratchingScreenPath.addPath(mercatorLivePath)
                     scratchingScreenPath.transform(mercatorToScreenMatrix)
                     maskCanvas?.drawPath(scratchingScreenPath, tempEraser)
+                }
+
+                if (!isCameraMoving && mercatorHistoryPaths.isNotEmpty()) {
+                    tempEraser.maskFilter = cachedBlurFilter
+                    tempEraser.strokeWidth = baseRadius * 1.55f
+                    mercatorHistoryPaths.forEach { path ->
+                        scratchingHistoryPath.reset()
+                        scratchingHistoryPath.addPath(path)
+                        scratchingHistoryPath.transform(mercatorToScreenMatrix)
+                        maskCanvas?.drawPath(scratchingHistoryPath, tempEraser)
+                    }
                 }
 
                 // Draw History Spots into Mask
@@ -1420,7 +1555,7 @@ class FlutterMapView(
                                 maskCanvas?.drawCircle(sx, sy, dynamicRadius, tempSpot)
                             }
                         }
-                        i += 2
+                        i += 2 * historyStride
                     }
                 }
 
@@ -1456,7 +1591,7 @@ class FlutterMapView(
                         noiseOffsetX + timeWindX,
                         noiseOffsetY + timeWindY
                 )
-                runtimeShader?.setFloatUniform("uFogDensity", 0.95f)
+                runtimeShader?.setFloatUniform("uFogDensity", 0.9f)
 
                 runtimeShader?.setFloatUniform("uFogColorBright", 0.89f, 0.91f, 0.94f)
                 runtimeShader?.setFloatUniform("uFogColorMid", 0.68f, 0.73f, 0.80f)
@@ -1545,13 +1680,26 @@ class FlutterMapView(
                 }
 
                 // 3. 实时轨迹的高斯边缘消除 (物理侵蚀感)
-                if (!mercatorLivePath.isEmpty) {
+                val historyStride = if (isCameraMoving) 5 else 1
+
+                if (!isCameraMoving && !mercatorLivePath.isEmpty) {
                     pathEraserPaint.maskFilter = cachedBlurFilter
                     pathEraserPaint.strokeWidth = baseRadius * 1.8f
                     scratchingScreenPath.reset()
                     scratchingScreenPath.addPath(mercatorLivePath)
                     scratchingScreenPath.transform(mercatorToScreenMatrix)
                     canvas.drawPath(scratchingScreenPath, pathEraserPaint)
+                }
+
+                if (!isCameraMoving && mercatorHistoryPaths.isNotEmpty()) {
+                    pathEraserPaint.maskFilter = cachedBlurFilter
+                    pathEraserPaint.strokeWidth = baseRadius * 1.55f
+                    mercatorHistoryPaths.forEach { path ->
+                        scratchingHistoryPath.reset()
+                        scratchingHistoryPath.addPath(path)
+                        scratchingHistoryPath.transform(mercatorToScreenMatrix)
+                        canvas.drawPath(scratchingHistoryPath, pathEraserPaint)
+                    }
                 }
 
                 // 4. 计算探索掩码的动态驱散 (Dynamic Erosion)
@@ -1582,7 +1730,7 @@ class FlutterMapView(
                                 canvas.drawCircle(sx, sy, dynamicRadius, spotEraserPaint)
                             }
                         }
-                        i += 2
+                        i += 2 * historyStride
                     }
                 }
 
@@ -1590,7 +1738,7 @@ class FlutterMapView(
             }
 
             if (isAnimating) {
-                postInvalidateOnAnimation()
+                requestRender()
             }
         }
 
@@ -1643,7 +1791,7 @@ class FlutterMapView(
                 canvas.drawColor(Color.parseColor("#1AFFFFFF"))
             }
 
-            if (isAnimating) postInvalidateOnAnimation()
+            if (isAnimating) requestRender()
         }
     }
 

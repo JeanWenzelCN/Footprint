@@ -40,6 +40,7 @@ enum class AppThemeStyle {
     CYBERPUNK,
     FOREST,
     SAHARA,
+    EMBER,
     AUTO
 }
 
@@ -79,6 +80,7 @@ fun FootprintTheme(
                         if (darkTheme) CyberpunkDarkColors else CyberpunkLightColors
                 AppThemeStyle.FOREST -> ForestColors
                 AppThemeStyle.SAHARA -> SaharaColors
+                AppThemeStyle.EMBER -> if (darkTheme) EmberDarkColors else EmberLightColors
                 else -> if (darkTheme) DarkColors else LightColors
             }
 
