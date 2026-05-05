@@ -19,6 +19,10 @@ import 'badge_hall_screen.dart';
 import 'easter_egg.dart';
 import 'package:flutter/foundation.dart';
 
+const String kAppVersionName = '3.8.2';
+const int kAppBuildNumber = 58;
+const String kAppVersionLabel = 'Footprint v$kAppVersionName (Build $kAppBuildNumber)';
+
 const Color kAtelierCanvas = Color(0xFFF4EFE7);
 const Color kAtelierSurface = Color(0xFFFFFCF7);
 const Color kAtelierPrimary = Color(0xFF163A59);
@@ -3110,7 +3114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  "Footprint v3.6.6",
+                  kAppVersionLabel,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.blueAccent),
                 ),
               ),
@@ -4679,6 +4683,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => _handleDataOperation('importData', '导入'),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _t("应用信息", cs),
+          _card(
+            cs,
+            const ListTile(
+              leading: Icon(Icons.info_outline),
+              title: Text("当前版本"),
+              subtitle: Text(kAppVersionLabel),
             ),
           ),
           const SizedBox(height: 100),

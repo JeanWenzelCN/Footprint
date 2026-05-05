@@ -264,7 +264,9 @@ class MainActivity : FlutterActivity() {
                                             "themeMode" to prefs.themeMode.name,
                                             "themeStyle" to prefs.themeStyle.name,
                                             "hapticEnabled" to prefs.hapticFeedbackEnabled,
-                                            "isMaintValid" to prefs.isMaintenanceModeValidated
+                                            "isMaintValid" to prefs.isMaintenanceModeValidated,
+                                            "versionName" to getAppVersionName(),
+                                            "versionCode" to getAppVersionCode()
                                     )
                             result.success(gson.toJson(settings))
                         }
@@ -975,5 +977,24 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+    }
+
+    private fun getAppVersionName(): String {
+        return try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getAppVersionCode(): Long {
+        return try {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode
+            else info.versionCode.toLong()
+        } catch (_: Exception) {
+            0L
+        }
     }
 }
