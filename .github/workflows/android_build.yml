@@ -22,11 +22,15 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
     - name: Install Flutter
       uses: subosito/flutter-action@v2
       with:
-        channel: 'stable'          # 最新稳定版
-        # 如果你想固定版本，可以写：flutter-version: '3.32.3'
+        channel: 'stable'
 
     - name: Prepare Flutter module
       working-directory: flutter_ui
