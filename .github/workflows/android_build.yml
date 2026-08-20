@@ -2,7 +2,7 @@ name: Android Build
 
 on:
   push:
-    branches: [ "master" ]   # 如果你的默认分支是 main，请改成 main
+    branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:
@@ -25,11 +25,11 @@ jobs:
     - name: Install Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.0'   # 可以改为你本地使用的 Flutter 版本
-        channel: 'stable'
+        channel: 'stable'          # 最新稳定版
+        # 如果你想固定版本，可以写：flutter-version: '3.32.3'
 
     - name: Prepare Flutter module
-      working-directory: flutter_ui   # 如果你的 Flutter 模块目录名不同，请修改
+      working-directory: flutter_ui
       run: flutter pub get
 
     - name: Grant execute permission for gradlew
